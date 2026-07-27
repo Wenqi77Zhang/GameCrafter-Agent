@@ -11,8 +11,11 @@ requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [{ name = "Wenqi77Zhang" }]
 dependencies = [
+    "alembic>=1.18,<2",
     "fastapi>=0.115,<1",
+    "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.7,<3",
+    "sqlalchemy>=2.0,<3",
     "uvicorn[standard]>=0.34,<1",
 ]
 
@@ -31,6 +34,9 @@ packages = ["src/gamecrafter"]
 addopts = "-q --strict-markers -p no:cacheprovider"
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "postgres: requires a running PostgreSQL test database",
+]
 
 [tool.ruff]
 target-version = "py312"

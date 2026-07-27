@@ -13,5 +13,12 @@ The first release is local and single-user. That reduces but does not remove dat
 - preserve source and human-review metadata;
 - support deletion of sources, snapshots, runs, and local uploads;
 - do not scrape authenticated or disallowed sources.
+- bind the development database port to `127.0.0.1`, not all network interfaces;
+- keep the Docker volume, database URL, local snapshots, and raw data outside Git;
+- expose detailed dependency failures in server logs only; `/ready` returns a safe generic error.
 
-Authentication, tenant isolation, private object storage, account export/deletion, rate limiting, and privacy terms are release gates for M6, not current M0 features.
+The M1-A database password is a local-only development placeholder. It must be replaced before any
+shared or remote deployment.
+
+Authentication, tenant isolation, private object storage, account export/deletion, rate limiting,
+and privacy terms are release gates for M6, not current M1-A features.

@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M0: repository and engineering restructuring**.
+The repository is currently in **M1-A: durable persistence foundation**.
 
-Implemented in M0:
+Implemented through M1-A:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -23,10 +23,15 @@ Implemented in M0:
 - project-local Python environment and repeatable scripts;
 - baseline tests and continuous integration;
 - product, architecture, migration, and roadmap documentation.
+- PostgreSQL 17 plus pgvector Docker Compose configuration;
+- Alembic migrations for projects, ingestion runs, leased jobs, and audit events;
+- a bounded-retry Python worker shell with durable checkpoints and idempotent run creation;
+- API liveness and database-readiness endpoints;
+- PostgreSQL migration and queue verification in CI.
 
 Not implemented yet:
 
-- website or document ingestion;
+- website discovery, capture, or document ingestion;
 - a production Game Knowledge Hub;
 - live trend sources;
 - LLM calls, RAG, or marketing agents;
@@ -36,7 +41,8 @@ The earlier README described several of these as if they already existed. They d
 
 ## Target product workflow (M1–M4)
 
-This is the planned workflow, not the current M0 implementation.
+This is the planned workflow. M1-A implements only the durable project, run, job, and audit
+foundation beneath it.
 
 ```mermaid
 flowchart LR
@@ -87,7 +93,8 @@ For an existing game, approved public evidence becomes a sourced **Public Game I
 
 ## Target software architecture
 
-This is the planned modular-monolith architecture. M0 implements only the web shell, API health boundary, configuration, tests, and CI.
+This is the target modular-monolith architecture. M1-A now implements the API health/readiness
+boundary, PostgreSQL adapter, migration layer, durable job queue, worker shell, and audit foundation.
 
 ```mermaid
 flowchart TB
@@ -138,6 +145,7 @@ See [`docs/architecture/system-architecture.md`](docs/architecture/system-archit
 ```text
 apps/
   api/                  FastAPI application entrypoint
+  worker/               Background worker entrypoint
   web/                  React and TypeScript frontend
 src/gamecrafter/
   api/                  HTTP application factory and routes
@@ -146,7 +154,7 @@ src/gamecrafter/
   agents/               Graphs, nodes, skills, prompts, and schemas
   infrastructure/       Database, source, model, storage, and tracing adapters
   config/               Validated settings
-tests/                  Unit, integration, contract, and future E2E tests
+tests/                  Unit, integration, contract, and PostgreSQL tests
 docs/                   Product, architecture, security, migration, and roadmap
 scripts/                Setup, development, and verification helpers
 legacy/                 Notes about the original placeholder shell
@@ -158,12 +166,14 @@ Prerequisites:
 
 - Python 3.12 or newer;
 - Node.js 22 or newer;
-- pnpm 10 or newer.
+- pnpm 10 or newer;
+- Docker Desktop with Linux containers.
 
 From PowerShell:
 
 ```powershell
 .\scripts\setup.ps1
+.\scripts\database.ps1 up
 .\scripts\start.ps1
 ```
 
@@ -172,14 +182,16 @@ The local services will be available at:
 - web: `http://localhost:5173`
 - API: `http://localhost:8000`
 - API health: `http://localhost:8000/health`
+- database readiness: `http://localhost:8000/ready`
 
-Run all M0 checks:
+Run all locally available checks:
 
 ```powershell
 .\scripts\verify.ps1
 ```
 
 Configuration names and safe placeholders are documented in [`.env.example`](.env.example). Never commit real API keys.
+The PostgreSQL volume and raw local data are not stored in Git.
 
 ## Documentation
 
@@ -188,6 +200,7 @@ Configuration names and safe placeholders are documented in [`.env.example`](.en
 - [Architecture decisions](docs/architecture/adr/)
 - [Long-term roadmap](docs/roadmap.md)
 - [M0 migration record](docs/migration/m0-restructure.md)
+- [M1-A implementation record](docs/migration/m1a-persistence-foundation.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

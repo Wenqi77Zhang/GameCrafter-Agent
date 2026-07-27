@@ -1,9 +1,10 @@
 """Validated environment settings."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
-from pydantic import HttpUrl
+from pydantic import HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +23,13 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     web_origin: HttpUrl = HttpUrl("http://localhost:5173")
+    database_url: SecretStr = SecretStr(
+        "postgresql+psycopg://gamecrafter:gamecrafter_local@127.0.0.1:5432/gamecrafter"
+    )
+    data_dir: Path = Path("data")
+    worker_id: str = "local-worker"
+    worker_poll_seconds: float = 1.0
+    job_lease_seconds: int = 60
     model_provider: str = "disabled"
     model_api_key: str | None = None
 

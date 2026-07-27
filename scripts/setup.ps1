@@ -45,6 +45,12 @@ try {
     }
 
     Write-Host "GameCrafter setup complete."
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        Write-Warning "Docker Desktop is not installed. It is required for M1 PostgreSQL."
+    }
+    else {
+        Write-Host "Next: .\scripts\database.ps1 up"
+    }
 }
 finally {
     Pop-Location
