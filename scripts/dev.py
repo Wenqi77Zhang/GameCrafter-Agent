@@ -1,0 +1,74 @@
+"""Run the local API and web development servers together."""
+
+from __future__ import annotations
+
+import os
+import shutil
+import signal
+import subprocess
+import sys
+from pathlib import Path
+
+
+def main() -> int:
+    repo_root = Path(__file__).resolve().parents[1]
+    pnpm = shutil.which("pnpm") or shutil.which("pnpm.cmd")
+    if pnpm is None:
+        print("pnpm was not found. Run scripts/setup.ps1 after installing pnpm.", file=sys.stderr)
+        return 2
+
+    commands = [
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "apps.api.main:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "8000",
+            "--reload",
+        ],
+        [pnpm, "--dir", "apps/web", "dev"],
+    ]
+
+    creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+    processes = [
+        subprocess.Popen(command, cwd=repo_root, creationflags=creation_flags)
+        for command in commands
+    ]
+
+    print("GameCrafter development services started.")
+    print("Web: http://localhost:5173")
+    print("API: http://localhost:8000/health")
+    print("Press Ctrl+C to stop both services.")
+
+    try:
+        return_code = 0
+        while all(process.poll() is None for process in processes):
+            for process in processes:
+                try:
+                    return_code = process.wait(timeout=0.3)
+                except subprocess.TimeoutExpired:
+                    continue
+                if return_code:
+                    return return_code
+        return return_code
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                if os.name == "nt":
+                    process.send_signal(signal.CTRL_BREAK_EVENT)
+                else:
+                    process.terminate()
+        for process in processes:
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
