@@ -19,11 +19,23 @@ if (-not $pnpm) {
 Push-Location $repoRoot
 try {
     & $python -m ruff format --check src tests apps/api
+    if ($LASTEXITCODE -ne 0) { throw "Python formatting check failed." }
+
     & $python -m ruff check src tests apps/api
+    if ($LASTEXITCODE -ne 0) { throw "Python lint check failed." }
+
     & $python -m pytest
+    if ($LASTEXITCODE -ne 0) { throw "Python tests failed." }
+
     & $pnpm.Source check:web
+    if ($LASTEXITCODE -ne 0) { throw "Frontend type check failed." }
+
     & $pnpm.Source test:web
+    if ($LASTEXITCODE -ne 0) { throw "Frontend tests failed." }
+
     & $pnpm.Source build:web
+    if ($LASTEXITCODE -ne 0) { throw "Frontend production build failed." }
+
     Write-Host "All GameCrafter M0 checks passed."
 }
 finally {

@@ -11,8 +11,10 @@ type Health = {
 
 type HealthState =
   | { kind: "loading" }
-  | { kind: "ready"; data: Health }
-  | { kind: "error"; message: string };
+  | { kind: "ready"; data: Health; checkedAt: Date }
+  | { kind: "error"; message: string; checkedAt: Date };
+
+const healthTimeoutMs = 5_000;
 
 const milestones = [
   {
@@ -35,32 +37,85 @@ const milestones = [
   },
 ] as const;
 
+function parseHealth(payload: unknown): Health {
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("status" in payload) ||
+    payload.status !== "ok" ||
+    !("service" in payload) ||
+    payload.service !== "gamecrafter-api" ||
+    !("version" in payload) ||
+    typeof payload.version !== "string" ||
+    payload.version.length === 0 ||
+    !("environment" in payload) ||
+    typeof payload.environment !== "string" ||
+    payload.environment.length === 0 ||
+    !("phase" in payload) ||
+    payload.phase !== "M0" ||
+    !("timestamp" in payload) ||
+    typeof payload.timestamp !== "string"
+  ) {
+    throw new Error("API returned an invalid health payload");
+  }
+
+  return payload as Health;
+}
+
 async function fetchHealth(signal: AbortSignal): Promise<Health> {
   const response = await fetch("/api/health", { signal });
   if (!response.ok) {
     throw new Error(`API returned ${response.status}`);
   }
-  return (await response.json()) as Health;
+  return parseHealth(await response.json());
+}
+
+function formatCheckedAt(value: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(value);
 }
 
 export function App() {
   const [health, setHealth] = useState<HealthState>({ kind: "loading" });
+  const [healthAttempt, setHealthAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
+    let disposed = false;
+    const timeout = window.setTimeout(() => controller.abort(), healthTimeoutMs);
+
+    setHealth({ kind: "loading" });
 
     fetchHealth(controller.signal)
-      .then((data) => setHealth({ kind: "ready", data }))
+      .then((data) => {
+        if (!disposed) {
+          setHealth({ kind: "ready", data, checkedAt: new Date() });
+        }
+      })
       .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") {
+        if (disposed) {
           return;
         }
-        const message = error instanceof Error ? error.message : "Unknown API error";
-        setHealth({ kind: "error", message });
-      });
+        const message = controller.signal.aborted
+          ? "API health check timed out after 5 seconds"
+          : error instanceof Error
+            ? error.message
+            : "Unknown API error";
+        setHealth({ kind: "error", message, checkedAt: new Date() });
+      })
+      .finally(() => window.clearTimeout(timeout));
 
-    return () => controller.abort();
-  }, []);
+    return () => {
+      disposed = true;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [healthAttempt]);
+
+  const retryHealth = () => setHealthAttempt((attempt) => attempt + 1);
 
   return (
     <main className="app-shell">
@@ -99,13 +154,19 @@ export function App() {
       </section>
 
       <section className="status-grid" aria-label="System status">
-        <article className="status-card status-card--wide">
+        <article className="status-card status-card--wide" aria-live="polite">
           <div className="card-label">Local system health</div>
           {health.kind === "loading" && <p className="health loading">Checking API…</p>}
           {health.kind === "error" && (
             <div>
               <p className="health error">API unavailable</p>
               <p className="status-detail">{health.message}</p>
+              <div className="health-actions">
+                <span>Checked {formatCheckedAt(health.checkedAt)}</span>
+                <button className="retry-action" type="button" onClick={retryHealth}>
+                  Check again
+                </button>
+              </div>
             </div>
           )}
           {health.kind === "ready" && (
@@ -117,6 +178,12 @@ export function App() {
               <p className="status-detail">
                 {health.data.service} · v{health.data.version} · {health.data.environment}
               </p>
+              <div className="health-actions">
+                <span>Checked {formatCheckedAt(health.checkedAt)}</span>
+                <button className="retry-action" type="button" onClick={retryHealth}>
+                  Check again
+                </button>
+              </div>
             </div>
           )}
         </article>

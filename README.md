@@ -34,7 +34,9 @@ Not implemented yet:
 
 The earlier README described several of these as if they already existed. They did not. The original placeholder modules remain traceable in Git history and are documented under [`legacy/`](legacy/README.md).
 
-## Product workflow DAG
+## Target product workflow (M1–M4)
+
+This is the planned workflow, not the current M0 implementation.
 
 ```mermaid
 flowchart LR
@@ -42,7 +44,8 @@ flowchart LR
         A1["Official websites"]
         A2["Official news and patch notes"]
         A3["Official video transcripts"]
-        A4["User-owned documents"]
+        A4["Official store pages"]
+        A5["User-owned documents"]
     end
 
     subgraph Knowledge["Game Knowledge Hub"]
@@ -56,7 +59,7 @@ flowchart LR
     subgraph Marketing["Marketing Studio"]
         C1["Fetch real trend signals"]
         C2["Normalize, deduplicate, cluster"]
-        C3["Explain game-market fit"]
+        C3["Rank candidates and explain fit"]
         C4{"Human topic approval"}
         C5["Create marketing brief"]
         C6["Generate structured script"]
@@ -72,14 +75,19 @@ flowchart LR
     B5 --> C3
     C1 --> C2 --> C3 --> C4
     C4 -->|"approve"| C5 --> C6 --> C7 --> C8
-    C4 -->|"reject"| C1
+    C4 -->|"choose another"| C3
+    C4 -->|"refresh signals"| C1
     C8 -->|"revise"| C6
     C8 -->|"approve"| C9
 ```
 
 The graph is deliberately constrained. Specialized agent nodes operate inside a deterministic workflow; models do not form an unrestricted autonomous agent swarm. Human approval is required before topic selection and final export.
 
-## Software architecture DAG
+For an existing game, approved public evidence becomes a sourced **Public Game Intelligence Profile**, not a claimed internal GDD. Future trend connectors must use authorized sources. TikTok Creative Center data is manually verified or imported in the first release rather than collected through unauthorized scraping.
+
+## Target software architecture
+
+This is the planned modular-monolith architecture. M0 implements only the web shell, API health boundary, configuration, tests, and CI.
 
 ```mermaid
 flowchart TB

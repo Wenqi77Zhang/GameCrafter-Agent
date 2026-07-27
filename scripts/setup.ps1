@@ -22,16 +22,21 @@ try {
         }
 
         & $python.Source -m venv $venvPath
+        if ($LASTEXITCODE -ne 0) { throw "Failed to create the project environment." }
     }
 
     & $venvPython -m pip install --upgrade pip
+    if ($LASTEXITCODE -ne 0) { throw "Failed to upgrade pip." }
+
     & $venvPython -m pip install -e ".[dev]"
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install Python dependencies." }
 
     $pnpm = Get-Command pnpm -ErrorAction SilentlyContinue
     if (-not $pnpm) {
         throw "pnpm 10+ was not found. Install pnpm and reopen PowerShell."
     }
     & $pnpm.Source install
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install frontend dependencies." }
 
     $envPath = Join-Path $repoRoot ".env"
     if (-not (Test-Path -LiteralPath $envPath)) {

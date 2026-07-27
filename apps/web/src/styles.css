@@ -30,6 +30,16 @@ a {
   text-decoration: none;
 }
 
+button {
+  font: inherit;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid #8ca5ff;
+  outline-offset: 4px;
+}
+
 .app-shell {
   width: min(1180px, calc(100% - 40px));
   margin: 0 auto;
@@ -201,6 +211,30 @@ a {
   box-shadow: 0 0 0 6px rgb(98 222 164 / 10%);
 }
 
+.health-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin-top: 16px;
+  color: #707d96;
+  font-size: 0.78rem;
+}
+
+.retry-action {
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 9px;
+  padding: 6px 10px;
+  color: #c9d2e5;
+  background: rgb(255 255 255 / 5%);
+  cursor: pointer;
+}
+
+.retry-action:hover {
+  border-color: rgb(140 165 255 / 55%);
+  background: rgb(140 165 255 / 10%);
+}
+
 .roadmap {
   padding: 120px 0 88px;
 }
@@ -312,5 +346,11 @@ footer {
   footer {
     flex-direction: column;
     gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 }

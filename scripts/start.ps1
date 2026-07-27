@@ -12,3 +12,4 @@ if (-not (Test-Path -LiteralPath $python)) {
 }
 
 & $python (Join-Path $PSScriptRoot "dev.py")
+exit $LASTEXITCODE
