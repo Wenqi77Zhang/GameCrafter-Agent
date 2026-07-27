@@ -1,5 +1,37 @@
-# 忽略不需要上传的文件
-
-venv/
+# Python
+.venv/
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# JavaScript
+node_modules/
+apps/web/dist/
+*.tsbuildinfo
+
+# Local configuration and data
 .env
+.env.*
+!.env.example
+data/
+uploads/
+*.db
+*.sqlite
+*.sqlite3
+
+# Editors and operating systems
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs and coverage
+*.log
+.coverage
+htmlcov/
+coverage/
+playwright-report/
+test-results/

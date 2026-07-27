@@ -1,0 +1,50 @@
+# GameCrafter v2 product baseline
+
+Status: confirmed on 2026-07-27.
+
+GameCrafter is a long-term personal product, portfolio project, and potential commercial product. It is no longer a four-day team assignment.
+
+## Product
+
+GameCrafter is an evidence-aware game knowledge and marketing workspace for independent game developers.
+
+The first complete slice:
+
+1. imports public game evidence;
+2. builds a human-reviewed Game Knowledge Hub;
+3. retrieves real trend signals;
+4. explains game, platform, market, audience, and goal fit;
+5. requires human topic approval;
+6. creates a structured marketing brief and TikTok script;
+7. evaluates and revises low-score sections;
+8. preserves versions and requires final human approval.
+
+## First validation case
+
+- Game: NTE: Neverness to Everness (《异环》)
+- Developer: Hotta Studio, part of Perfect World
+- Target platform: TikTok
+- Markets: United States, United Kingdom, Canada, Australia, and New Zealand
+- Audience: potential new players in English-speaking markets
+- Output: a 25–35 second English vertical-video marketing script
+
+## First-release boundaries
+
+The first release is local and single-user. It does not include accounts, multi-tenancy, team collaboration, billing, a complete GDD Studio, video rendering, or unauthorized TikTok scraping.
+
+Public sources must not be described as an internal GDD. For existing games, the Knowledge Hub creates a sourced Public Game Intelligence Profile. User-owned internal documents may be supported locally, but online private uploads require later authentication and isolation work.
+
+## Architecture policy
+
+- modular monolith before microservices;
+- deterministic state graphs around constrained specialist nodes;
+- local ReAct only where research tools are needed;
+- evaluator–optimizer loops with explicit limits;
+- human approval before topic selection and final export;
+- versioned skills, prompts, rules, sources, and outputs;
+- provider adapters instead of vendor coupling;
+- no MCP service unless cross-application reuse or independent permissions justify it.
+
+## Change control
+
+Changes to the product positioning, first complete slice, default validation case, data boundary, agent pattern, main technology stack, or milestone order require explicit approval from the project owner and synchronized documentation updates.
