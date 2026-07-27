@@ -5,7 +5,7 @@ type Health = {
   service: "gamecrafter-api";
   version: string;
   environment: string;
-  phase: "M0";
+  phase: "M1-A";
   timestamp: string;
 };
 
@@ -21,13 +21,13 @@ const milestones = [
     id: "M0",
     title: "Engineering foundation",
     detail: "Repository, API, web shell, tests, CI, and architecture decisions.",
-    state: "active",
+    state: "complete",
   },
   {
-    id: "M1",
-    title: "Game Knowledge Hub",
-    detail: "Traceable sources, claims, conflicts, human review, and snapshots.",
-    state: "next",
+    id: "M1-A",
+    title: "Durable persistence foundation",
+    detail: "PostgreSQL migrations, resumable job state, worker leases, and audit events.",
+    state: "active",
   },
   {
     id: "M2–M4",
@@ -52,7 +52,7 @@ function parseHealth(payload: unknown): Health {
     typeof payload.environment !== "string" ||
     payload.environment.length === 0 ||
     !("phase" in payload) ||
-    payload.phase !== "M0" ||
+    payload.phase !== "M1-A" ||
     !("timestamp" in payload) ||
     typeof payload.timestamp !== "string"
   ) {
@@ -126,7 +126,7 @@ export function App() {
           </span>
           <span>GameCrafter</span>
         </a>
-        <span className="phase-badge">M0 · Foundation</span>
+        <span className="phase-badge">M1-A · Persistence</span>
       </header>
 
       <section className="hero">

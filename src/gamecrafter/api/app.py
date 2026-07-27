@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from gamecrafter import __version__
 from gamecrafter.api.routes.health import router as health_router
+from gamecrafter.api.routes.readiness import router as readiness_router
 from gamecrafter.config.settings import get_settings
 
 
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(health_router)
+    application.include_router(readiness_router)
     return application
 
 

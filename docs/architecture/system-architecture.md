@@ -27,6 +27,35 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
+## Implemented M1-A runtime
+
+```mermaid
+flowchart LR
+    USER["Local user"]
+    WEB["React status shell"]
+    API["FastAPI"]
+    COMMAND["Future ingestion command"]
+    RUNS[("ingestion_runs")]
+    JOBS[("ingestion_jobs")]
+    AUDIT[("audit_events")]
+    WORKER["Python worker"]
+    HANDLER["M1-B and M1-C handlers"]
+
+    USER --> WEB --> API
+    API -->|"liveness"| WEB
+    API -->|"database readiness"| RUNS
+    COMMAND -. "not exposed until M1-B" .-> RUNS
+    COMMAND -. "atomic enqueue" .-> JOBS
+    JOBS -->|"lease with bounded retry"| WORKER
+    WORKER -. "handler registry currently empty" .-> HANDLER
+    WORKER -->|"checkpoint and terminal state"| RUNS
+    WORKER -->|"append-only event"| AUDIT
+```
+
+Solid arrows are exercised by M1-A. Dotted arrows mark extension points whose business handlers are
+deliberately deferred. PostgreSQL owns run, job, and audit consistency; the worker never claims a
+website or model capability until its typed handler is implemented and registered.
+
 ## Knowledge-ingestion state graph
 
 ```mermaid
@@ -186,7 +215,9 @@ Specialist research nodes may use a bounded `Perceive → Reason → Act → Eva
 
 ## Storage direction
 
-The target persistence layer is PostgreSQL with full-text search and pgvector. Raw pages, documents, and large responses use an object-storage interface. M0 does not yet implement persistence; this diagram records the intended boundary for later milestones.
+M1-A implements PostgreSQL, enables pgvector, and stores projects, ingestion runs, leased jobs, and
+audit events. It does not create embeddings or claim records yet. Raw pages, documents, and large
+responses will use the object-storage interface beginning with M1-B.
 
 ## Observability
 

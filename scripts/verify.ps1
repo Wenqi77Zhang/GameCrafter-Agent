@@ -18,10 +18,10 @@ if (-not $pnpm) {
 
 Push-Location $repoRoot
 try {
-    & $python -m ruff format --check src tests apps/api
+    & $python -m ruff format --check src tests apps/api apps/worker migrations
     if ($LASTEXITCODE -ne 0) { throw "Python formatting check failed." }
 
-    & $python -m ruff check src tests apps/api
+    & $python -m ruff check src tests apps/api apps/worker migrations
     if ($LASTEXITCODE -ne 0) { throw "Python lint check failed." }
 
     & $python -m pytest
@@ -36,7 +36,8 @@ try {
     & $pnpm.Source build:web
     if ($LASTEXITCODE -ne 0) { throw "Frontend production build failed." }
 
-    Write-Host "All GameCrafter M0 checks passed."
+    Write-Host "All locally available GameCrafter checks passed."
+    Write-Host "PostgreSQL tests run when GAMECRAFTER_TEST_DATABASE_URL is configured."
 }
 finally {
     Pop-Location

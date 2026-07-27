@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from gamecrafter.api.app import create_app
 
 
-def test_health_endpoint_reports_m0_status() -> None:
+def test_health_endpoint_reports_current_foundation_status() -> None:
     client = TestClient(create_app())
 
     response = client.get("/health")
@@ -12,5 +12,5 @@ def test_health_endpoint_reports_m0_status() -> None:
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["service"] == "gamecrafter-api"
-    assert payload["phase"] == "M0"
+    assert payload["phase"] == "M1-A"
     assert payload["version"] == "0.1.0"

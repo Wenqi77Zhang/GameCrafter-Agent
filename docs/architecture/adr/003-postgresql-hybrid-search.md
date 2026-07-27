@@ -1,6 +1,6 @@
 # ADR-003: PostgreSQL with full-text search and pgvector
 
-Status: planned for M1; accepted as the target direction.
+Status: accepted; the PostgreSQL and pgvector foundation begins in M1-A.
 
 ## Context
 
@@ -16,3 +16,6 @@ Use PostgreSQL as the primary data store and combine native full-text search wit
 - local development needs PostgreSQL when M1 persistence begins;
 - vector indexing and retrieval quality still require explicit evaluation;
 - large raw documents remain outside relational rows behind object-storage references.
+
+M1-A enables the `vector` extension but deliberately creates no embeddings or vector indexes.
+Retrieval evaluation remains a later Knowledge Hub concern.

@@ -16,3 +16,11 @@ Each milestone must produce a runnable slice, tests, a failure case, evidence, a
 | M8 | Structured GDD Studio | chapter-level evidence, assumptions, revisions, shared knowledge |
 
 The course game-marketing requirements remain the minimum acceptance line for M2–M5, but the product is no longer constrained to a four-day team submission.
+
+## Current delivery
+
+- M0 is complete.
+- M1-A implements the PostgreSQL, migration, durable run, leased-job, worker, and audit
+  foundation.
+- M1-B source discovery and capture, M1-C claim review, and M1-D real NTE acceptance remain
+  unimplemented.

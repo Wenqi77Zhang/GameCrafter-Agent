@@ -1,0 +1,23 @@
+name: gamecrafter
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.2-pg17-bookworm
+    environment:
+      POSTGRES_DB: gamecrafter
+      POSTGRES_USER: gamecrafter
+      POSTGRES_PASSWORD: ${GAMECRAFTER_POSTGRES_PASSWORD:-gamecrafter_local}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - gamecrafter-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gamecrafter -d gamecrafter"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  gamecrafter-postgres:
