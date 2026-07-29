@@ -62,13 +62,20 @@ Public sources must not be described as an internal GDD. For existing games, the
   effective time, and game version. A model confidence score cannot resolve a conflict.
 - Approved facts affect later workflows only after the user explicitly publishes an immutable
   knowledge snapshot. Open conflicts block publication.
-- The first model adapter uses the OpenAI Responses API behind a provider-neutral `ModelGateway`
-  and stays disabled without local configuration. Only normalized public source text and minimum
-  provenance metadata may leave the machine in M1-C; raw HTML, images, secrets, object paths,
-  private documents, and unrelated logs are excluded.
-- Model calls use minimized logging and `store: false`, while product copy must still disclose that
-  provider abuse-monitoring retention can apply unless the organization has eligible data-retention
-  controls.
+- C2 runs in strict zero-API-cost mode. Only disabled and exact offline-replay gateways may be
+  composed into the runnable application; automated tests must fail if they attempt a real model
+  network request.
+- The first cloud-provider adapter targets the OpenAI Responses API behind a provider-neutral
+  `ModelGateway`, but C2.1 only implements its dependency-injected request adapter and simulated
+  tests. It does not install a model SDK, read an API key, construct a network client, or perform a
+  live call.
+- If cloud execution is explicitly approved in a later baseline change, every real extraction must
+  pass a per-run egress preflight. Only normalized public source text and minimum provenance
+  metadata may leave the machine; raw HTML, images, secrets, object paths, private documents, and
+  unrelated logs remain excluded.
+- Any later OpenAI call must use minimized logging and `store: false`, while product copy must still
+  disclose that provider abuse-monitoring retention can apply unless the organization has eligible
+  data-retention controls.
 
 ## Architecture policy
 

@@ -102,6 +102,8 @@ class EvidenceSpan:
             raise ValueError("evidence end_offset must be after start_offset")
         if not self.quote.strip():
             raise ValueError("evidence quote must not be blank")
+        if self.end_offset - self.start_offset != len(self.quote):
+            raise ValueError("evidence range length must equal quote length")
 
     @property
     def quote_sha256(self) -> str:

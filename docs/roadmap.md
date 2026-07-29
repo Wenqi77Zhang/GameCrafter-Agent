@@ -33,5 +33,8 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C1 implements controlled entity/claim vocabularies, exact evidence spans, append-only human
   reviews, deterministic conflict-group contracts, immutable knowledge snapshots, and PostgreSQL
   approval/publication guards.
-- M1-C C2–C5 extraction, conflict processing, review UI, publication/evaluation, and M1-D real NTE
-  acceptance remain unimplemented.
+- M1-C C2.1 implements the provider-neutral `ModelGateway`, strict claim-output decoder, disabled
+  gateway, exact offline replay, and a dependency-injected OpenAI Responses request adapter under a
+  strict zero-API-cost policy.
+- M1-C C2.2–C5 extraction Harness, durable jobs, NTE replay workspace, conflict processing, review
+  UI, publication/evaluation, and M1-D real NTE acceptance remain unimplemented.
