@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from gamecrafter.config.settings import Settings
 
 
@@ -19,3 +22,8 @@ def test_settings_use_safe_local_defaults() -> None:
     assert settings.worker_id == "local-worker"
     assert settings.model_provider == "disabled"
     assert settings.model_api_key is None
+
+
+def test_settings_reject_cloud_model_provider_in_zero_cost_mode() -> None:
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, model_provider="openai")

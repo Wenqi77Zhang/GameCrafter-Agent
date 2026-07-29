@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C1: reviewable knowledge data contracts**.
+The repository is currently in **M1-C C2.1: zero-cost model gateway contracts**.
 
-Implemented through M1-C C1:
+Implemented through M1-C C2.1:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -66,15 +66,21 @@ Implemented through M1-C C1:
 - deterministic conflict-group and immutable knowledge-snapshot contracts;
 - PostgreSQL guards for evidence-required approval, unresolved-conflict publication blocking, and
   immutable review/snapshot lineage.
+- a provider-neutral `ModelGateway` with disabled, exact offline-replay, and dependency-injected
+  OpenAI Responses adapters;
+- strict structured claim output, exact quote/range validation, request fingerprints, redacted
+  provider errors, and token-usage contracts;
+- a zero-cost runtime boundary: no model SDK, API key, network client, or live model call is
+  constructed in C2.1.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- model claim extraction, deterministic conflict processing, review UI, snapshot publication
-  commands, embeddings, or an approved knowledge snapshot;
+- runnable extraction jobs, offline NTE replay data, deterministic conflict processing, review UI,
+  snapshot publication commands, embeddings, or an approved knowledge snapshot;
 - live trend sources;
-- LLM calls, RAG, or marketing agents;
+- live LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
 
 The earlier README described several of these as if they already existed. They did not. The original placeholder modules remain traceable in Git history and are documented under [`legacy/`](legacy/README.md).
@@ -262,6 +268,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-B B3 ingestion-handler record](docs/migration/m1b-source-ingestion-handlers.md)
 - [M1-B B4 source-workspace record](docs/migration/m1b-source-workspace.md)
 - [M1-C C1 knowledge-contract record](docs/migration/m1c-knowledge-review-contracts.md)
+- [M1-C C2.1 model-gateway record](docs/migration/m1c-model-gateway.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

@@ -11,7 +11,7 @@ from gamecrafter.domain.knowledge.claims import (
 def test_candidate_claim_requires_typed_value_and_exact_evidence() -> None:
     evidence = EvidenceSpan(
         start_offset=10,
-        end_offset=30,
+        end_offset=32,
         quote="Official game evidence",
     )
     claim = CandidateClaim(

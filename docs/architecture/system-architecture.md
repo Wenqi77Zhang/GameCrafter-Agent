@@ -277,6 +277,42 @@ lineage, reject snapshot membership while a claim belongs to an open conflict gr
 changes to published knowledge lineage. Application commands in C3 and C4 will explain these gates
 before transaction execution and will prevent empty snapshots.
 
+## Implemented M1-C C2.1 zero-cost model boundary
+
+```mermaid
+flowchart LR
+    REQUEST["Bounded normalized-text request"]
+    PORT["Application ModelGateway port"]
+    DISABLED["Disabled gateway"]
+    REPLAY["Exact offline Replay gateway"]
+    OPENAI["Dependency-injected OpenAI Responses adapter"]
+    SCHEMA["Strict structured claim schema"]
+    EVIDENCE["Exact quote and range validator"]
+    CANDIDATE["Framework-independent candidate claims"]
+
+    REQUEST --> PORT
+    PORT --> DISABLED
+    PORT --> REPLAY --> SCHEMA
+    PORT -. "implemented but not composed or called" .-> OPENAI --> SCHEMA
+    SCHEMA --> EVIDENCE --> CANDIDATE
+```
+
+The application port owns provider-neutral requests, fingerprints, validated results, token usage,
+and safe failure types. Infrastructure adapters depend inward on that port. The disabled adapter
+fails closed. Replay accepts a fixture only when its key matches the exact source version, text,
+offset, subject, locale, region, prompt version, and schema version.
+
+The OpenAI adapter constructs a Responses request with strict JSON Schema, `store: false`, bounded
+output, low reasoning effort, and no source identifier, URL, path, secret, raw HTML, image, or log
+content. C2.1 injects a simulated client in tests; it does not install the OpenAI SDK, read an API
+key, create a live client, or make a network call. Runtime composition and preflight remain C2.2
+and C2.3 work, and the confirmed strict zero-cost policy prohibits cloud execution.
+
+Both replay and provider output pass the same decoder. A candidate is rejected unless every quote
+exactly equals its cited chunk range, its declared value kind matches its JSON value, and its
+predicate belongs to the controlled vocabulary. Chunk-relative ranges become source-version
+absolute ranges before leaving the adapter.
+
 ## Marketing workflow state graph
 
 ```mermaid
@@ -417,6 +453,10 @@ unimplemented.
 M1-C C1 adds project-local entities, immutable candidate claims, exact evidence ranges, append-only
 human reviews, conflict groups, and immutable knowledge snapshots. It does not yet add extraction,
 model calls, conflict classification, review APIs, or embeddings.
+
+M1-C C2.1 adds the framework-independent model port and zero-cost adapters. It still does not add a
+runnable extraction job, source chunker, preflight API, persistent invocation record, NTE replay
+fixture, extraction interface, live model call, conflict classifier, or review action.
 
 ## Observability
 

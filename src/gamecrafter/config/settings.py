@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     worker_id: str = "local-worker"
     worker_poll_seconds: float = 1.0
     job_lease_seconds: int = 60
-    model_provider: str = "disabled"
-    model_api_key: str | None = None
+    model_provider: Literal["disabled", "replay"] = "disabled"
+    model_api_key: SecretStr | None = None
 
 
 @lru_cache
