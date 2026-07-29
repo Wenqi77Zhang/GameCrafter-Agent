@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-B B4: human-controlled source workspace and run events**.
+The repository is currently in **M1-C C1: reviewable knowledge data contracts**.
 
-Implemented through M1-B B4:
+Implemented through M1-C C1:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -59,12 +59,20 @@ Implemented through M1-B B4:
 - four NTE official-site quick profiles, filtered targeted discovery, and direct official-URL
   import;
 - visible candidate provenance, evidence counts, checkpoints, and actionable terminal failures.
+- controlled game-knowledge entity types, predicates, and typed candidate values;
+- immutable model claims with exact source-version evidence spans and complete extraction
+  provenance;
+- append-only human reviews that preserve original and approved edited values separately;
+- deterministic conflict-group and immutable knowledge-snapshot contracts;
+- PostgreSQL guards for evidence-required approval, unresolved-conflict publication blocking, and
+  immutable review/snapshot lineage.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- claim extraction, conflict review, embeddings, or an approved knowledge snapshot;
+- model claim extraction, deterministic conflict processing, review UI, snapshot publication
+  commands, embeddings, or an approved knowledge snapshot;
 - live trend sources;
 - LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
@@ -253,6 +261,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-B B2 source-access and adapter record](docs/migration/m1b-source-access-adapters.md)
 - [M1-B B3 ingestion-handler record](docs/migration/m1b-source-ingestion-handlers.md)
 - [M1-B B4 source-workspace record](docs/migration/m1b-source-workspace.md)
+- [M1-C C1 knowledge-contract record](docs/migration/m1c-knowledge-review-contracts.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

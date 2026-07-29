@@ -50,6 +50,26 @@ Public sources must not be described as an internal GDD. For existing games, the
 - The local filesystem implements the first `ObjectStorage` adapter. Raw evidence and private local
   data remain gitignored; later storage providers stay behind the same application port.
 
+## M1 knowledge-review policy
+
+- A model-produced claim is never an approved fact. Every new claim requires an exact evidence
+  span and an explicit human decision.
+- M1-C uses controlled entity and predicate vocabularies. Unsupported claims remain unclassified
+  rather than allowing a model to silently expand the ontology.
+- Human decisions are approve, approve with edit, reject, or defer. The original model value and
+  every review decision remain immutable and attributable.
+- Conflict detection is deterministic over subject, predicate, normalized value, region, locale,
+  effective time, and game version. A model confidence score cannot resolve a conflict.
+- Approved facts affect later workflows only after the user explicitly publishes an immutable
+  knowledge snapshot. Open conflicts block publication.
+- The first model adapter uses the OpenAI Responses API behind a provider-neutral `ModelGateway`
+  and stays disabled without local configuration. Only normalized public source text and minimum
+  provenance metadata may leave the machine in M1-C; raw HTML, images, secrets, object paths,
+  private documents, and unrelated logs are excluded.
+- Model calls use minimized logging and `store: false`, while product copy must still disclose that
+  provider abuse-monitoring retention can apply unless the organization has eligible data-retention
+  controls.
+
 ## Architecture policy
 
 - modular monolith before microservices;

@@ -245,6 +245,38 @@ Key rules:
 - marketing runs reference a frozen knowledge snapshot, not mutable live records.
 - retry counts, terminal failures, and quarantine reasons remain visible in the run record.
 
+## Implemented M1-C C1 reviewable knowledge lineage
+
+```mermaid
+flowchart LR
+    PROJECT["Project"]
+    ENTITY["Controlled entity"]
+    CLAIM["Immutable model claim"]
+    EVIDENCE["Exact source-version evidence span"]
+    REVIEW{"Append-only human review"}
+    CONFLICT["Deterministic conflict group"]
+    SNAPSHOT["Immutable knowledge snapshot"]
+    MEMBER["Snapshot member with exact approving review"]
+
+    PROJECT --> ENTITY --> CLAIM
+    CLAIM --> EVIDENCE
+    CLAIM --> REVIEW
+    CLAIM --> CONFLICT
+    REVIEW -->|"approve or approve with edit"| MEMBER
+    CONFLICT -->|"open blocks publication"| MEMBER
+    SNAPSHOT --> MEMBER
+```
+
+The claim is never updated into a fact. Its model value, evidence, model name, prompt version,
+schema version, locale, region, effective time, and game version remain immutable. A human decision
+is a separate append-only record; an approved edit stores the exact accepted value without erasing
+the model output. Snapshot membership references that specific approving review.
+
+PostgreSQL triggers reject approval without evidence, reject cross-project review or snapshot
+lineage, reject snapshot membership while a claim belongs to an open conflict group, and prevent
+changes to published knowledge lineage. Application commands in C3 and C4 will explain these gates
+before transaction execution and will prevent empty snapshots.
+
 ## Marketing workflow state graph
 
 ```mermaid
@@ -381,6 +413,10 @@ PostgreSQL and object storage cannot commit atomically;
 content-addressed files written immediately before a failed DB transaction may be left unreferenced
 and require a later safe garbage-collection command. Embeddings and claim records remain
 unimplemented.
+
+M1-C C1 adds project-local entities, immutable candidate claims, exact evidence ranges, append-only
+human reviews, conflict groups, and immutable knowledge snapshots. It does not yet add extraction,
+model calls, conflict classification, review APIs, or embeddings.
 
 ## Observability
 

@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -22,6 +23,14 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from gamecrafter.domain.knowledge.claims import (
+    ClaimValueKind,
+    ConflictRelation,
+    ConflictStatus,
+    EntityType,
+    FactPredicate,
+    ReviewDecision,
+)
 from gamecrafter.domain.runs.state import JobStatus, RunStatus
 
 
@@ -32,6 +41,16 @@ def utc_now() -> datetime:
 
 
 json_type = JSON().with_variant(JSONB(), "postgresql")
+nullable_json_type = JSON(none_as_null=True).with_variant(
+    JSONB(none_as_null=True),
+    "postgresql",
+)
+
+
+def sql_values(values: Any) -> str:
+    """Return a stable quoted list for database check constraints."""
+
+    return ", ".join(f"'{item.value}'" for item in values)
 
 
 class Base(DeclarativeBase):
@@ -418,5 +437,377 @@ class AuditEventRecord(Base):
     actor_id: Mapped[str] = mapped_column(String(120), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False, default=dict)
     occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class KnowledgeEntityRecord(Base):
+    """Project-local subject identity used by reviewable claims."""
+
+    __tablename__ = "knowledge_entities"
+    __table_args__ = (
+        CheckConstraint(
+            f"entity_type IN ({sql_values(EntityType)})",
+            name="ck_knowledge_entities_type",
+        ),
+        CheckConstraint(
+            "length(trim(canonical_key)) > 0 AND length(trim(display_name)) > 0",
+            name="ck_knowledge_entities_names_nonblank",
+        ),
+        UniqueConstraint(
+            "project_id",
+            "entity_type",
+            "canonical_key",
+            name="uq_knowledge_entities_project_type_key",
+        ),
+        Index("ix_knowledge_entities_project_type", "project_id", "entity_type"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    canonical_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(300), nullable=False)
+    aliases: Mapped[list[str]] = mapped_column(json_type, nullable=False, default=list)
+    details: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
+class KnowledgeClaimRecord(Base):
+    """Immutable model-produced claim awaiting an append-only human decision."""
+
+    __tablename__ = "knowledge_claims"
+    __table_args__ = (
+        CheckConstraint(
+            f"predicate IN ({sql_values(FactPredicate)})",
+            name="ck_knowledge_claims_predicate",
+        ),
+        CheckConstraint(
+            f"value_kind IN ({sql_values(ClaimValueKind)})",
+            name="ck_knowledge_claims_value_kind",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_knowledge_claims_confidence",
+        ),
+        CheckConstraint(
+            "length(value_fingerprint_sha256) = 64",
+            name="ck_knowledge_claims_value_fingerprint",
+        ),
+        CheckConstraint(
+            "length(scope_fingerprint_sha256) = 64",
+            name="ck_knowledge_claims_scope_fingerprint",
+        ),
+        CheckConstraint(
+            "length(trim(normalized_value)) > 0",
+            name="ck_knowledge_claims_normalized_value_nonblank",
+        ),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_from IS NULL OR effective_to >= effective_from",
+            name="ck_knowledge_claims_effective_window",
+        ),
+        Index("ix_knowledge_claims_project_predicate", "project_id", "predicate"),
+        Index("ix_knowledge_claims_subject_scope", "subject_entity_id", "scope_fingerprint_sha256"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    subject_entity_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_entities.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    extraction_run_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("ingestion_runs.id", ondelete="SET NULL"),
+    )
+    predicate: Mapped[str] = mapped_column(String(80), nullable=False)
+    value_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    value: Mapped[Any] = mapped_column(json_type, nullable=False)
+    normalized_value: Mapped[str] = mapped_column(Text, nullable=False)
+    value_fingerprint_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    scope_fingerprint_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    confidence: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
+    locale: Mapped[str] = mapped_column(String(16), nullable=False)
+    region: Mapped[str] = mapped_column(String(32), nullable=False)
+    effective_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    effective_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    game_version: Mapped[str | None] = mapped_column(String(120))
+    model_provider: Mapped[str] = mapped_column(String(80), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ClaimEvidenceSpanRecord(Base):
+    """Immutable exact evidence range supporting one candidate claim."""
+
+    __tablename__ = "claim_evidence_spans"
+    __table_args__ = (
+        CheckConstraint("ordinal >= 0", name="ck_claim_evidence_spans_ordinal"),
+        CheckConstraint("start_offset >= 0", name="ck_claim_evidence_spans_start"),
+        CheckConstraint(
+            "end_offset > start_offset",
+            name="ck_claim_evidence_spans_end",
+        ),
+        CheckConstraint(
+            "length(quote_sha256) = 64",
+            name="ck_claim_evidence_spans_quote_sha256",
+        ),
+        CheckConstraint(
+            "length(trim(quote)) > 0 AND end_offset - start_offset = length(quote)",
+            name="ck_claim_evidence_spans_quote_range",
+        ),
+        UniqueConstraint(
+            "claim_id",
+            "ordinal",
+            name="uq_claim_evidence_spans_claim_ordinal",
+        ),
+        Index("ix_claim_evidence_spans_source_version", "source_version_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    claim_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_claims.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_version_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("source_versions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_offset: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_offset: Mapped[int] = mapped_column(Integer, nullable=False)
+    quote: Mapped[str] = mapped_column(Text, nullable=False)
+    quote_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ClaimReviewRecord(Base):
+    """Append-only human decision that may carry an approved edited value."""
+
+    __tablename__ = "claim_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            f"decision IN ({sql_values(ReviewDecision)})",
+            name="ck_claim_reviews_decision",
+        ),
+        CheckConstraint(
+            f"approved_value_kind IS NULL OR approved_value_kind IN ({sql_values(ClaimValueKind)})",
+            name="ck_claim_reviews_approved_value_kind",
+        ),
+        CheckConstraint(
+            "("
+            "decision IN ('approve', 'approve_with_edit') "
+            "AND approved_value IS NOT NULL AND approved_value_kind IS NOT NULL "
+            "AND approved_normalized_value IS NOT NULL"
+            ") OR ("
+            "decision IN ('reject', 'defer') "
+            "AND approved_value IS NULL AND approved_value_kind IS NULL "
+            "AND approved_normalized_value IS NULL"
+            ")",
+            name="ck_claim_reviews_decision_value",
+        ),
+        CheckConstraint(
+            "length(trim(reason)) > 0",
+            name="ck_claim_reviews_reason_nonblank",
+        ),
+        Index("ix_claim_reviews_claim_created", "claim_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    claim_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_claims.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    decision: Mapped[str] = mapped_column(String(32), nullable=False)
+    approved_value_kind: Mapped[str | None] = mapped_column(String(32))
+    approved_value: Mapped[Any | None] = mapped_column(nullable_json_type)
+    approved_normalized_value: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    reviewer_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ClaimConflictGroupRecord(Base):
+    """Potentially conflicting claims sharing one deterministic comparison key."""
+
+    __tablename__ = "claim_conflict_groups"
+    __table_args__ = (
+        CheckConstraint(
+            f"predicate IN ({sql_values(FactPredicate)})",
+            name="ck_claim_conflict_groups_predicate",
+        ),
+        CheckConstraint(
+            f"status IN ({sql_values(ConflictStatus)})",
+            name="ck_claim_conflict_groups_status",
+        ),
+        CheckConstraint(
+            "length(scope_fingerprint_sha256) = 64",
+            name="ck_claim_conflict_groups_scope_fingerprint",
+        ),
+        UniqueConstraint(
+            "project_id",
+            "subject_entity_id",
+            "predicate",
+            "scope_fingerprint_sha256",
+            name="uq_claim_conflict_groups_comparison_key",
+        ),
+        Index("ix_claim_conflict_groups_project_status", "project_id", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    subject_entity_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_entities.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    predicate: Mapped[str] = mapped_column(String(80), nullable=False)
+    scope_fingerprint_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="open")
+    resolution_summary: Mapped[str | None] = mapped_column(Text)
+    resolved_by: Mapped[str | None] = mapped_column(String(120))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ClaimConflictMemberRecord(Base):
+    """Membership and deterministic relation inside one conflict group."""
+
+    __tablename__ = "claim_conflict_members"
+    __table_args__ = (
+        CheckConstraint(
+            f"relation IN ({sql_values(ConflictRelation)})",
+            name="ck_claim_conflict_members_relation",
+        ),
+        UniqueConstraint(
+            "conflict_group_id",
+            "claim_id",
+            name="uq_claim_conflict_members_group_claim",
+        ),
+        Index("ix_claim_conflict_members_claim", "claim_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    conflict_group_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("claim_conflict_groups.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    claim_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_claims.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    relation: Mapped[str] = mapped_column(String(32), nullable=False)
+    basis: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class KnowledgeSnapshotRecord(Base):
+    """Immutable published set of specifically reviewed claim values."""
+
+    __tablename__ = "knowledge_snapshots"
+    __table_args__ = (
+        CheckConstraint("version_number > 0", name="ck_knowledge_snapshots_version"),
+        CheckConstraint(
+            "length(content_sha256) = 64",
+            name="ck_knowledge_snapshots_content_sha256",
+        ),
+        UniqueConstraint(
+            "project_id",
+            "version_number",
+            name="uq_knowledge_snapshots_project_version",
+        ),
+        Index("ix_knowledge_snapshots_project_published", "project_id", "published_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    published_by: Mapped[str] = mapped_column(String(120), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    published_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class KnowledgeSnapshotMemberRecord(Base):
+    """Immutable link to the exact approving review used by a snapshot."""
+
+    __tablename__ = "knowledge_snapshot_members"
+    __table_args__ = (
+        UniqueConstraint(
+            "snapshot_id",
+            "claim_id",
+            name="uq_knowledge_snapshot_members_snapshot_claim",
+        ),
+        UniqueConstraint(
+            "snapshot_id",
+            "review_id",
+            name="uq_knowledge_snapshot_members_snapshot_review",
+        ),
+        Index("ix_knowledge_snapshot_members_claim", "claim_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    snapshot_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    claim_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_claims.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    review_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("claim_reviews.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
