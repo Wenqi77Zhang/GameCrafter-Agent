@@ -26,5 +26,7 @@ The course game-marketing requirements remain the minimum acceptance line for M2
   constraints, and the private local object-storage adapter.
 - M1-B B2 implements exact official-site access policy, bounded HTTP and browser fetcher
   boundaries, and deterministic global/mainland NTE adapters.
-- M1-B B3 discovery/capture handlers and persistence, B4 APIs/SSE/Sources/Runs interfaces, M1-C
-  claim review, and M1-D real NTE acceptance remain unimplemented.
+- M1-B B3 implements durable discovery/capture handlers, robots and access scheduling, bounded
+  official images, immutable version persistence, conditional reuse, and audit events.
+- M1-B B4 APIs/SSE/Sources/Runs interfaces, M1-C claim review, and M1-D real NTE acceptance remain
+  unimplemented.

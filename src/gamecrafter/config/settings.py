@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     object_storage_path: Path = Path("data/objects")
     source_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
     source_html_max_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    source_image_max_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
+    source_max_images_per_page: int = Field(default=8, ge=0, le=20)
     source_max_redirects: int = Field(default=3, ge=0, le=10)
     source_min_interval_seconds: float = Field(default=1.0, ge=0)
     source_max_concurrency_per_host: int = Field(default=1, ge=1, le=3)

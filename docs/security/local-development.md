@@ -28,10 +28,13 @@ The first release is local and single-user. That reduces but does not remove dat
 - the browser fallback is opt-in per page pattern, uses a fresh isolated context, and blocks
   downloads, service workers, popups, dialogs, cross-host resource requests, and excessive
   same-host subresources;
-- request-count limits are enforced by the access-budget object. Per-host concurrency and minimum
-  interval settings are validated now and will be enforced when the B3 scheduler is wired;
-- robots rules can be parsed through a dedicated boundary, but the B3 handler must fetch and enforce
-  them before any live discovery run;
+- request-count limits, per-host/global concurrency, and minimum intervals are enforced inside the
+  current single B3 worker process; a larger crawl delay declared by robots rules raises the host
+  interval. Multi-process deployment requires a shared rate limiter before it is supported;
+- robots rules are fetched through the same URL and response controls, cached within the job, and
+  conservatively enforced before page or image access;
+- only same-host PNG, JPEG, WebP, and GIF candidates are accepted; each image has a byte limit and
+  must match its declared format signature. SVG and external CDN assets are not captured in B3;
 - captured website content remains untrusted evidence and cannot directly choose tools, prompts, or
   final marketing claims.
 
@@ -44,8 +47,12 @@ the validated address to the connection. Exact official-host allowlists substant
 exposure, while connection-level DNS pinning remains a hardening item before remote or multi-tenant
 deployment.
 
+PostgreSQL and local object storage do not share one transaction. A failed database transaction can
+leave an unreferenced content-addressed object, but cannot expose a partial source version. A later
+garbage-collection command must delete only objects proven unreferenced by `source_assets`.
+
 The M1-A database password is a local-only development placeholder. It must be replaced before any
 shared or remote deployment.
 
 Authentication, tenant isolation, private object storage, account export/deletion, rate limiting,
-and privacy terms are release gates for M6, not current M1-A features.
+and privacy terms are release gates for M6, not current M1-B features.

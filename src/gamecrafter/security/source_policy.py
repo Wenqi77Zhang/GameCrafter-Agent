@@ -12,6 +12,8 @@ from threading import Lock
 from typing import Protocol
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
+from gamecrafter.application.ports.source_capture import SourceAccessError
+
 _TRACKING_PARAMETERS = frozenset(
     {
         "fbclid",
@@ -23,7 +25,7 @@ _TRACKING_PARAMETERS = frozenset(
 )
 
 
-class SourcePolicyError(ValueError):
+class SourcePolicyError(SourceAccessError, ValueError):
     """Base error for a source URL rejected before network access."""
 
 

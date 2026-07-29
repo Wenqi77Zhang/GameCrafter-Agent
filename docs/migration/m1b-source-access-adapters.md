@@ -55,6 +55,9 @@ facts eligible for marketing output.
 Those capabilities belong to B3, B4, M1-C, and M1-D respectively. The existing concurrency and
 minimum-interval settings become operational only in the B3 scheduler.
 
+Follow-up: B3 now registers the discovery/capture handlers and enforces robots rules, request
+budgets, host spacing, and concurrency. This document remains the historical B2 boundary.
+
 ## Local verification
 
 ```powershell

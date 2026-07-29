@@ -11,6 +11,8 @@ def test_settings_use_safe_local_defaults() -> None:
     assert settings.object_storage_backend == "filesystem"
     assert settings.object_storage_path.as_posix() == "data/objects"
     assert settings.source_max_concurrency_per_host == 1
+    assert settings.source_image_max_bytes == 5 * 1024 * 1024
+    assert settings.source_max_images_per_page == 8
     assert settings.source_global_max_concurrency == 3
     assert settings.source_quick_candidate_limit == 30
     assert settings.source_targeted_candidate_limit == 100

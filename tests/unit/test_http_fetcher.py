@@ -10,6 +10,7 @@ from gamecrafter.infrastructure.ingestion.http import (
     UnsupportedMediaTypeError,
 )
 from gamecrafter.infrastructure.ingestion.nte import NTE_ACCESS_RULES
+from gamecrafter.infrastructure.ingestion.scheduler import HostAccessScheduler
 from gamecrafter.security.source_policy import (
     AccessBudget,
     OfficialSourcePolicy,
@@ -27,6 +28,11 @@ def make_fetcher(handler, *, max_requests: int = 5) -> HttpPageFetcher:
     return HttpPageFetcher(
         policy=OfficialSourcePolicy(NTE_ACCESS_RULES, resolver=PublicResolver()),
         budget=AccessBudget(max_requests=max_requests),
+        scheduler=HostAccessScheduler(
+            global_concurrency=1,
+            per_host_concurrency=1,
+            min_interval_seconds=0,
+        ),
         client_factory=lambda: httpx2.Client(
             transport=transport,
             follow_redirects=False,

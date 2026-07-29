@@ -8,11 +8,18 @@ from urllib.parse import urljoin
 import httpx2
 
 from gamecrafter.application.ports.source_capture import (
+    GAMECRAFTER_USER_AGENT,
     CapturedPage,
+    CaptureError,
+    CapturePurpose,
     CaptureRequest,
+    RedirectLimitError,
+    RequestScheduler,
+    ResponseTooLargeError,
+    UnsupportedMediaTypeError,
+    UpstreamStatusError,
 )
 from gamecrafter.domain.knowledge.sources import CaptureMethod
-from gamecrafter.infrastructure.ingestion.robots import GAMECRAFTER_USER_AGENT
 from gamecrafter.security.source_policy import (
     AccessBudget,
     AccessPurpose,
@@ -31,30 +38,6 @@ _SAFE_RESPONSE_HEADERS = frozenset(
 _CONDITIONAL_REQUEST_HEADERS = frozenset({"if-none-match", "if-modified-since"})
 
 
-class CaptureError(RuntimeError):
-    """Base error for a bounded capture that could not produce evidence."""
-
-
-class RedirectLimitError(CaptureError):
-    """Raised before following more redirects than the request allows."""
-
-
-class ResponseTooLargeError(CaptureError):
-    """Raised when headers or streamed bytes exceed the request budget."""
-
-
-class UnsupportedMediaTypeError(CaptureError):
-    """Raised when a response is not one of the expected evidence types."""
-
-
-class UpstreamStatusError(CaptureError):
-    """Raised for a terminal non-success response from an official source."""
-
-    def __init__(self, status_code: int) -> None:
-        self.status_code = status_code
-        super().__init__(f"official source returned HTTP {status_code}")
-
-
 class HttpPageFetcher:
     """Fetch official pages with manual redirect validation and byte limits."""
 
@@ -63,16 +46,27 @@ class HttpPageFetcher:
         *,
         policy: OfficialSourcePolicy,
         budget: AccessBudget,
+        scheduler: RequestScheduler,
         client_factory: Callable[[], httpx2.Client] | None = None,
     ) -> None:
         self._policy = policy
         self._budget = budget
+        self._scheduler = scheduler
         self._client_factory = client_factory or self._default_client
 
     def fetch(self, request: CaptureRequest) -> CapturedPage:
+        purpose = (
+            AccessPurpose.ROBOTS
+            if request.purpose is CapturePurpose.ROBOTS
+            else (
+                AccessPurpose.ASSET
+                if request.purpose is CapturePurpose.ASSET
+                else AccessPurpose.PAGE
+            )
+        )
         requested_url = self._policy.authorize(
             request.url,
-            purpose=AccessPurpose.PAGE,
+            purpose=purpose,
             resolve_dns=False,
         ).url
         current_url = requested_url
@@ -81,7 +75,7 @@ class HttpPageFetcher:
             while True:
                 authorized = self._policy.authorize(
                     current_url,
-                    purpose=AccessPurpose.PAGE,
+                    purpose=purpose,
                 )
                 self._budget.consume()
                 headers = {"User-Agent": f"{GAMECRAFTER_USER_AGENT}/0.1"}
@@ -89,12 +83,12 @@ class HttpPageFetcher:
                     if key.lower() not in _CONDITIONAL_REQUEST_HEADERS:
                         raise CaptureError("capture request included a forbidden HTTP header")
                     headers[key] = value
-                with client.stream(
-                    "GET",
-                    authorized.url,
-                    headers=headers,
-                    timeout=request.timeout_seconds,
-                ) as response:
+                with (
+                    self._scheduler.slot(authorized.url),
+                    client.stream(
+                        "GET", authorized.url, headers=headers, timeout=request.timeout_seconds
+                    ) as response,
+                ):
                     if response.status_code in _REDIRECT_STATUSES:
                         location = response.headers.get("location")
                         if not location:

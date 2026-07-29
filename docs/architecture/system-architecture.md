@@ -39,21 +39,21 @@ flowchart LR
     JOBS[("ingestion_jobs")]
     AUDIT[("audit_events")]
     WORKER["Python worker"]
-    HANDLER["M1-B and M1-C handlers"]
+    HANDLER["M1-B source handlers"]
 
     USER --> WEB --> API
     API -->|"liveness"| WEB
     API -->|"database readiness"| RUNS
-    COMMAND -. "not exposed until M1-B" .-> RUNS
+    COMMAND -. "not exposed until B4 API" .-> RUNS
     COMMAND -. "atomic enqueue" .-> JOBS
     JOBS -->|"lease with bounded retry"| WORKER
-    WORKER -. "handler registry currently empty" .-> HANDLER
+    WORKER -->|"registered discovery and capture jobs"| HANDLER
     WORKER -->|"checkpoint and terminal state"| RUNS
     WORKER -->|"append-only event"| AUDIT
 ```
 
-Solid arrows are exercised by M1-A. Dotted arrows mark extension points whose business handlers are
-deliberately deferred. PostgreSQL owns run, job, and audit consistency; the worker never claims a
+The worker-to-handler arrow is implemented in M1-B B3. The delivery command remains dotted until B4
+exposes the product API. PostgreSQL owns run, job, and audit consistency; the worker never claims a
 website or model capability until its typed handler is implemented and registered.
 
 ## Implemented M1-B B1 evidence contracts
@@ -110,8 +110,8 @@ flowchart LR
     ALLOW -->|"yes"| DNS
     DNS -->|"unsafe"| REJECT
     DNS -->|"safe"| ROBOTS
-    ROBOTS -. "B3 handler will enforce" .-> BUDGET
-    BUDGET -. "B3 scheduler will enforce" .-> HTTP
+    ROBOTS -->|"enforced by B3 handler"| BUDGET
+    BUDGET -->|"scheduled by B3 worker"| HTTP
     HTTP --> REDIRECT --> RESPONSE
     RESPONSE -->|"valid HTML"| ADAPTER --> RESULT
     RESPONSE -->|"static page insufficient"| FALLBACK
@@ -119,17 +119,64 @@ flowchart LR
     FALLBACK -->|"yes"| BROWSER --> RESPONSE
 ```
 
-Solid arrows describe implemented policy, fetcher, and adapter behavior. Dotted arrows identify
-contracts that exist but are not yet wired into the B3 job handler. HTTP is the default. Browser
-rendering is allowed only for explicitly listed NTE homepage paths, runs in a fresh context, blocks
-downloads, popups, service workers, and cross-host requests, and still applies the same final-URL
-and response-size boundary.
+All access-flow arrows are wired by B3. HTTP is the default. Browser rendering is allowed only for
+explicitly listed NTE homepage paths, runs in a fresh context, blocks downloads, popups, service
+workers, and cross-host requests, and still applies the same final-URL and response-size boundary.
 
 The first adapters accept only `nte.perfectworld.com` global pages under `en`, `cn`, or `jp`, plus
 `yh.wanmei.com` mainland pages. Listing pages can produce reviewable candidates but cannot be
 directly imported as evidence. Homepage and article URLs are assigned deterministic locale, region,
 source type, raw category, and classification-basis metadata. A date segment in an article URL is
 kept only as a family-grouping signal; it is not asserted as the publication date.
+
+## Implemented M1-B B3 ingestion and persistence flow
+
+```mermaid
+flowchart TB
+    subgraph Discovery["Human-triggered discovery run"]
+        D1["Explicit approved listing URLs"]
+        D2["Validate mode, filters, and limits"]
+        D3["robots and scheduled HTTP"]
+        D4["Deterministic adapter discovery"]
+        D5[("Reviewable discovery candidates")]
+        D1 --> D2 --> D3 --> D4 --> D5
+    end
+
+    subgraph Capture["Direct import or later selected-candidate run"]
+        C1["Resolve direct URL or same-project selected candidate"]
+        C2["Policy, robots, budget, and host schedule"]
+        C3["Conditional HTTP capture"]
+        C4{"Static homepage evidence sufficient?"}
+        C5["Controlled Playwright fallback"]
+        C6["Visible-text and image-reference extraction"]
+        C7["Bounded same-host image capture"]
+        C8["Content-addressed object writes"]
+        C9["Transactional source, version, and asset write"]
+        C10{"Existing evidence fingerprint?"}
+        C11["Reuse prior immutable version"]
+        C12["Create initial or meaningful version"]
+        C1 --> C2 --> C3 --> C4
+        C4 -->|"yes"| C6
+        C4 -->|"no and explicitly allowed"| C5 --> C6
+        C6 --> C7 --> C8 --> C9 --> C10
+        C10 -->|"yes"| C11
+        C10 -->|"no"| C12
+    end
+
+    D5 -. "B4 human selection command" .-> C1
+    C11 --> AUDIT[("Append-only audit event")]
+    C12 --> AUDIT
+```
+
+Discovery and capture are deliberately separate durable runs. A candidate may be captured only
+after it is selected and belongs to the capture run's project; this preserves the human gate
+without trying to reopen an already completed discovery run. Direct URL import is itself an
+explicit human action. No scheduled or recursive crawl exists.
+
+The version fingerprint covers the parser version, normalized text, and captured image digests.
+Byte-identical or semantically unchanged recaptures reuse the existing version. Changed text or an
+evidence image creates a new immutable version linked to its predecessor. Raw HTML remains stored
+for replay even though incidental markup-only changes do not automatically create versions.
 
 ## Knowledge-ingestion state graph
 
@@ -294,8 +341,11 @@ M1-A implements PostgreSQL, enables pgvector, and stores projects, ingestion run
 audit events. M1-B B1 adds source identities, immutable evidence versions, multilingual content
 families, discovery candidates, stored-object metadata, and evidence links. Large bytes use the
 `ObjectStorage` application port; its first adapter is a private content-addressed local filesystem.
-B2 adds source-policy, `PageFetcher`, and `SiteAdapter` boundaries without writing captured content.
-No live capture handler writes these contracts yet, and embeddings and claim records remain
+B2 adds source-policy, `PageFetcher`, and `SiteAdapter` boundaries. B3 writes raw HTML, normalized
+text, bounded official images, source identities, version lineage, evidence links, and audit events
+through registered worker handlers. PostgreSQL and object storage cannot commit atomically;
+content-addressed files written immediately before a failed DB transaction may be left unreferenced
+and require a later safe garbage-collection command. Embeddings and claim records remain
 unimplemented.
 
 ## Observability

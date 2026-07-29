@@ -43,7 +43,7 @@ class JobQueue(Protocol):
         """Record a failure and either retry or expose it for attention."""
 
 
-JobHandler = Callable[[Mapping[str, Any]], None]
+JobHandler = Callable[[ClaimedJob], None]
 
 
 class JobExecutionError(RuntimeError):
@@ -90,7 +90,7 @@ class Worker:
 
         try:
             handler = self._handlers[job.task_type]
-            handler(job.payload)
+            handler(job)
         except KeyError:
             self._queue.fail(
                 job,

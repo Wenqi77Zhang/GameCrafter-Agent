@@ -5,6 +5,7 @@ import pytest
 from gamecrafter.application.ports.source_capture import CaptureRequest
 from gamecrafter.infrastructure.ingestion.browser import BrowserPageFetcher
 from gamecrafter.infrastructure.ingestion.nte import NTE_ACCESS_RULES
+from gamecrafter.infrastructure.ingestion.scheduler import HostAccessScheduler
 from gamecrafter.security.source_policy import (
     AccessBudget,
     OfficialSourcePolicy,
@@ -27,6 +28,11 @@ def test_browser_fetcher_refuses_pages_without_adapter_permission() -> None:
     fetcher = BrowserPageFetcher(
         policy=OfficialSourcePolicy(NTE_ACCESS_RULES, resolver=PublicResolver()),
         budget=AccessBudget(max_requests=1),
+        scheduler=HostAccessScheduler(
+            global_concurrency=1,
+            per_host_concurrency=1,
+            min_interval_seconds=0,
+        ),
     )
 
     with pytest.raises(SourcePolicyError, match="not allowed"):

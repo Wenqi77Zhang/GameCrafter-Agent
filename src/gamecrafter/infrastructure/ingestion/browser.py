@@ -2,26 +2,26 @@
 
 from __future__ import annotations
 
-from gamecrafter.application.ports.source_capture import CapturedPage, CaptureRequest
-from gamecrafter.domain.knowledge.sources import CaptureMethod
-from gamecrafter.infrastructure.ingestion.http import (
+from gamecrafter.application.ports.source_capture import (
+    GAMECRAFTER_USER_AGENT,
+    BrowserUnavailableError,
+    CapturedPage,
     CaptureError,
+    CapturePurpose,
+    CaptureRequest,
     RedirectLimitError,
+    RequestScheduler,
     ResponseTooLargeError,
     UnsupportedMediaTypeError,
     UpstreamStatusError,
 )
-from gamecrafter.infrastructure.ingestion.robots import GAMECRAFTER_USER_AGENT
+from gamecrafter.domain.knowledge.sources import CaptureMethod
 from gamecrafter.security.source_policy import (
     AccessBudget,
     AccessPurpose,
     OfficialSourcePolicy,
     SourcePolicyError,
 )
-
-
-class BrowserUnavailableError(CaptureError):
-    """Raised when Playwright or its Chromium runtime is unavailable."""
 
 
 class BrowserPageFetcher:
@@ -32,11 +32,15 @@ class BrowserPageFetcher:
         *,
         policy: OfficialSourcePolicy,
         budget: AccessBudget,
+        scheduler: RequestScheduler,
     ) -> None:
         self._policy = policy
         self._budget = budget
+        self._scheduler = scheduler
 
     def fetch(self, request: CaptureRequest) -> CapturedPage:
+        if request.purpose is not CapturePurpose.PAGE:
+            raise SourcePolicyError("browser capture supports page requests only")
         if not self._policy.browser_fallback_allowed(request.url):
             raise SourcePolicyError("browser fallback is not allowed for this page")
         authorized = self._policy.authorize(request.url, purpose=AccessPurpose.PAGE)
@@ -48,7 +52,7 @@ class BrowserPageFetcher:
             raise BrowserUnavailableError("Playwright is not installed") from error
 
         try:
-            with sync_playwright() as playwright:
+            with self._scheduler.slot(authorized.url), sync_playwright() as playwright:
                 browser = playwright.chromium.launch(headless=True)
                 try:
                     context = browser.new_context(

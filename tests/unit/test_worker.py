@@ -1,4 +1,3 @@
-from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
@@ -60,11 +59,11 @@ def make_worker(queue: RecordingQueue, handler: Any) -> Worker:
 
 def test_worker_completes_a_registered_handler() -> None:
     queue = RecordingQueue(make_job())
-    received: list[Mapping[str, Any]] = []
+    received: list[ClaimedJob] = []
     worker = make_worker(queue, received.append)
 
     assert worker.run_once() is True
-    assert received == [{"value": 7}]
+    assert received == [queue.job]
     assert queue.completed is True
     assert queue.failure is None
 
@@ -89,7 +88,7 @@ def test_worker_preserves_explicit_failure_policy() -> None:
     ]:
         queue = RecordingQueue(make_job())
 
-        def fail(_: Mapping[str, Any], raised: Exception = error) -> None:
+        def fail(_: ClaimedJob, raised: Exception = error) -> None:
             raise raised
 
         make_worker(queue, fail).run_once()
