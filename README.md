@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-A: durable persistence foundation**.
+The repository is currently in **M1-B B1: source evidence contracts**.
 
-Implemented through M1-A:
+Implemented through M1-B B1:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -27,11 +27,16 @@ Implemented through M1-A:
 - Alembic migrations for projects, ingestion runs, leased jobs, and audit events;
 - a bounded-retry Python worker shell with durable checkpoints and idempotent run creation;
 - API liveness and database-readiness endpoints;
-- PostgreSQL migration and queue verification in CI.
+- PostgreSQL migration and queue verification in CI;
+- canonical source, multilingual family, discovery-candidate, immutable-version, and evidence-asset
+  contracts;
+- content-addressed local object storage with atomic writes, deduplication, limits, and traversal
+  protection;
+- M1-B migration upgrade and downgrade verification in CI.
 
 Not implemented yet:
 
-- website discovery, capture, or document ingestion;
+- live website discovery, capture, or document ingestion;
 - a production Game Knowledge Hub;
 - live trend sources;
 - LLM calls, RAG, or marketing agents;
@@ -41,8 +46,8 @@ The earlier README described several of these as if they already existed. They d
 
 ## Target product workflow (M1–M4)
 
-This is the planned workflow. M1-A implements only the durable project, run, job, and audit
-foundation beneath it.
+This is the planned workflow. M1-A implements the durable project, run, job, and audit foundation.
+M1-B B1 adds source-evidence and object-storage contracts, but no live source handler yet.
 
 ```mermaid
 flowchart LR
@@ -93,8 +98,10 @@ For an existing game, approved public evidence becomes a sourced **Public Game I
 
 ## Target software architecture
 
-This is the target modular-monolith architecture. M1-A now implements the API health/readiness
-boundary, PostgreSQL adapter, migration layer, durable job queue, worker shell, and audit foundation.
+This is the target modular-monolith architecture. M1-A implements the API health/readiness
+boundary, PostgreSQL adapter, migration layer, durable job queue, worker shell, and audit
+foundation. M1-B B1 adds inward-facing source-evidence contracts and a local `ObjectStorage`
+adapter.
 
 ```mermaid
 flowchart TB
@@ -201,6 +208,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [Long-term roadmap](docs/roadmap.md)
 - [M0 migration record](docs/migration/m0-restructure.md)
 - [M1-A implementation record](docs/migration/m1a-persistence-foundation.md)
+- [M1-B B1 evidence-contract record](docs/migration/m1b-source-evidence-contracts.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

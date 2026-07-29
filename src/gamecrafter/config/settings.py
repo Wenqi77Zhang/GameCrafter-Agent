@@ -27,6 +27,8 @@ class Settings(BaseSettings):
         "postgresql+psycopg://gamecrafter:gamecrafter_local@127.0.0.1:5432/gamecrafter"
     )
     data_dir: Path = Path("data")
+    object_storage_backend: Literal["filesystem"] = "filesystem"
+    object_storage_path: Path = Path("data/objects")
     worker_id: str = "local-worker"
     worker_poll_seconds: float = 1.0
     job_lease_seconds: int = 60

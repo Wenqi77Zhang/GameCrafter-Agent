@@ -56,6 +56,36 @@ Solid arrows are exercised by M1-A. Dotted arrows mark extension points whose bu
 deliberately deferred. PostgreSQL owns run, job, and audit consistency; the worker never claims a
 website or model capability until its typed handler is implemented and registered.
 
+## Implemented M1-B B1 evidence contracts
+
+```mermaid
+flowchart LR
+    PROJECT["Project"]
+    RUN["Ingestion run"]
+    CANDIDATE["Discovery candidate"]
+    FAMILY["Multilingual content family"]
+    SOURCE["Canonical source"]
+    VERSION["Immutable source version"]
+    ASSET["Evidence asset link"]
+    OBJECT["Content-addressed stored object"]
+    PORT["ObjectStorage port"]
+    LOCAL["Private local filesystem adapter"]
+
+    PROJECT --> RUN --> CANDIDATE
+    PROJECT --> FAMILY
+    PROJECT --> SOURCE
+    FAMILY -->|"optional grouping"| SOURCE
+    CANDIDATE -. "imported source; handler not implemented" .-> SOURCE
+    SOURCE --> VERSION --> ASSET --> OBJECT
+    PORT --> LOCAL
+    OBJECT -. "metadata only; capture not implemented" .-> PORT
+```
+
+B1 creates these domain, database, and storage contracts. It does not discover or capture a live
+website. PostgreSQL prevents updates to stored-object metadata, source versions, and evidence links;
+a meaningful change must create a new version. Physical object deletion remains a later,
+dependency-aware application command.
+
 ## Knowledge-ingestion state graph
 
 ```mermaid
@@ -216,8 +246,11 @@ Specialist research nodes may use a bounded `Perceive → Reason → Act → Eva
 ## Storage direction
 
 M1-A implements PostgreSQL, enables pgvector, and stores projects, ingestion runs, leased jobs, and
-audit events. It does not create embeddings or claim records yet. Raw pages, documents, and large
-responses will use the object-storage interface beginning with M1-B.
+audit events. M1-B B1 adds source identities, immutable evidence versions, multilingual content
+families, discovery candidates, stored-object metadata, and evidence links. Large bytes use the
+`ObjectStorage` application port; its first adapter is a private content-addressed local filesystem.
+No live capture handler writes these contracts yet, and embeddings and claim records remain
+unimplemented.
 
 ## Observability
 

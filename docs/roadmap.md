@@ -22,5 +22,7 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M0 is complete.
 - M1-A implements the PostgreSQL, migration, durable run, leased-job, worker, and audit
   foundation.
-- M1-B source discovery and capture, M1-C claim review, and M1-D real NTE acceptance remain
-  unimplemented.
+- M1-B B1 implements source-evidence domain contracts, PostgreSQL tables, immutable version
+  constraints, and the private local object-storage adapter.
+- M1-B website policy/adapters, discovery/capture handlers, APIs, SSE, and Sources/Runs interfaces
+  remain unimplemented. M1-C claim review and M1-D real NTE acceptance also remain unimplemented.
