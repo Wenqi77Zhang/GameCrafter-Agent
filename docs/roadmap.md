@@ -30,4 +30,8 @@ The course game-marketing requirements remain the minimum acceptance line for M2
   official images, immutable version persistence, conditional reuse, and audit events.
 - M1-B B4 implements human-controlled project/source/candidate/run APIs, atomic candidate
   selection, resumable SSE audit events, and bilingual Sources/Runs interfaces.
-- M1-C claim review and M1-D real NTE acceptance remain unimplemented.
+- M1-C C1 implements controlled entity/claim vocabularies, exact evidence spans, append-only human
+  reviews, deterministic conflict-group contracts, immutable knowledge snapshots, and PostgreSQL
+  approval/publication guards.
+- M1-C C2–C5 extraction, conflict processing, review UI, publication/evaluation, and M1-D real NTE
+  acceptance remain unimplemented.
