@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-A: durable persistence foundation**.
+The repository is currently in **M1-B B4: human-controlled source workspace and run events**.
 
-Implemented through M1-A:
+Implemented through M1-B B4:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -27,12 +27,44 @@ Implemented through M1-A:
 - Alembic migrations for projects, ingestion runs, leased jobs, and audit events;
 - a bounded-retry Python worker shell with durable checkpoints and idempotent run creation;
 - API liveness and database-readiness endpoints;
-- PostgreSQL migration and queue verification in CI.
+- PostgreSQL migration and queue verification in CI;
+- canonical source, multilingual family, discovery-candidate, immutable-version, and evidence-asset
+  contracts;
+- content-addressed local object storage with atomic writes, deduplication, limits, and traversal
+  protection;
+- M1-B migration upgrade and downgrade verification in CI.
+- exact official-host and path allowlists for the NTE global and mainland sites;
+- HTTPS URL normalization, redirect revalidation, public-DNS checks, response limits, and
+  per-run access-budget contracts;
+- a bounded HTTP page fetcher plus an isolated Playwright fallback restricted to approved
+  homepage paths;
+- deterministic NTE metadata adapters for English, Simplified Chinese, Japanese, and mainland
+  Chinese pages;
+- direct homepage/article adaptation and bounded listing-page candidate discovery.
+- registered `source.discover` and `source.capture` durable worker handlers;
+- per-job robots enforcement, request budgets, host spacing, and in-process concurrency gates;
+- quick/targeted candidate filtering with explicit listing-page and candidate limits;
+- direct official-URL import and same-project capture of human-selected candidates;
+- deterministic visible-text extraction that excludes executable page sections;
+- bounded same-host PNG, JPEG, WebP, and GIF capture with byte and signature checks;
+- content-addressed raw HTML, normalized text, and image storage;
+- transactional source creation, immutable version lineage, conditional HTTP reuse, and
+  fingerprint-based no-change detection;
+- source audit events and explicit retry/terminal failure classification.
+- project-scoped source, candidate, and run APIs with bounded command schemas;
+- atomic human candidate selection and capture enqueue with strict idempotency conflict checks;
+- resumable SSE audit streams with durable event cursors and terminal closure;
+- responsive Sources/Runs product interfaces, default Simplified Chinese, and remembered English
+  switching;
+- four NTE official-site quick profiles, filtered targeted discovery, and direct official-URL
+  import;
+- visible candidate provenance, evidence counts, checkpoints, and actionable terminal failures.
 
 Not implemented yet:
 
-- website discovery, capture, or document ingestion;
-- a production Game Knowledge Hub;
+- document ingestion or an installed browser runtime by default;
+- a live NTE acceptance capture committed as product evidence;
+- claim extraction, conflict review, embeddings, or an approved knowledge snapshot;
 - live trend sources;
 - LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
@@ -41,8 +73,11 @@ The earlier README described several of these as if they already existed. They d
 
 ## Target product workflow (M1–M4)
 
-This is the planned workflow. M1-A implements only the durable project, run, job, and audit
-foundation beneath it.
+This is the planned workflow. M1-A implements the durable project, run, job, and audit foundation.
+M1-B B1 adds source-evidence and object-storage contracts. B2 adds controlled access primitives
+and NTE adapters. B3 registers durable discovery/capture handlers and immutable persistence. B4
+exposes them through human-controlled product APIs, resumable run events, and the Sources/Runs
+workspace.
 
 ```mermaid
 flowchart LR
@@ -93,8 +128,13 @@ For an existing game, approved public evidence becomes a sourced **Public Game I
 
 ## Target software architecture
 
-This is the target modular-monolith architecture. M1-A now implements the API health/readiness
-boundary, PostgreSQL adapter, migration layer, durable job queue, worker shell, and audit foundation.
+This is the target modular-monolith architecture. M1-A implements the API health/readiness
+boundary, PostgreSQL adapter, migration layer, durable job queue, worker shell, and audit
+foundation. M1-B B1 adds inward-facing source-evidence contracts and a local `ObjectStorage`
+adapter. B2 adds `PageFetcher` and `SiteAdapter` boundaries with HTTP, Playwright, and NTE
+implementations. B3 composes them into registered worker handlers and transactional source
+persistence. B4 adds validated delivery commands, project-scoped read models, SSE run events, and
+the bilingual human-control interface.
 
 ```mermaid
 flowchart TB
@@ -190,6 +230,14 @@ Run all locally available checks:
 .\scripts\verify.ps1
 ```
 
+Static HTTP capture does not require a browser download. Before a later JavaScript-rendered
+acceptance test, inspect or install the isolated Chromium headless shell explicitly:
+
+```powershell
+.\scripts\browser.ps1 status
+.\scripts\browser.ps1 install
+```
+
 Configuration names and safe placeholders are documented in [`.env.example`](.env.example). Never commit real API keys.
 The PostgreSQL volume and raw local data are not stored in Git.
 
@@ -201,6 +249,10 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [Long-term roadmap](docs/roadmap.md)
 - [M0 migration record](docs/migration/m0-restructure.md)
 - [M1-A implementation record](docs/migration/m1a-persistence-foundation.md)
+- [M1-B B1 evidence-contract record](docs/migration/m1b-source-evidence-contracts.md)
+- [M1-B B2 source-access and adapter record](docs/migration/m1b-source-access-adapters.md)
+- [M1-B B3 ingestion-handler record](docs/migration/m1b-source-ingestion-handlers.md)
+- [M1-B B4 source-workspace record](docs/migration/m1b-source-workspace.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

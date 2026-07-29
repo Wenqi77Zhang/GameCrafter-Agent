@@ -50,7 +50,7 @@ def test_project_run_and_job_complete_as_one_audited_flow() -> None:
     handled: list[dict[str, object]] = []
     worker = Worker(
         queue=DatabaseJobQueue(sessions),
-        handlers={"test.capture": lambda payload: handled.append(dict(payload))},
+        handlers={"test.capture": lambda job: handled.append(dict(job.payload))},
         worker_id="worker-1",
         lease_seconds=30,
     )

@@ -34,6 +34,22 @@ The first release is local and single-user. It does not include accounts, multi-
 
 Public sources must not be described as an internal GDD. For existing games, the Knowledge Hub creates a sourced Public Game Intelligence Profile. User-owned internal documents may be supported locally, but online private uploads require later authentication and isolation work.
 
+## M1 official-source policy
+
+- The NTE validation profile supports the global official site's English, Simplified Chinese, and
+  Japanese sections plus the separate mainland-China official site.
+- Discovery is bounded and human-triggered. It offers quick discovery, filtered historical
+  discovery, and direct official-URL import; there is no silent scheduled crawling in the first
+  release.
+- Candidates require human selection before full capture. Original HTML, normalized text,
+  provenance metadata, and bounded relevant images form an immutable local evidence bundle.
+- HTTP is the primary capture mechanism. A site adapter may permit one controlled Playwright
+  fallback for pages that require JavaScript.
+- Official-language variants remain separate evidence and may be linked as one content family;
+  they are never silently merged into one fact.
+- The local filesystem implements the first `ObjectStorage` adapter. Raw evidence and private local
+  data remain gitignored; later storage providers stay behind the same application port.
+
 ## Architecture policy
 
 - modular monolith before microservices;
