@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-B B3: durable source discovery and capture handlers**.
+The repository is currently in **M1-B B4: human-controlled source workspace and run events**.
 
-Implemented through M1-B B3:
+Implemented through M1-B B4:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -51,13 +51,20 @@ Implemented through M1-B B3:
 - transactional source creation, immutable version lineage, conditional HTTP reuse, and
   fingerprint-based no-change detection;
 - source audit events and explicit retry/terminal failure classification.
+- project-scoped source, candidate, and run APIs with bounded command schemas;
+- atomic human candidate selection and capture enqueue with strict idempotency conflict checks;
+- resumable SSE audit streams with durable event cursors and terminal closure;
+- responsive Sources/Runs product interfaces, default Simplified Chinese, and remembered English
+  switching;
+- four NTE official-site quick profiles, filtered targeted discovery, and direct official-URL
+  import;
+- visible candidate provenance, evidence counts, checkpoints, and actionable terminal failures.
 
 Not implemented yet:
 
-- source APIs, progress events, or Sources/Runs product interfaces;
-- candidate-selection commands, document ingestion, or an installed browser runtime by default;
+- document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- a production Game Knowledge Hub;
+- claim extraction, conflict review, embeddings, or an approved knowledge snapshot;
 - live trend sources;
 - LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
@@ -68,8 +75,9 @@ The earlier README described several of these as if they already existed. They d
 
 This is the planned workflow. M1-A implements the durable project, run, job, and audit foundation.
 M1-B B1 adds source-evidence and object-storage contracts. B2 adds controlled access primitives
-and NTE adapters. B3 registers durable discovery/capture handlers and immutable persistence; B4
-will expose them through the product API and interface.
+and NTE adapters. B3 registers durable discovery/capture handlers and immutable persistence. B4
+exposes them through human-controlled product APIs, resumable run events, and the Sources/Runs
+workspace.
 
 ```mermaid
 flowchart LR
@@ -125,7 +133,8 @@ boundary, PostgreSQL adapter, migration layer, durable job queue, worker shell, 
 foundation. M1-B B1 adds inward-facing source-evidence contracts and a local `ObjectStorage`
 adapter. B2 adds `PageFetcher` and `SiteAdapter` boundaries with HTTP, Playwright, and NTE
 implementations. B3 composes them into registered worker handlers and transactional source
-persistence.
+persistence. B4 adds validated delivery commands, project-scoped read models, SSE run events, and
+the bilingual human-control interface.
 
 ```mermaid
 flowchart TB
@@ -243,6 +252,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-B B1 evidence-contract record](docs/migration/m1b-source-evidence-contracts.md)
 - [M1-B B2 source-access and adapter record](docs/migration/m1b-source-access-adapters.md)
 - [M1-B B3 ingestion-handler record](docs/migration/m1b-source-ingestion-handlers.md)
+- [M1-B B4 source-workspace record](docs/migration/m1b-source-workspace.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

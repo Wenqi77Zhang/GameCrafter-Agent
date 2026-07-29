@@ -27,14 +27,14 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A runtime
+## Implemented M1-A to M1-B runtime
 
 ```mermaid
 flowchart LR
     USER["Local user"]
-    WEB["React status shell"]
+    WEB["React Sources and Runs workspace"]
     API["FastAPI"]
-    COMMAND["Future ingestion command"]
+    COMMAND["Validated workspace commands and queries"]
     RUNS[("ingestion_runs")]
     JOBS[("ingestion_jobs")]
     AUDIT[("audit_events")]
@@ -42,19 +42,21 @@ flowchart LR
     HANDLER["M1-B source handlers"]
 
     USER --> WEB --> API
-    API -->|"liveness"| WEB
+    API -->|"sources, candidates, runs"| WEB
+    API -. "resumable SSE audit events" .-> WEB
     API -->|"database readiness"| RUNS
-    COMMAND -. "not exposed until B4 API" .-> RUNS
-    COMMAND -. "atomic enqueue" .-> JOBS
+    API --> COMMAND
+    COMMAND -->|"atomic idempotent enqueue"| RUNS
+    COMMAND --> JOBS
     JOBS -->|"lease with bounded retry"| WORKER
     WORKER -->|"registered discovery and capture jobs"| HANDLER
     WORKER -->|"checkpoint and terminal state"| RUNS
     WORKER -->|"append-only event"| AUDIT
 ```
 
-The worker-to-handler arrow is implemented in M1-B B3. The delivery command remains dotted until B4
-exposes the product API. PostgreSQL owns run, job, and audit consistency; the worker never claims a
-website or model capability until its typed handler is implemented and registered.
+The worker-to-handler arrow is implemented in M1-B B3; the commands, queries, and event delivery are
+implemented in B4. PostgreSQL owns project, candidate, run, job, and audit consistency. The worker
+never claims a website or model capability until its typed handler is implemented and registered.
 
 ## Implemented M1-B B1 evidence contracts
 
@@ -163,7 +165,7 @@ flowchart TB
         C10 -->|"no"| C12
     end
 
-    D5 -. "B4 human selection command" .-> C1
+    D5 -->|"B4 atomic human selection command"| C1
     C11 --> AUDIT[("Append-only audit event")]
     C12 --> AUDIT
 ```
@@ -172,6 +174,36 @@ Discovery and capture are deliberately separate durable runs. A candidate may be
 after it is selected and belongs to the capture run's project; this preserves the human gate
 without trying to reopen an already completed discovery run. Direct URL import is itself an
 explicit human action. No scheduled or recursive crawl exists.
+
+## Implemented M1-B B4 delivery and observability
+
+```mermaid
+flowchart LR
+    HUMAN["Local human user"]
+    SOURCES["Sources interface"]
+    RUNSUI["Runs interface"]
+    COMMAND{"Validated command"}
+    IDEMP{"Matching idempotency key?"}
+    SELECT{"Candidate still discovered?"}
+    TX["Atomic candidate, run, job, audit transaction"]
+    WORKER["B3 worker"]
+    AUDIT[("Append-only audit events")]
+    SSE["SSE with Last-Event-ID"]
+
+    HUMAN --> SOURCES --> COMMAND --> IDEMP
+    IDEMP -->|"existing matching request"| RUNSUI
+    IDEMP -->|"new request"| SELECT
+    SELECT -->|"yes or direct URL"| TX --> WORKER --> AUDIT --> SSE --> RUNSUI
+    SELECT -->|"no"| HUMAN
+    RUNSUI -->|"select run or reconnect"| SSE
+```
+
+Candidate selection and run enqueue commit together. Conflicting idempotency-key reuse and stale
+candidate selection are rejected rather than silently creating ambiguous work. SSE reads only
+project/run audit records, uses a durable cursor, and never sends raw evidence bytes or credentials.
+The interface defaults to Simplified Chinese because the product users are often Chinese studios;
+English is an explicit remembered preference even though the first marketing target is English
+TikTok.
 
 The version fingerprint covers the parser version, normalized text, and captured image digests.
 Byte-identical or semantically unchanged recaptures reuse the existing version. Changed text or an
@@ -343,7 +375,9 @@ families, discovery candidates, stored-object metadata, and evidence links. Larg
 `ObjectStorage` application port; its first adapter is a private content-addressed local filesystem.
 B2 adds source-policy, `PageFetcher`, and `SiteAdapter` boundaries. B3 writes raw HTML, normalized
 text, bounded official images, source identities, version lineage, evidence links, and audit events
-through registered worker handlers. PostgreSQL and object storage cannot commit atomically;
+through registered worker handlers. B4 reads project-scoped summaries and creates candidate/run/job
+state in one PostgreSQL transaction; SSE projects append-only audit events to the browser.
+PostgreSQL and object storage cannot commit atomically;
 content-addressed files written immediately before a failed DB transaction may be left unreferenced
 and require a later safe garbage-collection command. Embeddings and claim records remain
 unimplemented.

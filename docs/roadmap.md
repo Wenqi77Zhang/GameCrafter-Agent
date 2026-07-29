@@ -28,5 +28,6 @@ The course game-marketing requirements remain the minimum acceptance line for M2
   boundaries, and deterministic global/mainland NTE adapters.
 - M1-B B3 implements durable discovery/capture handlers, robots and access scheduling, bounded
   official images, immutable version persistence, conditional reuse, and audit events.
-- M1-B B4 APIs/SSE/Sources/Runs interfaces, M1-C claim review, and M1-D real NTE acceptance remain
-  unimplemented.
+- M1-B B4 implements human-controlled project/source/candidate/run APIs, atomic candidate
+  selection, resumable SSE audit events, and bilingual Sources/Runs interfaces.
+- M1-C claim review and M1-D real NTE acceptance remain unimplemented.
