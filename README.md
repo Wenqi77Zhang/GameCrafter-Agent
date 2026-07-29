@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-B B1: source evidence contracts**.
+The repository is currently in **M1-B B2: controlled source access and NTE adapters**.
 
-Implemented through M1-B B1:
+Implemented through M1-B B2:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -33,10 +33,20 @@ Implemented through M1-B B1:
 - content-addressed local object storage with atomic writes, deduplication, limits, and traversal
   protection;
 - M1-B migration upgrade and downgrade verification in CI.
+- exact official-host and path allowlists for the NTE global and mainland sites;
+- HTTPS URL normalization, redirect revalidation, public-DNS checks, response limits, and
+  per-run access-budget contracts;
+- a bounded HTTP page fetcher plus an isolated Playwright fallback restricted to approved
+  homepage paths;
+- deterministic NTE metadata adapters for English, Simplified Chinese, Japanese, and mainland
+  Chinese pages;
+- direct homepage/article adaptation and bounded listing-page candidate discovery.
 
 Not implemented yet:
 
-- live website discovery, capture, or document ingestion;
+- a registered live discovery/capture job handler or persistence workflow;
+- source APIs, progress events, or Sources/Runs product interfaces;
+- asset capture, document ingestion, or an installed browser runtime by default;
 - a production Game Knowledge Hub;
 - live trend sources;
 - LLM calls, RAG, or marketing agents;
@@ -47,7 +57,8 @@ The earlier README described several of these as if they already existed. They d
 ## Target product workflow (M1–M4)
 
 This is the planned workflow. M1-A implements the durable project, run, job, and audit foundation.
-M1-B B1 adds source-evidence and object-storage contracts, but no live source handler yet.
+M1-B B1 adds source-evidence and object-storage contracts. B2 adds controlled access primitives
+and NTE adapters, but no registered live source handler yet.
 
 ```mermaid
 flowchart LR
@@ -101,7 +112,8 @@ For an existing game, approved public evidence becomes a sourced **Public Game I
 This is the target modular-monolith architecture. M1-A implements the API health/readiness
 boundary, PostgreSQL adapter, migration layer, durable job queue, worker shell, and audit
 foundation. M1-B B1 adds inward-facing source-evidence contracts and a local `ObjectStorage`
-adapter.
+adapter. B2 adds `PageFetcher` and `SiteAdapter` boundaries with HTTP, Playwright, and NTE
+implementations.
 
 ```mermaid
 flowchart TB
@@ -197,6 +209,14 @@ Run all locally available checks:
 .\scripts\verify.ps1
 ```
 
+Static HTTP capture does not require a browser download. Before a later JavaScript-rendered
+acceptance test, inspect or install the isolated Chromium headless shell explicitly:
+
+```powershell
+.\scripts\browser.ps1 status
+.\scripts\browser.ps1 install
+```
+
 Configuration names and safe placeholders are documented in [`.env.example`](.env.example). Never commit real API keys.
 The PostgreSQL volume and raw local data are not stored in Git.
 
@@ -209,6 +229,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M0 migration record](docs/migration/m0-restructure.md)
 - [M1-A implementation record](docs/migration/m1a-persistence-foundation.md)
 - [M1-B B1 evidence-contract record](docs/migration/m1b-source-evidence-contracts.md)
+- [M1-B B2 source-access and adapter record](docs/migration/m1b-source-access-adapters.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

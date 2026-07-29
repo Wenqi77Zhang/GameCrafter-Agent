@@ -13,6 +13,8 @@ authors = [{ name = "Wenqi77Zhang" }]
 dependencies = [
     "alembic>=1.18,<2",
     "fastapi>=0.115,<1",
+    "httpx2>=2.7,<3",
+    "playwright>=1.61,<2",
     "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.7,<3",
     "sqlalchemy>=2.0,<3",
@@ -21,7 +23,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "httpx2>=2.9,<3",
     "pytest>=8.3,<9",
     "pytest-cov>=6,<7",
     "ruff>=0.11,<1",
@@ -31,7 +32,7 @@ dev = [
 packages = ["src/gamecrafter"]
 
 [tool.pytest.ini_options]
-addopts = "-q --strict-markers -p no:cacheprovider"
+addopts = "-q --strict-markers -p no:cacheprovider --basetemp=.test-tmp"
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [

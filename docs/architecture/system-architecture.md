@@ -86,6 +86,51 @@ website. PostgreSQL prevents updates to stored-object metadata, source versions,
 a meaningful change must create a new version. Physical object deletion remains a later,
 dependency-aware application command.
 
+## Implemented M1-B B2 controlled source boundary
+
+```mermaid
+flowchart LR
+    INPUT["User URL or approved listing URL"]
+    CANON["Canonicalize HTTPS URL"]
+    ALLOW{"Exact host and path allowlist"}
+    DNS{"All resolved IPs are public"}
+    ROBOTS["robots.txt policy port"]
+    BUDGET["Request budget and scheduling settings"]
+    HTTP["Bounded HTTP fetcher"]
+    REDIRECT{"Revalidate every redirect"}
+    RESPONSE{"Status, media type, and byte limits"}
+    FALLBACK{"Approved homepage fallback?"}
+    BROWSER["Isolated Playwright context"]
+    ADAPTER["Deterministic NTE adapter"]
+    RESULT["Adapted source or discovery candidates"]
+    REJECT["Reject without capture"]
+
+    INPUT --> CANON --> ALLOW
+    ALLOW -->|"no"| REJECT
+    ALLOW -->|"yes"| DNS
+    DNS -->|"unsafe"| REJECT
+    DNS -->|"safe"| ROBOTS
+    ROBOTS -. "B3 handler will enforce" .-> BUDGET
+    BUDGET -. "B3 scheduler will enforce" .-> HTTP
+    HTTP --> REDIRECT --> RESPONSE
+    RESPONSE -->|"valid HTML"| ADAPTER --> RESULT
+    RESPONSE -->|"static page insufficient"| FALLBACK
+    FALLBACK -->|"no"| REJECT
+    FALLBACK -->|"yes"| BROWSER --> RESPONSE
+```
+
+Solid arrows describe implemented policy, fetcher, and adapter behavior. Dotted arrows identify
+contracts that exist but are not yet wired into the B3 job handler. HTTP is the default. Browser
+rendering is allowed only for explicitly listed NTE homepage paths, runs in a fresh context, blocks
+downloads, popups, service workers, and cross-host requests, and still applies the same final-URL
+and response-size boundary.
+
+The first adapters accept only `nte.perfectworld.com` global pages under `en`, `cn`, or `jp`, plus
+`yh.wanmei.com` mainland pages. Listing pages can produce reviewable candidates but cannot be
+directly imported as evidence. Homepage and article URLs are assigned deterministic locale, region,
+source type, raw category, and classification-basis metadata. A date segment in an article URL is
+kept only as a family-grouping signal; it is not asserted as the publication date.
+
 ## Knowledge-ingestion state graph
 
 ```mermaid
@@ -249,6 +294,7 @@ M1-A implements PostgreSQL, enables pgvector, and stores projects, ingestion run
 audit events. M1-B B1 adds source identities, immutable evidence versions, multilingual content
 families, discovery candidates, stored-object metadata, and evidence links. Large bytes use the
 `ObjectStorage` application port; its first adapter is a private content-addressed local filesystem.
+B2 adds source-policy, `PageFetcher`, and `SiteAdapter` boundaries without writing captured content.
 No live capture handler writes these contracts yet, and embeddings and claim records remain
 unimplemented.
 

@@ -24,5 +24,7 @@ The course game-marketing requirements remain the minimum acceptance line for M2
   foundation.
 - M1-B B1 implements source-evidence domain contracts, PostgreSQL tables, immutable version
   constraints, and the private local object-storage adapter.
-- M1-B website policy/adapters, discovery/capture handlers, APIs, SSE, and Sources/Runs interfaces
-  remain unimplemented. M1-C claim review and M1-D real NTE acceptance also remain unimplemented.
+- M1-B B2 implements exact official-site access policy, bounded HTTP and browser fetcher
+  boundaries, and deterministic global/mainland NTE adapters.
+- M1-B B3 discovery/capture handlers and persistence, B4 APIs/SSE/Sources/Runs interfaces, M1-C
+  claim review, and M1-D real NTE acceptance remain unimplemented.
