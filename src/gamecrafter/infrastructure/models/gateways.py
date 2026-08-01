@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from gamecrafter.application.ports.model_gateway import (
+    CLAIM_PROMPT_VERSION,
+    CLAIM_SCHEMA_VERSION,
     ClaimExtractionRequest,
     ClaimExtractionResult,
     InvalidModelOutputError,
@@ -20,9 +22,6 @@ from gamecrafter.infrastructure.models.structured_claims import (
     decode_claim_output,
     strict_claim_schema,
 )
-
-CLAIM_PROMPT_VERSION = "knowledge-claim-v1"
-CLAIM_SCHEMA_VERSION = "knowledge-claim-v1"
 
 _DEVELOPER_INSTRUCTIONS = """\
 Extract only claims directly supported by the supplied public source text.

@@ -36,5 +36,8 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C2.1 implements the provider-neutral `ModelGateway`, strict claim-output decoder, disabled
   gateway, exact offline replay, and a dependency-injected OpenAI Responses request adapter under a
   strict zero-API-cost policy.
-- M1-C C2.2–C5 extraction Harness, durable jobs, NTE replay workspace, conflict processing, review
+- M1-C C2.2 implements deterministic 4,000/400 Unicode chunking, sequential fail-closed extraction
+  orchestration, exact overlap deduplication, strict source-attributed replay-fixture loading, and a
+  network-blocked English NTE homepage replay.
+- M1-C C3–C5 durable extraction jobs and persistence, extraction APIs, conflict processing, review
   UI, publication/evaluation, and M1-D real NTE acceptance remain unimplemented.

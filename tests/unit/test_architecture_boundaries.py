@@ -33,7 +33,7 @@ def test_c2_model_adapters_do_not_import_network_clients() -> None:
     """Keep the confirmed C2 runtime incapable of constructing a paid client."""
 
     model_root = Path("src/gamecrafter/infrastructure/models")
-    forbidden = ("httpx", "openai", "requests")
+    forbidden = ("http.client", "httpx", "openai", "requests", "socket", "urllib")
     violations: list[str] = []
 
     for path in model_root.rglob("*.py"):

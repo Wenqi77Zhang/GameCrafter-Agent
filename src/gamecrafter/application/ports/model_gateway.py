@@ -10,6 +10,9 @@ from uuid import UUID
 
 from gamecrafter.domain.knowledge.claims import CandidateClaim
 
+CLAIM_PROMPT_VERSION = "knowledge-claim-v1"
+CLAIM_SCHEMA_VERSION = "knowledge-claim-v1"
+
 
 class ModelGatewayError(RuntimeError):
     """Safe base error for model gateway failures."""
