@@ -305,13 +305,48 @@ offset, subject, locale, region, prompt version, and schema version.
 The OpenAI adapter constructs a Responses request with strict JSON Schema, `store: false`, bounded
 output, low reasoning effort, and no source identifier, URL, path, secret, raw HTML, image, or log
 content. C2.1 injects a simulated client in tests; it does not install the OpenAI SDK, read an API
-key, create a live client, or make a network call. Runtime composition and preflight remain C2.2
-and C2.3 work, and the confirmed strict zero-cost policy prohibits cloud execution.
+key, create a live client, or make a network call. Runnable cloud composition and egress preflight
+remain later work, and the confirmed strict zero-cost policy prohibits cloud execution.
 
 Both replay and provider output pass the same decoder. A candidate is rejected unless every quote
 exactly equals its cited chunk range, its declared value kind matches its JSON value, and its
 predicate belongs to the controlled vocabulary. Chunk-relative ranges become source-version
 absolute ranges before leaving the adapter.
+
+## Implemented M1-C C2.2 deterministic extraction Harness
+
+```mermaid
+flowchart LR
+    DOCUMENT["Immutable normalized source text"]
+    CHUNKER["unicode-boundary-v1 chunker"]
+    CHUNKS["Ordered exact 4,000/400 slices"]
+    REQUESTS["Fingerprint-bound extraction requests"]
+    REPLAY["Exact offline replay gateway"]
+    VALIDATE["Strict schema and evidence validation"]
+    DEDUPE["Stable predicate/value/evidence deduplication"]
+    MANIFEST["Document result and invocation manifest"]
+    FAIL["Safe whole-document failure"]
+
+    DOCUMENT --> CHUNKER --> CHUNKS --> REQUESTS --> REPLAY --> VALIDATE --> DEDUPE --> MANIFEST
+    REQUESTS -. "missing fixture, invalid output, or fingerprint mismatch" .-> FAIL
+```
+
+The chunker never trims or normalizes its input. It prefers paragraph, newline, and sentence
+boundaries, then hard-splits only when necessary. Chunk ranges use Python Unicode code-point
+indices and each chunk ID binds the chunker version, configuration, order, offsets, and exact text.
+
+The Harness is a single sequential Knowledge Curator orchestration service, not a ReAct loop or
+multi-Agent conversation. Stable ordering makes replay and debugging reproducible. Any chunk
+failure suppresses partial output, and the public error omits source text and provider messages.
+Successful results retain chunk IDs, request fingerprints, provider/model/response identifiers,
+usage, and claim counts. Overlap duplicates are removed only when predicate, value kind, value,
+and absolute evidence are identical; the first deterministic result is retained.
+
+The committed NTE fixture freezes a minimal English official-homepage description with URL,
+capture time, public-material notice, source-text digest, and exact request fingerprint. Its test
+blocks socket connections, proving the replay path does not require a model SDK, API key, provider
+network request, or token spend. It is a test snapshot of public material, not an internal GDD or
+live-site acceptance evidence.
 
 ## Marketing workflow state graph
 
@@ -448,15 +483,17 @@ state in one PostgreSQL transaction; SSE projects append-only audit events to th
 PostgreSQL and object storage cannot commit atomically;
 content-addressed files written immediately before a failed DB transaction may be left unreferenced
 and require a later safe garbage-collection command. Embeddings and claim records remain
-unimplemented.
+unimplemented at the M1-B boundary.
 
 M1-C C1 adds project-local entities, immutable candidate claims, exact evidence ranges, append-only
 human reviews, conflict groups, and immutable knowledge snapshots. It does not yet add extraction,
 model calls, conflict classification, review APIs, or embeddings.
 
-M1-C C2.1 adds the framework-independent model port and zero-cost adapters. It still does not add a
-runnable extraction job, source chunker, preflight API, persistent invocation record, NTE replay
-fixture, extraction interface, live model call, conflict classifier, or review action.
+M1-C C2.1 adds the framework-independent model port and zero-cost adapters. C2.2 adds the pure
+deterministic source chunker, sequential extraction Harness, invocation manifest, strict fixture
+loader, and source-attributed NTE offline replay. It still does not add a durable extraction job,
+database invocation record, preflight or extraction API, product interface, live model call,
+conflict classifier, or review action.
 
 ## Observability
 

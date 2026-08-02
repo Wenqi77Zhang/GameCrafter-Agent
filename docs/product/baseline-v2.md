@@ -65,6 +65,15 @@ Public sources must not be described as an internal GDD. For existing games, the
 - C2 runs in strict zero-API-cost mode. Only disabled and exact offline-replay gateways may be
   composed into the runnable application; automated tests must fail if they attempt a real model
   network request.
+- C2.2 chunks normalized text without rewriting it, using the versioned 4,000-character maximum and
+  400-character overlap. Offsets are Python Unicode code-point indices; delivery interfaces must
+  render server-returned evidence rather than re-slicing text with JavaScript UTF-16 offsets.
+- C2.2 uses one sequential Knowledge Curator Harness, not ReAct or an autonomous multi-Agent
+  conversation. Any chunk failure rejects the whole document result; only identical
+  predicate/value/evidence candidates are deduplicated, and every invocation remains traceable.
+- The committed NTE replay is a small, source-attributed snapshot of public English official-site
+  metadata. It is test evidence only, not an internal GDD, current live-site proof, or a live model
+  response.
 - The first cloud-provider adapter targets the OpenAI Responses API behind a provider-neutral
   `ModelGateway`, but C2.1 only implements its dependency-injected request adapter and simulated
   tests. It does not install a model SDK, read an API key, construct a network client, or perform a

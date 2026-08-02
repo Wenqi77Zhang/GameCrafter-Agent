@@ -1,0 +1,57 @@
+{
+  "fixture_schema_version": "gamecrafter-replay-v1",
+  "fixture_id": "nte-official-homepage-en-20260801-v1",
+  "source": {
+    "url": "https://nte.perfectworld.com/en/main.html",
+    "captured_at": "2026-08-01T15:36:16Z",
+    "public_material_notice": "Offline test snapshot of public official-site metadata; not an internal GDD or a live model result.",
+    "text_sha256": "b41602a514bfa147faba544c35a306d5b3caa7f5cc6b540082a3a43eb380cc8d"
+  },
+  "request": {
+    "source_version_id": "00000000-0000-0000-0000-00000000c222",
+    "subject_entity_key": "game:nte",
+    "text": "NTE is an supernatural urban open-world RPG developed by Hotta Studio, a subsidiary of Perfect World Games. In this Anomaly-filled city, you'll make a dazzling entrance, using your extraordinary Esper abilities to navigate freely and handle unexpected events. Beyond that, you can choose your own lifestyle, manage businesses, and experience a vibrant urban life.",
+    "text_start_offset": 0,
+    "locale": "en",
+    "region": "global",
+    "prompt_version": "knowledge-claim-v1",
+    "schema_version": "knowledge-claim-v1",
+    "fingerprint_sha256": "9e92fa33724c2bddfd61d9111967674e8516ee43695b7e42aa148919b63872fc"
+  },
+  "response": {
+    "claims": [
+      {
+        "predicate": "genre.primary",
+        "value_kind": "string",
+        "value": "supernatural urban open-world RPG",
+        "confidence": 0.99,
+        "evidence": [
+          {
+            "start_offset": 10,
+            "end_offset": 43,
+            "quote": "supernatural urban open-world RPG"
+          }
+        ]
+      },
+      {
+        "predicate": "game.developer",
+        "value_kind": "entity_ref",
+        "value": {
+          "entity_key": "organization:hotta-studio"
+        },
+        "confidence": 0.98,
+        "evidence": [
+          {
+            "start_offset": 57,
+            "end_offset": 69,
+            "quote": "Hotta Studio"
+          }
+        ]
+      }
+    ]
+  },
+  "usage": {
+    "input_tokens": 0,
+    "output_tokens": 0
+  }
+}

@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C2.1: zero-cost model gateway contracts**.
+The repository is currently in **M1-C C2.2: deterministic offline extraction Harness**.
 
-Implemented through M1-C C2.1:
+Implemented through M1-C C2.2:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -72,13 +72,20 @@ Implemented through M1-C C2.1:
   provider errors, and token-usage contracts;
 - a zero-cost runtime boundary: no model SDK, API key, network client, or live model call is
   constructed in C2.1.
+- a paragraph/sentence-aware deterministic Unicode chunker with exact source offsets, stable chunk
+  IDs, a 4,000-character limit, and 400-character overlap;
+- a sequential fail-closed extraction Harness with request/result fingerprint checks, exact
+  overlap deduplication, aggregate usage, and a replayable invocation manifest;
+- a strict offline-fixture loader plus a source-attributed English NTE homepage replay whose tests
+  actively block network access and report zero token usage.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- runnable extraction jobs, offline NTE replay data, deterministic conflict processing, review UI,
-  snapshot publication commands, embeddings, or an approved knowledge snapshot;
+- durable extraction jobs, model-invocation persistence, extraction APIs, deterministic conflict
+  processing, review UI, snapshot publication commands, embeddings, or an approved knowledge
+  snapshot;
 - live trend sources;
 - live LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
@@ -148,7 +155,9 @@ foundation. M1-B B1 adds inward-facing source-evidence contracts and a local `Ob
 adapter. B2 adds `PageFetcher` and `SiteAdapter` boundaries with HTTP, Playwright, and NTE
 implementations. B3 composes them into registered worker handlers and transactional source
 persistence. B4 adds validated delivery commands, project-scoped read models, SSE run events, and
-the bilingual human-control interface.
+the bilingual human-control interface. M1-C C1 adds reviewable knowledge lineage and PostgreSQL
+guards. C2.1 adds the zero-cost model boundary; C2.2 adds deterministic chunking, sequential
+offline extraction orchestration, and the source-attributed NTE replay fixture.
 
 ```mermaid
 flowchart TB
@@ -269,6 +278,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-B B4 source-workspace record](docs/migration/m1b-source-workspace.md)
 - [M1-C C1 knowledge-contract record](docs/migration/m1c-knowledge-review-contracts.md)
 - [M1-C C2.1 model-gateway record](docs/migration/m1c-model-gateway.md)
+- [M1-C C2.2 extraction-Harness record](docs/migration/m1c-extraction-harness.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles
