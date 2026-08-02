@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 from gamecrafter.infrastructure.database.models import (
     Base,
     DiscoveryCandidateRecord,
-    IngestionJobRecord,
+    WorkflowJobRecord,
 )
 from gamecrafter.infrastructure.database.workspace_service import (
     DatabaseWorkspaceService,
@@ -60,6 +60,8 @@ def test_project_and_discovery_run_are_idempotent_but_not_ambiguous() -> None:
         actor_id="test-user",
     )
     assert created is True
+    assert run["workflow_kind"] == "source.discover"
+    assert run["task_type"] == "source.discover"
     repeated, created = workspace.enqueue(
         project_id=UUID(project["id"]),
         idempotency_key="discovery-0001",
@@ -69,6 +71,20 @@ def test_project_and_discovery_run_are_idempotent_but_not_ambiguous() -> None:
     )
     assert created is False
     assert repeated["id"] == run["id"]
+
+    with sessions.begin() as session:
+        session.add(
+            WorkflowJobRecord(
+                run_id=UUID(run["id"]),
+                task_type="source.follow_up",
+                payload={},
+            )
+        )
+    listed = workspace.list_runs(UUID(project["id"]))
+    assert len(listed) == 1
+    assert listed[0]["task_type"] == "source.discover"
+    assert listed[0]["workflow_kind"] == "source.discover"
+
     with pytest.raises(WorkspaceConflictError, match="different request"):
         workspace.enqueue(
             project_id=UUID(project["id"]),
@@ -129,7 +145,7 @@ def test_candidate_selection_is_atomic_and_project_scoped() -> None:
     with sessions() as session:
         candidate = session.get(DiscoveryCandidateRecord, candidate_id)
         job = session.scalar(
-            select(IngestionJobRecord).where(IngestionJobRecord.run_id == UUID(capture["id"]))
+            select(WorkflowJobRecord).where(WorkflowJobRecord.run_id == UUID(capture["id"]))
         )
     assert candidate is not None
     assert candidate.status == "selected"

@@ -13,9 +13,9 @@ from gamecrafter.application.ports.site_adapter import AdaptedSource
 from gamecrafter.application.ports.source_repository import PreparedCapture
 from gamecrafter.domain.knowledge.sources import CaptureMethod, EvidenceDigest, SourceType
 from gamecrafter.infrastructure.database.models import (
-    IngestionRunRecord,
     SourceRecord,
     SourceVersionRecord,
+    WorkflowRunRecord,
 )
 from gamecrafter.infrastructure.database.run_service import DatabaseRunService
 from gamecrafter.infrastructure.database.source_repository import DatabaseSourceRepository
@@ -82,9 +82,10 @@ def test_capture_repository_is_idempotent_in_postgresql() -> None:
         name="异环",
     )
     with sessions.begin() as session:
-        run = IngestionRunRecord(
+        run = WorkflowRunRecord(
             project_id=project_id,
             idempotency_key=f"capture-{nonce}",
+            workflow_kind="source.capture",
         )
         session.add(run)
         session.flush()

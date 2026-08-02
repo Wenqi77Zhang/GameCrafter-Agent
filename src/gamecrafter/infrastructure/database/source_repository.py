@@ -19,11 +19,11 @@ from gamecrafter.domain.knowledge.sources import AssetRole, CandidateStatus, Cha
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
     DiscoveryCandidateRecord,
-    IngestionRunRecord,
     SourceAssetRecord,
     SourceRecord,
     SourceVersionRecord,
     StoredObjectRecord,
+    WorkflowRunRecord,
 )
 
 
@@ -346,10 +346,10 @@ class DatabaseSourceRepository:
             )
 
     @staticmethod
-    def _run(session: Session, run_id: UUID) -> IngestionRunRecord:
-        run = session.get(IngestionRunRecord, run_id)
+    def _run(session: Session, run_id: UUID) -> WorkflowRunRecord:
+        run = session.get(WorkflowRunRecord, run_id)
         if run is None:
-            raise SourcePersistenceError("source task references a missing ingestion run")
+            raise SourcePersistenceError("source task references a missing workflow run")
         return run
 
     @staticmethod
@@ -417,7 +417,7 @@ class DatabaseSourceRepository:
     def _event(
         self,
         *,
-        run: IngestionRunRecord,
+        run: WorkflowRunRecord,
         event_type: str,
         payload: dict,
     ) -> AuditEventRecord:

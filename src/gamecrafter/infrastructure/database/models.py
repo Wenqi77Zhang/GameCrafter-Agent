@@ -274,22 +274,32 @@ class SourceAssetRecord(Base):
     details: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False, default=dict)
 
 
-class IngestionRunRecord(Base):
-    """Durable state and checkpoint for one ingestion request."""
+class WorkflowRunRecord(Base):
+    """Durable state and checkpoint for one bounded workflow."""
 
-    __tablename__ = "ingestion_runs"
+    __tablename__ = "workflow_runs"
     __table_args__ = (
         CheckConstraint(
             "status IN ('queued', 'running', 'retry_wait', 'needs_attention', "
             "'succeeded', 'cancelled')",
-            name="ck_ingestion_runs_status",
+            name="ck_workflow_runs_status",
+        ),
+        CheckConstraint(
+            "length(trim(workflow_kind)) > 0",
+            name="ck_workflow_runs_kind_nonblank",
         ),
         UniqueConstraint(
             "project_id",
             "idempotency_key",
-            name="uq_ingestion_runs_project_idempotency",
+            name="uq_workflow_runs_project_idempotency",
         ),
-        Index("ix_ingestion_runs_project_created", "project_id", "created_at"),
+        Index("ix_workflow_runs_project_created", "project_id", "created_at"),
+        Index(
+            "ix_workflow_runs_project_kind_created",
+            "project_id",
+            "workflow_kind",
+            "created_at",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -299,6 +309,7 @@ class IngestionRunRecord(Base):
         nullable=False,
     )
     idempotency_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    workflow_kind: Mapped[str] = mapped_column(String(80), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default=RunStatus.QUEUED.value)
     checkpoint: Mapped[str] = mapped_column(String(64), nullable=False, default="created")
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -340,7 +351,7 @@ class DiscoveryCandidateRecord(Base):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     run_id: Mapped[UUID] = mapped_column(
         Uuid,
-        ForeignKey("ingestion_runs.id", ondelete="CASCADE"),
+        ForeignKey("workflow_runs.id", ondelete="CASCADE"),
         nullable=False,
     )
     project_id: Mapped[UUID] = mapped_column(
@@ -370,24 +381,24 @@ class DiscoveryCandidateRecord(Base):
     selected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class IngestionJobRecord(Base):
+class WorkflowJobRecord(Base):
     """Database-backed job with bounded attempts and an expiring lease."""
 
-    __tablename__ = "ingestion_jobs"
+    __tablename__ = "workflow_jobs"
     __table_args__ = (
         CheckConstraint(
             "status IN ('queued', 'leased', 'completed', 'failed', 'cancelled')",
-            name="ck_ingestion_jobs_status",
+            name="ck_workflow_jobs_status",
         ),
-        CheckConstraint("attempts >= 0", name="ck_ingestion_jobs_attempts_nonnegative"),
-        CheckConstraint("max_attempts > 0", name="ck_ingestion_jobs_max_attempts_positive"),
-        Index("ix_ingestion_jobs_claimable", "status", "available_at", "created_at"),
+        CheckConstraint("attempts >= 0", name="ck_workflow_jobs_attempts_nonnegative"),
+        CheckConstraint("max_attempts > 0", name="ck_workflow_jobs_max_attempts_positive"),
+        Index("ix_workflow_jobs_claimable", "status", "available_at", "created_at"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     run_id: Mapped[UUID] = mapped_column(
         Uuid,
-        ForeignKey("ingestion_runs.id", ondelete="CASCADE"),
+        ForeignKey("workflow_runs.id", ondelete="CASCADE"),
         nullable=False,
     )
     task_type: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -430,7 +441,7 @@ class AuditEventRecord(Base):
     )
     run_id: Mapped[UUID | None] = mapped_column(
         Uuid,
-        ForeignKey("ingestion_runs.id", ondelete="SET NULL"),
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"),
     )
     event_type: Mapped[str] = mapped_column(String(100), nullable=False)
     actor_type: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -532,7 +543,7 @@ class KnowledgeClaimRecord(Base):
     )
     extraction_run_id: Mapped[UUID | None] = mapped_column(
         Uuid,
-        ForeignKey("ingestion_runs.id", ondelete="SET NULL"),
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"),
     )
     predicate: Mapped[str] = mapped_column(String(80), nullable=False)
     value_kind: Mapped[str] = mapped_column(String(32), nullable=False)

@@ -19,9 +19,9 @@ from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
     Base,
     DiscoveryCandidateRecord,
-    IngestionRunRecord,
     SourceAssetRecord,
     SourceVersionRecord,
+    WorkflowRunRecord,
 )
 from gamecrafter.infrastructure.database.run_service import DatabaseRunService
 from gamecrafter.infrastructure.database.source_repository import (
@@ -269,7 +269,7 @@ def test_worker_executes_direct_capture_to_audited_immutable_version(tmp_path: P
     assert worker.run_once() is True
 
     with factory() as session:
-        run = session.get(IngestionRunRecord, run_id)
+        run = session.get(WorkflowRunRecord, run_id)
         assert run is not None
         assert run.status == "succeeded"
         assert session.scalar(select(func.count()).select_from(SourceVersionRecord)) == 1

@@ -2,14 +2,14 @@ from datetime import UTC, datetime
 
 import pytest
 
-from gamecrafter.domain.runs.state import IngestionRun, RunStatus, RunTransitionError
+from gamecrafter.domain.runs.state import RunStatus, RunTransitionError, WorkflowRun
 
 
 def test_run_follows_a_valid_success_path() -> None:
     started_at = datetime(2026, 7, 28, 8, 0, tzinfo=UTC)
     finished_at = datetime(2026, 7, 28, 8, 1, tzinfo=UTC)
 
-    running = IngestionRun().transition(
+    running = WorkflowRun().transition(
         RunStatus.RUNNING,
         checkpoint="policy_check",
         at=started_at,
@@ -27,7 +27,7 @@ def test_run_follows_a_valid_success_path() -> None:
 
 
 def test_terminal_run_cannot_be_silently_reopened() -> None:
-    succeeded = IngestionRun().transition(RunStatus.RUNNING).transition(RunStatus.SUCCEEDED)
+    succeeded = WorkflowRun().transition(RunStatus.RUNNING).transition(RunStatus.SUCCEEDED)
 
     with pytest.raises(RunTransitionError, match="cannot transition"):
         succeeded.transition(RunStatus.RUNNING)
@@ -35,7 +35,7 @@ def test_terminal_run_cannot_be_silently_reopened() -> None:
 
 def test_retry_requires_an_explicit_wait_checkpoint() -> None:
     retry_wait = (
-        IngestionRun()
+        WorkflowRun()
         .transition(RunStatus.RUNNING, checkpoint="capture")
         .transition(
             RunStatus.RETRY_WAIT,

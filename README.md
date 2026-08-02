@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C2.2: deterministic offline extraction Harness**.
+The repository is currently in **M1-C C2.3a: generic Workflow Run/Job foundation**.
 
-Implemented through M1-C C2.2:
+Implemented through M1-C C2.3a:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -24,7 +24,7 @@ Implemented through M1-C C2.2:
 - baseline tests and continuous integration;
 - product, architecture, migration, and roadmap documentation.
 - PostgreSQL 17 plus pgvector Docker Compose configuration;
-- Alembic migrations for projects, ingestion runs, leased jobs, and audit events;
+- Alembic migrations for projects, generic workflow runs, leased jobs, and audit events;
 - a bounded-retry Python worker shell with durable checkpoints and idempotent run creation;
 - API liveness and database-readiness endpoints;
 - PostgreSQL migration and queue verification in CI;
@@ -78,12 +78,18 @@ Implemented through M1-C C2.2:
   overlap deduplication, aggregate usage, and a replayable invocation manifest;
 - a strict offline-fixture loader plus a source-attributed English NTE homepage replay whose tests
   actively block network access and report zero token usage.
+- a data-preserving `ingestion_runs`/`ingestion_jobs` to `workflow_runs`/`workflow_jobs` migration;
+- a nonblank `workflow_kind` discriminator backfilled from each legacy run's initial task;
+- reusable PostgreSQL-leased workflow execution for source, knowledge, and later marketing jobs
+  without adding a second queue stack;
+- upgrade/downgrade coverage that preserves run, job, audit, and knowledge-claim lineage while the
+  existing `/runs` source experience remains compatible.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- durable extraction jobs, model-invocation persistence, extraction APIs, deterministic conflict
+- durable extraction execution, model-invocation persistence, extraction APIs, deterministic conflict
   processing, review UI, snapshot publication commands, embeddings, or an approved knowledge
   snapshot;
 - live trend sources;
@@ -157,7 +163,8 @@ implementations. B3 composes them into registered worker handlers and transactio
 persistence. B4 adds validated delivery commands, project-scoped read models, SSE run events, and
 the bilingual human-control interface. M1-C C1 adds reviewable knowledge lineage and PostgreSQL
 guards. C2.1 adds the zero-cost model boundary; C2.2 adds deterministic chunking, sequential
-offline extraction orchestration, and the source-attributed NTE replay fixture.
+offline extraction orchestration, and the source-attributed NTE replay fixture. C2.3a generalizes
+the durable run/job substrate so later knowledge and marketing workflows reuse the same queue.
 
 ```mermaid
 flowchart TB
@@ -279,6 +286,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-C C1 knowledge-contract record](docs/migration/m1c-knowledge-review-contracts.md)
 - [M1-C C2.1 model-gateway record](docs/migration/m1c-model-gateway.md)
 - [M1-C C2.2 extraction-Harness record](docs/migration/m1c-extraction-harness.md)
+- [M1-C C2.3a workflow-foundation record](docs/migration/m1c-workflow-foundation.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

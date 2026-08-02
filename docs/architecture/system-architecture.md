@@ -27,7 +27,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M1-B runtime
+## Implemented M1-A to M1-C C2.3a runtime
 
 ```mermaid
 flowchart LR
@@ -35,11 +35,11 @@ flowchart LR
     WEB["React Sources and Runs workspace"]
     API["FastAPI"]
     COMMAND["Validated workspace commands and queries"]
-    RUNS[("ingestion_runs")]
-    JOBS[("ingestion_jobs")]
+    RUNS[("workflow_runs")]
+    JOBS[("workflow_jobs")]
     AUDIT[("audit_events")]
     WORKER["Python worker"]
-    HANDLER["M1-B source handlers"]
+    HANDLER["Registered source and future specialist handlers"]
 
     USER --> WEB --> API
     API -->|"sources, candidates, runs"| WEB
@@ -55,15 +55,17 @@ flowchart LR
 ```
 
 The worker-to-handler arrow is implemented in M1-B B3; the commands, queries, and event delivery are
-implemented in B4. PostgreSQL owns project, candidate, run, job, and audit consistency. The worker
-never claims a website or model capability until its typed handler is implemented and registered.
+implemented in B4. C2.3a renames the substrate without replacing rows and adds `workflow_kind` to
+make each run's business purpose explicit. PostgreSQL owns project, candidate, run, job, and audit
+consistency. The worker never claims a website or model capability until its typed handler is
+implemented and registered.
 
 ## Implemented M1-B B1 evidence contracts
 
 ```mermaid
 flowchart LR
     PROJECT["Project"]
-    RUN["Ingestion run"]
+    RUN["Workflow run: source ingestion kind"]
     CANDIDATE["Discovery candidate"]
     FAMILY["Multilingual content family"]
     SOURCE["Canonical source"]
@@ -348,6 +350,35 @@ blocks socket connections, proving the replay path does not require a model SDK,
 network request, or token spend. It is a test snapshot of public material, not an internal GDD or
 live-site acceptance evidence.
 
+## Implemented M1-C C2.3a generic workflow substrate
+
+```mermaid
+flowchart LR
+    COMMAND["Existing or future application command"]
+    RUN[("workflow_runs: workflow_kind and checkpoint")]
+    JOB[("workflow_jobs: task_type and lease")]
+    WORKER["Shared bounded-retry Python worker"]
+    SOURCE["source.discover or source.capture"]
+    KNOWLEDGE["knowledge.extract in C2.3b"]
+    MARKETING["marketing workflows in later milestones"]
+    AUDIT[("append-only audit_events")]
+
+    COMMAND -->|"atomic idempotent enqueue"| RUN --> JOB --> WORKER
+    WORKER --> SOURCE
+    WORKER -. "registered later" .-> KNOWLEDGE
+    WORKER -. "registered later" .-> MARKETING
+    WORKER -->|"checkpoint, retry, terminal state"| RUN
+    WORKER --> AUDIT
+```
+
+C2.3a is an infrastructure generalization, not durable extraction. The migration renames the
+existing tables in place, preserves identifiers and all foreign-key lineage, backfills each legacy
+run's `workflow_kind` from its earliest job, and retains `system.unknown` only for legacy runs that
+have no job. Upgrade/downgrade tests cover run, job, audit, and extraction-claim references. The
+existing `/runs` route and source UI retain `task_type` compatibility while exposing the new generic
+kind. One queue prevents source ingestion, knowledge extraction, and later marketing execution from
+developing incompatible retry, checkpoint, and observability semantics.
+
 ## Marketing workflow state graph
 
 ```mermaid
@@ -472,8 +503,10 @@ Specialist research nodes may use a bounded `Perceive → Reason → Act → Eva
 
 ## Storage direction
 
-M1-A implements PostgreSQL, enables pgvector, and stores projects, ingestion runs, leased jobs, and
-audit events. M1-B B1 adds source identities, immutable evidence versions, multilingual content
+M1-A implements PostgreSQL, enables pgvector, and initially stores projects, ingestion runs, leased
+jobs, and audit events. C2.3a data-preservingly renames those execution tables to `workflow_runs`
+and `workflow_jobs`, adds the nonblank `workflow_kind`, and retains the PostgreSQL lease queue.
+M1-B B1 adds source identities, immutable evidence versions, multilingual content
 families, discovery candidates, stored-object metadata, and evidence links. Large bytes use the
 `ObjectStorage` application port; its first adapter is a private content-addressed local filesystem.
 B2 adds source-policy, `PageFetcher`, and `SiteAdapter` boundaries. B3 writes raw HTML, normalized
@@ -491,13 +524,14 @@ model calls, conflict classification, review APIs, or embeddings.
 
 M1-C C2.1 adds the framework-independent model port and zero-cost adapters. C2.2 adds the pure
 deterministic source chunker, sequential extraction Harness, invocation manifest, strict fixture
-loader, and source-attributed NTE offline replay. It still does not add a durable extraction job,
-database invocation record, preflight or extraction API, product interface, live model call,
-conflict classifier, or review action.
+loader, and source-attributed NTE offline replay. C2.3a supplies the generic durable execution
+substrate but deliberately does not register a durable extraction handler or persist model
+invocations or claims; those belong to C2.3b. Extraction preflight/API, product interface, live
+model call, conflict classifier, and review action also remain unimplemented.
 
 ## Observability
 
-Each future run will record:
+Each workflow run progressively records:
 
 - run and trace identifiers;
 - node state and checkpoint;

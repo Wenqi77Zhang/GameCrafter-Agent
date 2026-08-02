@@ -41,6 +41,7 @@ class FakeWorkspace:
         return {
             "id": str(RUN_ID),
             "project_id": str(PROJECT_ID),
+            "workflow_kind": kwargs["task_type"],
             "task_type": kwargs["task_type"],
             "status": "queued",
             "checkpoint": "created",
@@ -86,6 +87,7 @@ def test_workspace_commands_require_explicit_idempotency_and_human_candidate() -
             json={"candidate_id": "40000000-0000-0000-0000-000000000001"},
         )
         assert response.status_code == 202
+        assert response.json()["workflow_kind"] == "source.capture"
         assert fake.enqueued[0]["task_type"] == "source.capture"
         assert fake.enqueued[0]["candidate_id"] == UUID("40000000-0000-0000-0000-000000000001")
     finally:

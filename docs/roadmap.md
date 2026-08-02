@@ -39,5 +39,8 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C2.2 implements deterministic 4,000/400 Unicode chunking, sequential fail-closed extraction
   orchestration, exact overlap deduplication, strict source-attributed replay-fixture loading, and a
   network-blocked English NTE homepage replay.
-- M1-C C3–C5 durable extraction jobs and persistence, extraction APIs, conflict processing, review
-  UI, publication/evaluation, and M1-D real NTE acceptance remain unimplemented.
+- M1-C C2.3a implements the generic `workflow_runs`/`workflow_jobs` substrate, a stable
+  `workflow_kind`, data-preserving upgrade/downgrade, and reuse of the existing PostgreSQL leased
+  queue while retaining the `/runs` source workflow.
+- M1-C C2.3b durable knowledge extraction, C2.4 extraction UI, C2.5 NTE PostgreSQL acceptance, C3
+  deterministic conflicts, C4 human reviews, and C5 snapshot publication remain unimplemented.
