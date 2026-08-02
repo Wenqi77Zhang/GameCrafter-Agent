@@ -9,11 +9,11 @@ from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from gamecrafter.application.jobs import ClaimedJob
-from gamecrafter.domain.runs.state import IngestionRun, JobStatus, RunStatus
+from gamecrafter.domain.runs.state import JobStatus, RunStatus, WorkflowRun
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
-    IngestionJobRecord,
-    IngestionRunRecord,
+    WorkflowJobRecord,
+    WorkflowRunRecord,
 )
 
 
@@ -21,8 +21,8 @@ class JobLeaseError(RuntimeError):
     """Raised when a worker no longer owns the job it tries to update."""
 
 
-def _run_state(record: IngestionRunRecord) -> IngestionRun:
-    return IngestionRun(
+def _run_state(record: WorkflowRunRecord) -> WorkflowRun:
+    return WorkflowRun(
         status=RunStatus(record.status),
         checkpoint=record.checkpoint,
         version=record.version,
@@ -33,7 +33,7 @@ def _run_state(record: IngestionRunRecord) -> IngestionRun:
     )
 
 
-def _apply_run_state(record: IngestionRunRecord, state: IngestionRun) -> None:
+def _apply_run_state(record: WorkflowRunRecord, state: WorkflowRun) -> None:
     record.status = state.status.value
     record.checkpoint = state.checkpoint
     record.version = state.version
@@ -45,7 +45,7 @@ def _apply_run_state(record: IngestionRunRecord, state: IngestionRun) -> None:
 
 def _event(
     *,
-    run: IngestionRunRecord,
+    run: WorkflowRunRecord,
     event_type: str,
     worker_id: str,
     payload: dict[str, Any] | None = None,
@@ -68,22 +68,22 @@ class DatabaseJobQueue:
 
     def claim_next(self, *, worker_id: str, lease_seconds: int) -> ClaimedJob | None:
         now = datetime.now(UTC)
-        claimable: Select[tuple[IngestionJobRecord]] = (
-            select(IngestionJobRecord)
+        claimable: Select[tuple[WorkflowJobRecord]] = (
+            select(WorkflowJobRecord)
             .where(
                 or_(
                     and_(
-                        IngestionJobRecord.status == JobStatus.QUEUED.value,
-                        IngestionJobRecord.attempts < IngestionJobRecord.max_attempts,
-                        IngestionJobRecord.available_at <= now,
+                        WorkflowJobRecord.status == JobStatus.QUEUED.value,
+                        WorkflowJobRecord.attempts < WorkflowJobRecord.max_attempts,
+                        WorkflowJobRecord.available_at <= now,
                     ),
                     and_(
-                        IngestionJobRecord.status == JobStatus.LEASED.value,
-                        IngestionJobRecord.lease_expires_at <= now,
+                        WorkflowJobRecord.status == JobStatus.LEASED.value,
+                        WorkflowJobRecord.lease_expires_at <= now,
                     ),
                 ),
             )
-            .order_by(IngestionJobRecord.available_at, IngestionJobRecord.created_at)
+            .order_by(WorkflowJobRecord.available_at, WorkflowJobRecord.created_at)
             .with_for_update(skip_locked=True)
             .limit(1)
         )
@@ -93,7 +93,7 @@ class DatabaseJobQueue:
             if job is None:
                 return None
 
-            run = session.get(IngestionRunRecord, job.run_id, with_for_update=True)
+            run = session.get(WorkflowRunRecord, job.run_id, with_for_update=True)
             if run is None:
                 raise RuntimeError(f"job {job.id} references a missing run")
 
@@ -168,11 +168,11 @@ class DatabaseJobQueue:
 
             unfinished = session.scalar(
                 select(func.count())
-                .select_from(IngestionJobRecord)
+                .select_from(WorkflowJobRecord)
                 .where(
-                    IngestionJobRecord.run_id == run.id,
-                    IngestionJobRecord.id != record.id,
-                    IngestionJobRecord.status.in_([JobStatus.QUEUED.value, JobStatus.LEASED.value]),
+                    WorkflowJobRecord.run_id == run.id,
+                    WorkflowJobRecord.id != record.id,
+                    WorkflowJobRecord.status.in_([JobStatus.QUEUED.value, JobStatus.LEASED.value]),
                 )
             )
             if unfinished == 0:
@@ -250,9 +250,9 @@ class DatabaseJobQueue:
         session: Session,
         job: ClaimedJob,
         worker_id: str,
-    ) -> tuple[IngestionJobRecord, IngestionRunRecord]:
+    ) -> tuple[WorkflowJobRecord, WorkflowRunRecord]:
         record = session.scalar(
-            select(IngestionJobRecord).where(IngestionJobRecord.id == job.id).with_for_update()
+            select(WorkflowJobRecord).where(WorkflowJobRecord.id == job.id).with_for_update()
         )
         if (
             record is None
@@ -261,7 +261,7 @@ class DatabaseJobQueue:
         ):
             raise JobLeaseError(f"worker {worker_id} no longer owns job {job.id}")
 
-        run = session.get(IngestionRunRecord, record.run_id, with_for_update=True)
+        run = session.get(WorkflowRunRecord, record.run_id, with_for_update=True)
         if run is None:
             raise RuntimeError(f"job {job.id} references a missing run")
         return record, run

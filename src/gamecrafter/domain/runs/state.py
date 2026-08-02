@@ -1,4 +1,4 @@
-"""Pure ingestion-run and job state rules."""
+"""Pure workflow-run and job state rules."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from enum import StrEnum
 
 
 class RunStatus(StrEnum):
-    """Durable lifecycle of an ingestion run."""
+    """Durable lifecycle shared by every bounded workflow run."""
 
     QUEUED = "queued"
     RUNNING = "running"
@@ -52,7 +52,7 @@ ALLOWED_RUN_TRANSITIONS: dict[RunStatus, frozenset[RunStatus]] = {
 
 
 @dataclass(frozen=True, slots=True)
-class IngestionRun:
+class WorkflowRun:
     """Framework-independent run state used by application services."""
 
     status: RunStatus = RunStatus.QUEUED
@@ -71,7 +71,7 @@ class IngestionRun:
         error_code: str | None = None,
         error_detail: str | None = None,
         at: datetime | None = None,
-    ) -> IngestionRun:
+    ) -> WorkflowRun:
         """Return a new validated state without mutating the current run."""
 
         if target not in ALLOWED_RUN_TRANSITIONS[self.status]:

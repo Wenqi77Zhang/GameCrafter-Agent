@@ -71,6 +71,15 @@ Public sources must not be described as an internal GDD. For existing games, the
 - C2.2 uses one sequential Knowledge Curator Harness, not ReAct or an autonomous multi-Agent
   conversation. Any chunk failure rejects the whole document result; only identical
   predicate/value/evidence candidates are deduplicated, and every invocation remains traceable.
+- C2.3a generalizes the original source-ingestion tables into `workflow_runs` and `workflow_jobs`.
+  Every run has a nonblank `workflow_kind`; source ingestion, knowledge extraction, and later
+  marketing workflows reuse one PostgreSQL leased queue rather than introducing a parallel broker
+  or worker system.
+- The rename is data-preserving and reversible. Existing run IDs, job IDs, audit references,
+  knowledge-claim extraction references, idempotency behavior, `/runs` routes, and current source UI
+  semantics remain stable.
+- The confirmed M1-C order is C2.3a workflow substrate, C2.3b durable extraction, C2.4 extraction
+  UI, C2.5 NTE PostgreSQL acceptance, C3 conflicts, C4 reviews, and C5 publication.
 - The committed NTE replay is a small, source-attributed snapshot of public English official-site
   metadata. It is test evidence only, not an internal GDD, current live-site proof, or a live model
   response.

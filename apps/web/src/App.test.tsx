@@ -41,6 +41,7 @@ function workspaceFetch(options?: { projects?: typeof project[]; candidates?: un
       return json(
         {
           id: "run-1",
+          workflow_kind: "source.capture",
           task_type: "source.capture",
           status: "queued",
           checkpoint: "created",

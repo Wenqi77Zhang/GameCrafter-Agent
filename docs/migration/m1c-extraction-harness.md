@@ -57,4 +57,5 @@ a claim that the live page is unchanged, or a real model response. Token usage i
 - deterministic conflict processing, review actions, and snapshot publication;
 - any live model call or paid API use.
 
-These belong to C3 and later slices.
+These belong to C2.3b and later slices. C2.3a first supplies the generic durable workflow
+substrate without claiming durable extraction itself.

@@ -10,8 +10,8 @@ from gamecrafter.infrastructure.database.job_queue import DatabaseJobQueue
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
     Base,
-    IngestionJobRecord,
-    IngestionRunRecord,
+    WorkflowJobRecord,
+    WorkflowRunRecord,
 )
 from gamecrafter.infrastructure.database.run_service import DatabaseRunService
 
@@ -60,8 +60,8 @@ def test_project_run_and_job_complete_as_one_audited_flow() -> None:
     assert handled == [{"source_count": 5}]
 
     with sessions() as session:
-        run = session.get(IngestionRunRecord, run_id)
-        job = session.scalar(select(IngestionJobRecord).where(IngestionJobRecord.run_id == run_id))
+        run = session.get(WorkflowRunRecord, run_id)
+        job = session.scalar(select(WorkflowJobRecord).where(WorkflowJobRecord.run_id == run_id))
         event_types = session.scalars(
             select(AuditEventRecord.event_type)
             .where(AuditEventRecord.run_id == run_id)
@@ -97,8 +97,8 @@ def test_unknown_job_becomes_visible_instead_of_looping_forever() -> None:
     assert worker.run_once() is True
 
     with sessions() as session:
-        run = session.get(IngestionRunRecord, run_id)
-        job = session.scalar(select(IngestionJobRecord).where(IngestionJobRecord.run_id == run_id))
+        run = session.get(WorkflowRunRecord, run_id)
+        job = session.scalar(select(WorkflowJobRecord).where(WorkflowJobRecord.run_id == run_id))
 
     assert run is not None
     assert run.status == RunStatus.NEEDS_ATTENTION.value
@@ -118,8 +118,8 @@ def test_expired_final_lease_becomes_visible_for_human_recovery() -> None:
         max_attempts=1,
     )
     with sessions.begin() as session:
-        run = session.get(IngestionRunRecord, run_id)
-        job = session.scalar(select(IngestionJobRecord).where(IngestionJobRecord.run_id == run_id))
+        run = session.get(WorkflowRunRecord, run_id)
+        job = session.scalar(select(WorkflowJobRecord).where(WorkflowJobRecord.run_id == run_id))
         assert run is not None
         assert job is not None
         run.status = RunStatus.RUNNING.value
@@ -136,8 +136,8 @@ def test_expired_final_lease_becomes_visible_for_human_recovery() -> None:
 
     assert claimed is None
     with sessions() as session:
-        run = session.get(IngestionRunRecord, run_id)
-        job = session.scalar(select(IngestionJobRecord).where(IngestionJobRecord.run_id == run_id))
+        run = session.get(WorkflowRunRecord, run_id)
+        job = session.scalar(select(WorkflowJobRecord).where(WorkflowJobRecord.run_id == run_id))
     assert run is not None
     assert run.status == RunStatus.NEEDS_ATTENTION.value
     assert run.last_error_code == "lease_expired"

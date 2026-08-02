@@ -12,12 +12,12 @@ from sqlalchemy.orm import Session, sessionmaker
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
     DiscoveryCandidateRecord,
-    IngestionJobRecord,
-    IngestionRunRecord,
     ProjectRecord,
     SourceAssetRecord,
     SourceRecord,
     SourceVersionRecord,
+    WorkflowJobRecord,
+    WorkflowRunRecord,
 )
 
 
@@ -88,14 +88,17 @@ class DatabaseWorkspaceService:
             if session.get(ProjectRecord, project_id) is None:
                 raise WorkspaceNotFoundError("project not found")
             existing = session.scalar(
-                select(IngestionRunRecord).where(
-                    IngestionRunRecord.project_id == project_id,
-                    IngestionRunRecord.idempotency_key == idempotency_key,
+                select(WorkflowRunRecord).where(
+                    WorkflowRunRecord.project_id == project_id,
+                    WorkflowRunRecord.idempotency_key == idempotency_key,
                 )
             )
             if existing is not None:
                 job = session.scalar(
-                    select(IngestionJobRecord).where(IngestionJobRecord.run_id == existing.id)
+                    select(WorkflowJobRecord)
+                    .where(WorkflowJobRecord.run_id == existing.id)
+                    .order_by(WorkflowJobRecord.created_at, WorkflowJobRecord.id)
+                    .limit(1)
                 )
                 if job is None or job.task_type != task_type or job.payload != payload:
                     raise WorkspaceConflictError(
@@ -117,14 +120,15 @@ class DatabaseWorkspaceService:
                 candidate.status = "selected"
                 candidate.selected_at = datetime.now(UTC)
 
-            run = IngestionRunRecord(
+            run = WorkflowRunRecord(
                 project_id=project_id,
                 idempotency_key=idempotency_key,
+                workflow_kind=task_type,
             )
             session.add(run)
             session.flush()
             session.add(
-                IngestionJobRecord(
+                WorkflowJobRecord(
                     run_id=run.id,
                     task_type=task_type,
                     payload=payload,
@@ -229,20 +233,33 @@ class DatabaseWorkspaceService:
     def list_runs(self, project_id: UUID) -> list[dict[str, Any]]:
         with self._session_factory() as session:
             self._require_project(session, project_id)
+            initial_task_type = (
+                select(WorkflowJobRecord.task_type)
+                .where(WorkflowJobRecord.run_id == WorkflowRunRecord.id)
+                .order_by(WorkflowJobRecord.created_at, WorkflowJobRecord.id)
+                .limit(1)
+                .scalar_subquery()
+            )
             rows = session.execute(
-                select(IngestionRunRecord, IngestionJobRecord.task_type)
-                .join(IngestionJobRecord, IngestionJobRecord.run_id == IngestionRunRecord.id)
-                .where(IngestionRunRecord.project_id == project_id)
-                .order_by(IngestionRunRecord.created_at.desc())
+                select(WorkflowRunRecord, initial_task_type.label("initial_task_type"))
+                .where(WorkflowRunRecord.project_id == project_id)
+                .order_by(WorkflowRunRecord.created_at.desc())
             ).all()
             return [self._run(run, task_type) for run, task_type in rows]
 
     def get_run(self, run_id: UUID) -> dict[str, Any]:
         with self._session_factory() as session:
+            initial_task_type = (
+                select(WorkflowJobRecord.task_type)
+                .where(WorkflowJobRecord.run_id == WorkflowRunRecord.id)
+                .order_by(WorkflowJobRecord.created_at, WorkflowJobRecord.id)
+                .limit(1)
+                .scalar_subquery()
+            )
             row = session.execute(
-                select(IngestionRunRecord, IngestionJobRecord.task_type)
-                .join(IngestionJobRecord, IngestionJobRecord.run_id == IngestionRunRecord.id)
-                .where(IngestionRunRecord.id == run_id)
+                select(WorkflowRunRecord, initial_task_type.label("initial_task_type")).where(
+                    WorkflowRunRecord.id == run_id
+                )
             ).one_or_none()
             if row is None:
                 raise WorkspaceNotFoundError("run not found")
@@ -250,7 +267,7 @@ class DatabaseWorkspaceService:
 
     def events_after(self, run_id: UUID, cursor: UUID | None) -> tuple[list[dict[str, Any]], bool]:
         with self._session_factory() as session:
-            run = session.get(IngestionRunRecord, run_id)
+            run = session.get(WorkflowRunRecord, run_id)
             if run is None:
                 raise WorkspaceNotFoundError("run not found")
             statement = select(AuditEventRecord).where(AuditEventRecord.run_id == run_id)
@@ -291,11 +308,12 @@ class DatabaseWorkspaceService:
         }
 
     @staticmethod
-    def _run(row: IngestionRunRecord, task_type: str) -> dict[str, Any]:
+    def _run(row: WorkflowRunRecord, task_type: str | None) -> dict[str, Any]:
         return {
             "id": str(row.id),
             "project_id": str(row.project_id),
-            "task_type": task_type,
+            "workflow_kind": row.workflow_kind,
+            "task_type": task_type or row.workflow_kind,
             "status": row.status,
             "checkpoint": row.checkpoint,
             "last_error_code": row.last_error_code,

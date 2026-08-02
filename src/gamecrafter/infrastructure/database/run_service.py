@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
-    IngestionJobRecord,
-    IngestionRunRecord,
     ProjectRecord,
+    WorkflowJobRecord,
+    WorkflowRunRecord,
 )
 
 
@@ -64,22 +64,23 @@ class DatabaseRunService:
 
         with self._session_factory.begin() as session:
             existing = session.scalar(
-                select(IngestionRunRecord).where(
-                    IngestionRunRecord.project_id == project_id,
-                    IngestionRunRecord.idempotency_key == idempotency_key,
+                select(WorkflowRunRecord).where(
+                    WorkflowRunRecord.project_id == project_id,
+                    WorkflowRunRecord.idempotency_key == idempotency_key,
                 )
             )
             if existing is not None:
                 return existing.id
 
-            run = IngestionRunRecord(
+            run = WorkflowRunRecord(
                 project_id=project_id,
                 idempotency_key=idempotency_key,
+                workflow_kind=task_type,
             )
             session.add(run)
             session.flush()
             session.add(
-                IngestionJobRecord(
+                WorkflowJobRecord(
                     run_id=run.id,
                     task_type=task_type,
                     payload=payload or {},

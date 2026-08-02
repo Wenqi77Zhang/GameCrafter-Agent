@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from gamecrafter.application.jobs import Worker
 from gamecrafter.domain.runs.state import RunStatus
 from gamecrafter.infrastructure.database.job_queue import DatabaseJobQueue
-from gamecrafter.infrastructure.database.models import IngestionRunRecord
+from gamecrafter.infrastructure.database.models import WorkflowRunRecord
 from gamecrafter.infrastructure.database.run_service import DatabaseRunService
 
 pytestmark = pytest.mark.postgres
@@ -40,14 +40,24 @@ def test_migration_enables_pgvector_and_worker_transactions() -> None:
         lease_seconds=30,
     )
 
-    assert worker.run_once() is True
+    for _ in range(20):
+        assert worker.run_once() is True
+        with sessions() as session:
+            current_status = session.scalar(
+                select(WorkflowRunRecord.status).where(WorkflowRunRecord.id == run_id)
+            )
+        if current_status == RunStatus.SUCCEEDED.value:
+            break
+    else:
+        pytest.fail("target PostgreSQL test run did not finish within the drain bound")
 
     with sessions() as session:
         extension_version = session.scalar(
             text("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
         )
-        run = session.scalar(select(IngestionRunRecord).where(IngestionRunRecord.id == run_id))
+        run = session.scalar(select(WorkflowRunRecord).where(WorkflowRunRecord.id == run_id))
 
     assert extension_version is not None
     assert run is not None
     assert run.status == RunStatus.SUCCEEDED.value
+    assert run.workflow_kind == "test.postgres"

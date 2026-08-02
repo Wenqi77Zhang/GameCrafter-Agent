@@ -30,6 +30,7 @@ type Source = {
 };
 type Run = {
   id: string;
+  workflow_kind: string;
   task_type: "source.discover" | "source.capture";
   status: string;
   checkpoint: string;
