@@ -10,19 +10,29 @@ from gamecrafter.config.settings import get_settings
 from gamecrafter.infrastructure.database.job_queue import DatabaseJobQueue
 from gamecrafter.infrastructure.database.session import get_session_factory
 from gamecrafter.infrastructure.ingestion.handlers import build_source_handlers
+from gamecrafter.infrastructure.models.handlers import build_knowledge_handlers
 
 
 def create_worker() -> Worker:
-    """Build the worker with the implemented M1-B source handlers."""
+    """Build the shared worker with source and durable knowledge handlers."""
 
     settings = get_settings()
     session_factory = get_session_factory()
-    return Worker(
-        queue=DatabaseJobQueue(session_factory),
-        handlers=build_source_handlers(
+    handlers = dict(
+        build_source_handlers(
             settings=settings,
             session_factory=session_factory,
-        ),
+        )
+    )
+    handlers.update(
+        build_knowledge_handlers(
+            settings=settings,
+            session_factory=session_factory,
+        )
+    )
+    return Worker(
+        queue=DatabaseJobQueue(session_factory),
+        handlers=handlers,
         worker_id=settings.worker_id,
         lease_seconds=settings.job_lease_seconds,
     )

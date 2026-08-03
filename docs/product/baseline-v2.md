@@ -78,6 +78,19 @@ Public sources must not be described as an internal GDD. For existing games, the
 - The rename is data-preserving and reversible. Existing run IDs, job IDs, audit references,
   knowledge-claim extraction references, idempotency behavior, `/runs` routes, and current source UI
   semantics remain stable.
+- C2.3b registers `knowledge.extract` on that shared worker. The handler accepts only project-bound
+  immutable source-version and subject IDs, verifies the normalized object byte count, digest,
+  encoding, and configured size limit, then fails the whole document closed on any chunk error.
+- Each chunk attempt persists redacted operational metadata only: hashes, offsets, provider/model
+  identifiers, response ID, usage, claim count, status, and safe error code. Prompt bodies, source
+  bodies, response bodies, keys, and local object paths are excluded from invocation rows and API
+  read models.
+- Candidate claims, exact evidence spans, the immutable result marker, and its audit event commit in
+  one transaction. A committed result is the retry idempotency boundary; PostgreSQL lineage triggers
+  reject cross-project or wrong-workflow extraction records.
+- The extraction command is unavailable while the model provider is disabled and is accepted in C2
+  only when a validated local fixture exactly covers the deterministic request fingerprints. This
+  preserves strict zero API cost; no approximate fixture or paid fallback exists.
 - The confirmed M1-C order is C2.3a workflow substrate, C2.3b durable extraction, C2.4 extraction
   UI, C2.5 NTE PostgreSQL acceptance, C3 conflicts, C4 reviews, and C5 publication.
 - The committed NTE replay is a small, source-attributed snapshot of public English official-site

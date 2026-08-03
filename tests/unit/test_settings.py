@@ -21,6 +21,8 @@ def test_settings_use_safe_local_defaults() -> None:
     assert settings.source_targeted_candidate_limit == 100
     assert settings.worker_id == "local-worker"
     assert settings.model_provider == "disabled"
+    assert settings.model_replay_fixture_path is None
+    assert settings.knowledge_document_max_bytes == 2 * 1024 * 1024
     assert settings.model_api_key is None
 
 

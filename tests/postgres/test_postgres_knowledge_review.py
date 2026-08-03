@@ -14,6 +14,7 @@ from gamecrafter.infrastructure.database.models import (
     ClaimReviewRecord,
     KnowledgeClaimRecord,
     KnowledgeEntityRecord,
+    KnowledgeExtractionResultRecord,
     KnowledgeSnapshotMemberRecord,
     KnowledgeSnapshotRecord,
     SourceRecord,
@@ -237,3 +238,126 @@ def test_postgres_rejects_cross_project_claim_subject() -> None:
                 schema_version="claim-v1",
             )
         )
+
+
+def test_postgres_enforces_extraction_lineage_and_immutable_result() -> None:
+    sessions = postgres_sessions()
+    nonce = uuid4().hex
+    service = DatabaseRunService(sessions)
+    project_id = service.create_project(slug=f"extract-a-{nonce}", name="Project A")
+    foreign_project_id = service.create_project(slug=f"extract-b-{nonce}", name="Project B")
+    run_id = service.enqueue_run(
+        project_id=project_id,
+        idempotency_key=f"extract-{nonce}",
+        task_type="knowledge.extract",
+    )
+    digest = sha256(nonce.encode()).hexdigest()
+
+    with sessions.begin() as session:
+        local_source = SourceRecord(
+            project_id=project_id,
+            canonical_url=f"https://nte.perfectworld.com/en/local-{nonce}.html",
+            site_key="nte-global",
+            locale="en",
+            region="global",
+            source_type="overview",
+        )
+        foreign_source = SourceRecord(
+            project_id=foreign_project_id,
+            canonical_url=f"https://nte.perfectworld.com/en/foreign-{nonce}.html",
+            site_key="nte-global",
+            locale="en",
+            region="global",
+            source_type="overview",
+        )
+        local_entity = KnowledgeEntityRecord(
+            project_id=project_id,
+            entity_type="game",
+            canonical_key=f"game:local:{nonce}",
+            display_name="Local game",
+        )
+        foreign_entity = KnowledgeEntityRecord(
+            project_id=foreign_project_id,
+            entity_type="game",
+            canonical_key=f"game:foreign-extract:{nonce}",
+            display_name="Foreign game",
+        )
+        session.add_all([local_source, foreign_source, local_entity, foreign_entity])
+        session.flush()
+        local_version = SourceVersionRecord(
+            source_id=local_source.id,
+            version_number=1,
+            title="Local evidence",
+            capture_method="http",
+            change_kind="initial",
+            raw_content_sha256=digest,
+            normalized_text_sha256=digest,
+            evidence_fingerprint_sha256=digest,
+            parser_version="test",
+            capture_policy_version="test",
+        )
+        foreign_version = SourceVersionRecord(
+            source_id=foreign_source.id,
+            version_number=1,
+            title="Foreign evidence",
+            capture_method="http",
+            change_kind="initial",
+            raw_content_sha256=digest,
+            normalized_text_sha256=digest,
+            evidence_fingerprint_sha256=digest,
+            parser_version="test",
+            capture_policy_version="test",
+        )
+        session.add_all([local_version, foreign_version])
+        session.flush()
+        local_version_id = local_version.id
+        local_entity_id = local_entity.id
+        foreign_version_id = foreign_version.id
+        foreign_entity_id = foreign_entity.id
+
+    with pytest.raises(DBAPIError, match="extraction subject"), sessions.begin() as session:
+        session.add(
+            _extraction_result(
+                run_id=run_id,
+                project_id=project_id,
+                source_version_id=foreign_version_id,
+                subject_entity_id=foreign_entity_id,
+                digest=digest,
+            )
+        )
+
+    with sessions.begin() as session:
+        session.add(
+            _extraction_result(
+                run_id=run_id,
+                project_id=project_id,
+                source_version_id=local_version_id,
+                subject_entity_id=local_entity_id,
+                digest=digest,
+            )
+        )
+
+    with pytest.raises(DBAPIError, match="immutable"), sessions.begin() as session:
+        result = session.get(KnowledgeExtractionResultRecord, run_id)
+        assert result is not None
+        result.manifest_sha256 = "f" * 64
+
+
+def _extraction_result(
+    *, run_id, project_id, source_version_id, subject_entity_id, digest
+) -> KnowledgeExtractionResultRecord:
+    return KnowledgeExtractionResultRecord(
+        run_id=run_id,
+        project_id=project_id,
+        source_version_id=source_version_id,
+        subject_entity_id=subject_entity_id,
+        document_sha256=digest,
+        manifest_sha256=digest,
+        chunker_version="test-v1",
+        max_chars=4000,
+        overlap_chars=400,
+        prompt_version="claim-v1",
+        schema_version="claim-v1",
+        invocation_count=0,
+        claim_count=0,
+    )

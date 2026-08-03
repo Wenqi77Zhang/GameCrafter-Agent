@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C2.3a: generic Workflow Run/Job foundation**.
+The repository is currently in **M1-C C2.3b: durable zero-cost knowledge extraction**.
 
-Implemented through M1-C C2.3a:
+Implemented through M1-C C2.3b:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -84,14 +84,21 @@ Implemented through M1-C C2.3a:
   without adding a second queue stack;
 - upgrade/downgrade coverage that preserves run, job, audit, and knowledge-claim lineage while the
   existing `/runs` source experience remains compatible.
+- a registered `knowledge.extract` worker handler on the shared PostgreSQL lease queue;
+- verified normalized-text loading with byte, SHA-256, UTF-8, project, source-version, and subject
+  integrity gates;
+- durable redacted per-chunk invocation lifecycles and an immutable whole-document result marker;
+- atomic candidate-claim, exact-evidence, extraction-result, and audit persistence with idempotent
+  retry behavior;
+- project-scoped extraction command/result/claim APIs with strict local replay preflight;
+- disabled-by-default execution where only an exact offline fixture can be enqueued at zero cost.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- durable extraction execution, model-invocation persistence, extraction APIs, deterministic conflict
-  processing, review UI, snapshot publication commands, embeddings, or an approved knowledge
-  snapshot;
+- extraction UI, deterministic conflict processing, review UI, snapshot publication commands,
+  embeddings, or an approved knowledge snapshot;
 - live trend sources;
 - live LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
@@ -165,6 +172,8 @@ the bilingual human-control interface. M1-C C1 adds reviewable knowledge lineage
 guards. C2.1 adds the zero-cost model boundary; C2.2 adds deterministic chunking, sequential
 offline extraction orchestration, and the source-attributed NTE replay fixture. C2.3a generalizes
 the durable run/job substrate so later knowledge and marketing workflows reuse the same queue.
+C2.3b registers durable extraction, persists redacted invocation and exact-evidence lineage, and
+exposes project-scoped commands and read models under exact offline-replay preflight.
 
 ```mermaid
 flowchart TB
@@ -287,6 +296,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-C C2.1 model-gateway record](docs/migration/m1c-model-gateway.md)
 - [M1-C C2.2 extraction-Harness record](docs/migration/m1c-extraction-harness.md)
 - [M1-C C2.3a workflow-foundation record](docs/migration/m1c-workflow-foundation.md)
+- [M1-C C2.3b durable-extraction record](docs/migration/m1c-durable-extraction.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles
