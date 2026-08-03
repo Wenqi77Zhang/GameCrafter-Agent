@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = 1.0
     job_lease_seconds: int = 60
     model_provider: Literal["disabled", "replay"] = "disabled"
+    model_replay_fixture_path: Path | None = None
+    knowledge_document_max_bytes: int = Field(default=2 * 1024 * 1024, gt=0)
     model_api_key: SecretStr | None = None
 
 

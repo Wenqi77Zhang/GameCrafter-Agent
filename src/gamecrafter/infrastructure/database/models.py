@@ -452,6 +452,156 @@ class AuditEventRecord(Base):
     )
 
 
+class KnowledgeExtractionResultRecord(Base):
+    """Immutable whole-document extraction result used as the idempotency marker."""
+
+    __tablename__ = "knowledge_extraction_results"
+    __table_args__ = (
+        CheckConstraint(
+            "length(document_sha256) = 64 AND length(manifest_sha256) = 64",
+            name="ck_knowledge_extraction_results_hashes",
+        ),
+        CheckConstraint(
+            "max_chars > 0 AND overlap_chars >= 0 AND overlap_chars < max_chars",
+            name="ck_knowledge_extraction_results_chunking",
+        ),
+        CheckConstraint(
+            "invocation_count >= 0 AND claim_count >= 0",
+            name="ck_knowledge_extraction_results_counts",
+        ),
+        CheckConstraint(
+            "input_tokens >= 0 AND output_tokens >= 0 "
+            "AND total_tokens >= input_tokens + output_tokens",
+            name="ck_knowledge_extraction_results_usage",
+        ),
+        Index(
+            "ix_knowledge_extraction_results_project_created",
+            "project_id",
+            "created_at",
+        ),
+    )
+
+    run_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("workflow_runs.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_version_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("source_versions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    subject_entity_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_entities.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    document_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    manifest_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    chunker_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    max_chars: Mapped[int] = mapped_column(Integer, nullable=False)
+    overlap_chars: Mapped[int] = mapped_column(Integer, nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    invocation_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    claim_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ModelInvocationRecord(Base):
+    """Redacted per-chunk model lifecycle metadata for one durable job attempt."""
+
+    __tablename__ = "model_invocations"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('running', 'succeeded', 'failed')",
+            name="ck_model_invocations_status",
+        ),
+        CheckConstraint("job_attempt > 0", name="ck_model_invocations_attempt_positive"),
+        CheckConstraint("chunk_index >= 0", name="ck_model_invocations_chunk_nonnegative"),
+        CheckConstraint(
+            "start_offset >= 0 AND end_offset > start_offset",
+            name="ck_model_invocations_offsets",
+        ),
+        CheckConstraint(
+            "length(chunk_id) = 64 AND length(request_fingerprint_sha256) = 64",
+            name="ck_model_invocations_hashes",
+        ),
+        CheckConstraint(
+            "input_tokens >= 0 AND output_tokens >= 0 "
+            "AND total_tokens >= input_tokens + output_tokens AND claim_count >= 0",
+            name="ck_model_invocations_usage",
+        ),
+        CheckConstraint(
+            "(status = 'running' AND finished_at IS NULL AND error_code IS NULL) "
+            "OR (status = 'succeeded' AND finished_at IS NOT NULL "
+            "AND provider IS NOT NULL AND model IS NOT NULL AND response_id IS NOT NULL "
+            "AND error_code IS NULL) "
+            "OR (status = 'failed' AND finished_at IS NOT NULL AND error_code IS NOT NULL)",
+            name="ck_model_invocations_outcome",
+        ),
+        UniqueConstraint(
+            "run_id",
+            "job_attempt",
+            "chunk_index",
+            name="uq_model_invocations_run_attempt_chunk",
+        ),
+        Index("ix_model_invocations_run_attempt", "run_id", "job_attempt", "chunk_index"),
+        Index("ix_model_invocations_project_started", "project_id", "started_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    run_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("workflow_runs.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_version_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("source_versions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    subject_entity_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_entities.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    job_attempt: Mapped[int] = mapped_column(Integer, nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    chunk_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    start_offset: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_offset: Mapped[int] = mapped_column(Integer, nullable=False)
+    request_fingerprint_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(80))
+    model: Mapped[str | None] = mapped_column(String(120))
+    response_id: Mapped[str | None] = mapped_column(String(200))
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    claim_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class KnowledgeEntityRecord(Base):
     """Project-local subject identity used by reviewable claims."""
 

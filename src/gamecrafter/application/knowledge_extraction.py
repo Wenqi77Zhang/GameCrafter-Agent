@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID
 
 from gamecrafter.application.ports.model_gateway import (
@@ -13,7 +13,6 @@ from gamecrafter.application.ports.model_gateway import (
     CLAIM_SCHEMA_VERSION,
     ClaimExtractionRequest,
     ModelGateway,
-    ModelGatewayError,
     ModelTokenUsage,
 )
 from gamecrafter.application.text_chunking import (
@@ -76,9 +75,49 @@ class ExtractionRunResult:
     chunker_version: str
     max_chars: int
     overlap_chars: int
+    prompt_version: str
+    schema_version: str
     invocations: tuple[ChunkInvocation, ...]
     claims: tuple[CandidateClaim, ...]
     usage: ModelTokenUsage
+
+
+class ExtractionObserver(Protocol):
+    """Persist safe per-chunk lifecycle metadata outside the pure Harness."""
+
+    def started(self, *, chunk: TextChunk, request: ClaimExtractionRequest) -> None:
+        """Record a request before the gateway can perform work."""
+
+    def succeeded(self, invocation: ChunkInvocation) -> None:
+        """Record a validated invocation without prompt or response bodies."""
+
+    def failed(
+        self,
+        *,
+        chunk: TextChunk,
+        request_fingerprint_sha256: str,
+        error_code: str,
+    ) -> None:
+        """Record one redacted failure classification."""
+
+
+class NullExtractionObserver:
+    """Default no-op observer preserving the C2.2 pure in-memory behavior."""
+
+    def started(self, *, chunk: TextChunk, request: ClaimExtractionRequest) -> None:
+        del chunk, request
+
+    def succeeded(self, invocation: ChunkInvocation) -> None:
+        del invocation
+
+    def failed(
+        self,
+        *,
+        chunk: TextChunk,
+        request_fingerprint_sha256: str,
+        error_code: str,
+    ) -> None:
+        del chunk, request_fingerprint_sha256, error_code
 
 
 class ExtractionHarness:
@@ -89,6 +128,7 @@ class ExtractionHarness:
         *,
         gateway: ModelGateway,
         chunker: DeterministicTextChunker,
+        observer: ExtractionObserver | None = None,
         prompt_version: str = CLAIM_PROMPT_VERSION,
         schema_version: str = CLAIM_SCHEMA_VERSION,
     ) -> None:
@@ -96,6 +136,7 @@ class ExtractionHarness:
             raise ValueError("prompt and schema versions must not be blank")
         self._gateway = gateway
         self._chunker = chunker
+        self._observer = observer or NullExtractionObserver()
         self._prompt_version = prompt_version
         self._schema_version = schema_version
 
@@ -109,13 +150,24 @@ class ExtractionHarness:
 
         for chunk in chunks:
             request = self._request(document, chunk)
+            self._observer.started(chunk=chunk, request=request)
             try:
                 result = self._gateway.extract_claims(request)
-            except ModelGatewayError as error:
+            except Exception as error:
+                self._observer.failed(
+                    chunk=chunk,
+                    request_fingerprint_sha256=request.fingerprint_sha256,
+                    error_code=type(error).__name__,
+                )
                 raise ExtractionHarnessError(
                     f"claim extraction failed for chunk {chunk.index} ({type(error).__name__})"
                 ) from None
             if result.request_fingerprint_sha256 != request.fingerprint_sha256:
+                self._observer.failed(
+                    chunk=chunk,
+                    request_fingerprint_sha256=request.fingerprint_sha256,
+                    error_code="RequestFingerprintMismatch",
+                )
                 raise ExtractionHarnessError(
                     f"claim extraction returned a mismatched fingerprint for chunk {chunk.index}"
                 )
@@ -123,20 +175,20 @@ class ExtractionHarness:
             input_tokens += result.usage.input_tokens
             output_tokens += result.usage.output_tokens
             total_tokens += result.usage.total_tokens
-            invocations.append(
-                ChunkInvocation(
-                    chunk_index=chunk.index,
-                    chunk_id=chunk.chunk_id,
-                    start_offset=chunk.start_offset,
-                    end_offset=chunk.end_offset,
-                    request_fingerprint_sha256=request.fingerprint_sha256,
-                    provider=result.provider,
-                    model=result.model,
-                    response_id=result.response_id,
-                    usage=result.usage,
-                    claim_count=len(result.claims),
-                )
+            invocation = ChunkInvocation(
+                chunk_index=chunk.index,
+                chunk_id=chunk.chunk_id,
+                start_offset=chunk.start_offset,
+                end_offset=chunk.end_offset,
+                request_fingerprint_sha256=request.fingerprint_sha256,
+                provider=result.provider,
+                model=result.model,
+                response_id=result.response_id,
+                usage=result.usage,
+                claim_count=len(result.claims),
             )
+            self._observer.succeeded(invocation)
+            invocations.append(invocation)
 
         return ExtractionRunResult(
             source_version_id=document.source_version_id,
@@ -144,6 +196,8 @@ class ExtractionHarness:
             chunker_version=CHUNKER_VERSION,
             max_chars=self._chunker.max_chars,
             overlap_chars=self._chunker.overlap_chars,
+            prompt_version=self._prompt_version,
+            schema_version=self._schema_version,
             invocations=tuple(invocations),
             claims=_deduplicate_claims(claims),
             usage=ModelTokenUsage(

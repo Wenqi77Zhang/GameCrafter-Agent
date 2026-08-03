@@ -31,7 +31,7 @@ type Source = {
 type Run = {
   id: string;
   workflow_kind: string;
-  task_type: "source.discover" | "source.capture";
+  task_type: string;
   status: string;
   checkpoint: string;
   last_error_code: string | null;
@@ -59,6 +59,7 @@ const copy = {
     targeted: "定向发现",
     direct: "直接导入官方页面",
     import: "导入",
+    extract: "知识提取",
     discover: "开始发现",
     candidates: "待选候选",
     captured: "已保存来源",
@@ -103,6 +104,7 @@ const copy = {
     targeted: "Targeted discovery",
     direct: "Import an official page",
     import: "Import",
+    extract: "Knowledge extraction",
     discover: "Discover",
     candidates: "Candidates for review",
     captured: "Saved sources",
@@ -511,7 +513,7 @@ export function App() {
                   <section className="run-list">
                     {runs.length === 0 ? <div className="empty-state">{t.noRuns}</div> : runs.map((run) => (
                       <button className={selectedRun === run.id ? "run-card active" : "run-card"} key={run.id} type="button" onClick={() => setSelectedRun(run.id)}>
-                        <div><strong>{run.task_type === "source.discover" ? t.quick : t.import}</strong><small>{formatDate(run.created_at, language)}</small></div>
+                        <div><strong>{run.task_type === "source.discover" ? t.quick : run.task_type === "source.capture" ? t.import : run.task_type === "knowledge.extract" ? t.extract : run.task_type}</strong><small>{formatDate(run.created_at, language)}</small></div>
                         <span className={`run-status run-status--${run.status}`}>{run.status}</span>
                         <p>{t.checkpoint}: {run.checkpoint}</p>
                         {run.last_error_code && <p className="run-error">{t.error}: {run.last_error_code}</p>}

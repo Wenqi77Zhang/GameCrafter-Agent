@@ -27,7 +27,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M1-C C2.3a runtime
+## Implemented M1-A to M1-C C2.3b runtime
 
 ```mermaid
 flowchart LR
@@ -39,7 +39,7 @@ flowchart LR
     JOBS[("workflow_jobs")]
     AUDIT[("audit_events")]
     WORKER["Python worker"]
-    HANDLER["Registered source and future specialist handlers"]
+    HANDLER["Registered source and knowledge handlers"]
 
     USER --> WEB --> API
     API -->|"sources, candidates, runs"| WEB
@@ -379,6 +379,50 @@ existing `/runs` route and source UI retain `task_type` compatibility while expo
 kind. One queue prevents source ingestion, knowledge extraction, and later marketing execution from
 developing incompatible retry, checkpoint, and observability semantics.
 
+## Implemented M1-C C2.3b durable extraction closure
+
+```mermaid
+flowchart LR
+    HUMAN["Explicit local command"]
+    PREFLIGHT{"Disabled or exact replay?"}
+    RUN[("workflow run and leased job")]
+    TARGET["Project-bound source version and subject"]
+    OBJECT["Verified normalized-text object"]
+    HARNESS["Sequential Knowledge Curator Harness"]
+    TRACE[("Redacted invocation lifecycle")]
+    TX{"Atomic result transaction"}
+    CLAIMS[("Immutable candidate claims and exact evidence")]
+    RESULT[("Immutable extraction result marker")]
+    AUDIT[("Append-only audit event")]
+    READ["Project-scoped result and claim APIs"]
+    STOP["Safe terminal failure"]
+
+    HUMAN --> PREFLIGHT
+    PREFLIGHT -->|"exact local replay"| RUN --> TARGET --> OBJECT --> HARNESS
+    PREFLIGHT -->|"disabled, missing, or mismatched"| STOP
+    OBJECT -. "size, digest, UTF-8, or lineage mismatch" .-> STOP
+    HARNESS --> TRACE
+    HARNESS --> TX
+    HARNESS -. "any chunk failure" .-> STOP
+    TX --> CLAIMS
+    TX --> RESULT
+    TX --> AUDIT
+    CLAIMS --> READ
+    RESULT --> READ
+```
+
+The API validates the project, immutable source version, subject, fixture provenance, source digest,
+and deterministic request coverage before enqueue. The worker repeats all authoritative checks and
+reads bytes only through `ObjectStorage`. Per-attempt invocation rows contain hashes, offsets,
+provider/model/response identifiers, usage, counts, timestamps, and safe error codes; they never
+contain prompt, source, response, secret, or object-path bodies.
+
+Claims, evidence spans, the result marker, and the success audit event commit together. A result
+marker makes later delivery of the same run a no-op, while attempts that stop before that commit
+remain observable. PostgreSQL triggers keep run, source, subject, and project lineage aligned and
+make the result marker immutable. C2.3b remains one deterministic specialist node: it does not add
+ReAct, self-learning, agent-to-agent conversation, or an MCP service.
+
 ## Marketing workflow state graph
 
 ```mermaid
@@ -525,9 +569,9 @@ model calls, conflict classification, review APIs, or embeddings.
 M1-C C2.1 adds the framework-independent model port and zero-cost adapters. C2.2 adds the pure
 deterministic source chunker, sequential extraction Harness, invocation manifest, strict fixture
 loader, and source-attributed NTE offline replay. C2.3a supplies the generic durable execution
-substrate but deliberately does not register a durable extraction handler or persist model
-invocations or claims; those belong to C2.3b. Extraction preflight/API, product interface, live
-model call, conflict classifier, and review action also remain unimplemented.
+substrate. C2.3b registers its extraction handler, validates stored text, persists redacted
+invocations plus atomic claim/evidence/result lineage, and exposes preflighted command/read APIs.
+The product interface, live model call, conflict classifier, and review action remain unimplemented.
 
 ## Observability
 

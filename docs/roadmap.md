@@ -42,5 +42,8 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C2.3a implements the generic `workflow_runs`/`workflow_jobs` substrate, a stable
   `workflow_kind`, data-preserving upgrade/downgrade, and reuse of the existing PostgreSQL leased
   queue while retaining the `/runs` source workflow.
-- M1-C C2.3b durable knowledge extraction, C2.4 extraction UI, C2.5 NTE PostgreSQL acceptance, C3
-  deterministic conflicts, C4 human reviews, and C5 snapshot publication remain unimplemented.
+- M1-C C2.3b implements the durable `knowledge.extract` handler, verified object loading, redacted
+  invocation traces, atomic claim/evidence/result persistence, idempotent retries, and project-scoped
+  APIs under disabled-or-exact-replay zero-cost preflight.
+- M1-C C2.4 extraction UI, C2.5 NTE PostgreSQL acceptance, C3 deterministic conflicts, C4 human
+  reviews, and C5 snapshot publication remain unimplemented.
