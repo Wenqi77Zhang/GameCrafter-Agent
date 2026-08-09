@@ -19,15 +19,13 @@ class Settings(BaseSettings):
     )
 
     environment: Literal["local", "test", "production"] = "local"
-    log_level: str = "INFO"
-    api_host: str = "127.0.0.1"
-    api_port: int = 8000
+    log_level: Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE"] = "INFO"
+    api_host: str = Field(default="127.0.0.1", min_length=1)
+    api_port: int = Field(default=8000, ge=1, le=65535)
     web_origin: HttpUrl = HttpUrl("http://localhost:5173")
     database_url: SecretStr = SecretStr(
         "postgresql+psycopg://gamecrafter:gamecrafter_local@127.0.0.1:5432/gamecrafter"
     )
-    data_dir: Path = Path("data")
-    object_storage_backend: Literal["filesystem"] = "filesystem"
     object_storage_path: Path = Path("data/objects")
     source_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
     source_html_max_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
@@ -45,7 +43,6 @@ class Settings(BaseSettings):
     model_provider: Literal["disabled", "replay"] = "disabled"
     model_replay_fixture_path: Path | None = None
     knowledge_document_max_bytes: int = Field(default=2 * 1024 * 1024, gt=0)
-    model_api_key: SecretStr | None = None
 
 
 @lru_cache

@@ -9,28 +9,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+from gamecrafter.config.development import development_commands
+from gamecrafter.config.settings import get_settings
+
 
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
+    settings = get_settings()
     pnpm = shutil.which("pnpm") or shutil.which("pnpm.cmd")
     if pnpm is None:
         print("pnpm was not found. Run scripts/setup.ps1 after installing pnpm.", file=sys.stderr)
         return 2
 
-    commands = [
-        [
-            sys.executable,
-            "-m",
-            "uvicorn",
-            "apps.api.main:app",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "8000",
-            "--reload",
-        ],
-        [pnpm, "--dir", "apps/web", "dev"],
-    ]
+    commands = development_commands(settings, pnpm=pnpm, python=sys.executable)
 
     creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
     processes = [
@@ -40,7 +31,7 @@ def main() -> int:
 
     print("GameCrafter development services started.")
     print("Web: http://localhost:5173")
-    print("API: http://localhost:8000/health")
+    print(f"API: http://{settings.api_host}:{settings.api_port}/health")
     print("Press Ctrl+C to stop both services.")
 
     try:
