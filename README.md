@@ -228,9 +228,8 @@ apps/
   web/                  React and TypeScript frontend
 src/gamecrafter/
   api/                  HTTP application factory and routes
-  domain/               Business entities and rules
+  domain/               Implemented knowledge and run business rules
   application/          Commands, queries, and orchestration services
-  agents/               Graphs, nodes, skills, prompts, and schemas
   infrastructure/       Database, source, model, storage, and tracing adapters
   config/               Validated settings
 tests/                  Unit, integration, contract, and PostgreSQL tests
@@ -238,6 +237,9 @@ docs/                   Product, architecture, security, migration, and roadmap
 scripts/                Setup, development, and verification helpers
 legacy/                 Notes about the original placeholder shell
 ```
+
+Future trend, campaign, script, and Agent-runtime packages are created only when their milestone
+adds executable behavior; the active tree does not keep empty capability placeholders.
 
 ## Quick start
 
@@ -262,6 +264,9 @@ The local services will be available at:
 - API: `http://localhost:8000`
 - API health: `http://localhost:8000/health`
 - database readiness: `http://localhost:8000/ready`
+
+The development launcher honors `GAMECRAFTER_API_HOST`, `GAMECRAFTER_API_PORT`, and
+`GAMECRAFTER_LOG_LEVEL`; the URLs above are the defaults from `.env.example`.
 
 Run all locally available checks:
 
