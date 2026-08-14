@@ -41,8 +41,12 @@ class FakeKnowledgeRepository:
     def extraction_result(self, **kwargs):
         return {"run_id": str(kwargs["run_id"]), "claim_count": 2, "invocations": []}
 
-    def list_claims(self, project_id):
+    def list_claims(self, project_id, **kwargs):
         assert project_id == PROJECT_ID
+        assert kwargs in (
+            {"subject_entity_id": None, "extraction_run_id": None},
+            {"subject_entity_id": ENTITY_ID, "extraction_run_id": RUN_ID},
+        )
         return [{"id": "claim-1", "evidence": [{"quote": "exact"}]}]
 
 
@@ -59,6 +63,46 @@ class FakeWorkspace:
             "task_type": kwargs["task_type"],
             "status": "queued",
         }, True
+
+
+class FakeKnowledgeWorkspace:
+    def __init__(self) -> None:
+        self.entity = {
+            "id": str(ENTITY_ID),
+            "project_id": str(PROJECT_ID),
+            "entity_type": "game",
+            "canonical_key": "game:nte",
+            "display_name": "异环",
+            "aliases": ["NTE"],
+            "status": "active",
+            "revision_number": 1,
+        }
+
+    def list_entities(self, project_id, *, include_archived=False):
+        assert project_id == PROJECT_ID
+        assert include_archived is False
+        return [self.entity]
+
+    def create_entity(self, **kwargs):
+        assert kwargs["project_id"] == PROJECT_ID
+        assert kwargs["actor_id"] == "local-user"
+        return self.entity, True
+
+    def correct_entity(self, **kwargs):
+        assert kwargs["entity_id"] == ENTITY_ID
+        return {**self.entity, "display_name": kwargs["display_name"], "revision_number": 2}, True
+
+    def archive_entity(self, **kwargs):
+        assert kwargs["entity_id"] == ENTITY_ID
+        return {**self.entity, "status": "archived", "revision_number": 2}, True
+
+    def list_entity_revisions(self, **kwargs):
+        assert kwargs["entity_id"] == ENTITY_ID
+        return [{"revision_number": 1, "display_name": "异环", "status": "active"}]
+
+    def list_source_versions(self, project_id):
+        assert project_id == PROJECT_ID
+        return [{"id": str(FakeKnowledgeRepository().target.source_version_id), "is_latest": True}]
 
 
 def test_disabled_mode_blocks_before_enqueue() -> None:
@@ -118,3 +162,70 @@ def test_exact_replay_queues_and_read_models_are_project_scoped() -> None:
         assert claims.status_code == 200 and claims.json()["items"][0]["id"] == "claim-1"
     finally:
         knowledge._repository, knowledge._workspace, knowledge.get_settings = originals
+
+
+def test_knowledge_delivery_routes_and_replay_capability() -> None:
+    repository = FakeKnowledgeRepository()
+    delivery = FakeKnowledgeWorkspace()
+    originals = knowledge._repository, knowledge._knowledge_workspace, knowledge.get_settings
+    knowledge._repository = lambda: repository
+    knowledge._knowledge_workspace = lambda: delivery
+    knowledge.get_settings = lambda: Settings(
+        _env_file=None,
+        model_provider="replay",
+        model_replay_fixture_path=FIXTURE_PATH,
+    )
+    try:
+        client = TestClient(create_app())
+        entities = client.get(f"/api/projects/{PROJECT_ID}/knowledge-entities")
+        created = client.post(
+            f"/api/projects/{PROJECT_ID}/knowledge-entities",
+            json={"display_name": "异环", "aliases": ["NTE"]},
+        )
+        corrected = client.put(
+            f"/api/projects/{PROJECT_ID}/knowledge-entities/{ENTITY_ID}",
+            json={
+                "display_name": "异环（Neverness to Everness）",
+                "aliases": ["NTE"],
+                "change_reason": "Correct the display label.",
+            },
+        )
+        revisions = client.get(
+            f"/api/projects/{PROJECT_ID}/knowledge-entities/{ENTITY_ID}/revisions"
+        )
+        versions = client.get(f"/api/projects/{PROJECT_ID}/source-versions")
+        capability = client.get(
+            f"/api/projects/{PROJECT_ID}/knowledge-extraction-capability",
+            params={
+                "source_version_id": str(repository.target.source_version_id),
+                "subject_entity_id": str(ENTITY_ID),
+            },
+        )
+        claims = client.get(
+            f"/api/projects/{PROJECT_ID}/knowledge-claims",
+            params={
+                "subject_entity_id": str(ENTITY_ID),
+                "extraction_run_id": str(RUN_ID),
+            },
+        )
+        archived = client.post(
+            f"/api/projects/{PROJECT_ID}/knowledge-entities/{ENTITY_ID}/archive",
+            json={"change_reason": "Created the wrong subject."},
+        )
+
+        assert entities.status_code == 200
+        assert created.status_code == 201
+        assert corrected.status_code == 200 and corrected.json()["revision_number"] == 2
+        assert revisions.status_code == 200
+        assert versions.status_code == 200 and versions.json()["items"][0]["is_latest"]
+        assert capability.status_code == 200
+        assert capability.json() == {
+            "available": True,
+            "mode": "offline_replay",
+            "reason_code": "available",
+            "reason": "an exact local zero-cost replay is available",
+        }
+        assert claims.status_code == 200
+        assert archived.status_code == 200 and archived.json()["status"] == "archived"
+    finally:
+        knowledge._repository, knowledge._knowledge_workspace, knowledge.get_settings = originals
