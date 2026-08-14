@@ -201,7 +201,17 @@ def test_nte_fixture_reaches_reviewable_claims_through_real_postgresql(
         worker_id="c25-acceptance-worker",
         lease_seconds=30,
     )
-    assert worker.run_once() is True
+    for _ in range(100):
+        worked = worker.run_once()
+        with sessions() as session:
+            target_status = session.scalar(
+                select(WorkflowRunRecord.status).where(WorkflowRunRecord.id == run_id)
+            )
+        if target_status in {"succeeded", "needs_attention", "cancelled"}:
+            break
+        assert worked is True, "acceptance target remained queued with no claimable job"
+    else:
+        pytest.fail("NTE acceptance run did not finish within the bounded queue drain")
 
     with sessions() as session:
         persisted_run = session.get(WorkflowRunRecord, run_id)

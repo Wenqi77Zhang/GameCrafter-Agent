@@ -27,7 +27,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M1-C C2.5 runtime
+## Implemented M1-A to M1-C C3a runtime
 
 ```mermaid
 flowchart LR
@@ -511,6 +511,42 @@ The local runner accepts only localhost URLs whose database name contains `test`
 Rows are not silently deleted because audit history is part of the contract. This proves the
 production PostgreSQL path for the reviewed NTE snapshot, but it is not current live-site capture
 evidence and is labelled accordingly.
+
+## Implemented M1-C C3a deterministic conflict reconciliation
+
+```mermaid
+flowchart LR
+    COMMAND["Explicit reconcile command"]
+    LOCK["Project row lock"]
+    CLAIMS["Immutable candidate Claims"]
+    SCOPE["Group by subject, predicate, scope fingerprint"]
+    DISTINCT{"Two or more normalized values?"}
+    CARDINALITY{"Single-valued predicate in policy v1?"}
+    CONFLICT["conflicting"]
+    COEXIST["possibly_coexisting"]
+    CLOSED{"Existing group is human-closed?"}
+    MEMBERS[("Idempotent group and members")]
+    AUDIT[("Reconciliation audit event")]
+    READS["Project-scoped candidates and exact evidence"]
+
+    COMMAND --> LOCK --> CLAIMS --> SCOPE --> DISTINCT
+    DISTINCT -->|"no"| AUDIT
+    DISTINCT -->|"yes"| CLOSED
+    CLOSED -->|"yes: report, do not reopen"| AUDIT
+    CLOSED -->|"no"| CARDINALITY
+    CARDINALITY -->|"yes"| CONFLICT --> MEMBERS
+    CARDINALITY -->|"no or uncertain"| COEXIST --> MEMBERS
+    MEMBERS --> AUDIT --> READS
+```
+
+The classifier is deterministic and versioned as `claim-conflict-v1`. It never reads model
+confidence, calls a model, chooses a winner, or creates an approved fact. Only game name, release
+status/date, and primary genre are considered single-valued inside an already exact scope. All
+other predicates are conservatively marked as possibly coexisting for human review.
+
+The project lock serializes concurrent reconciliation. Existing unique keys and missing-member
+checks make retries idempotent. A resolved or dismissed group is never silently reopened when new
+Claims appear; the command reports the skipped closed scope in its response and audit payload.
 
 ## Marketing workflow state graph
 

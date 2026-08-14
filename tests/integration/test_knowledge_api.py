@@ -105,6 +105,30 @@ class FakeKnowledgeWorkspace:
         return [{"id": str(FakeKnowledgeRepository().target.source_version_id), "is_latest": True}]
 
 
+class FakeConflictService:
+    def reconcile(self, **kwargs):
+        assert kwargs == {"project_id": PROJECT_ID, "actor_id": "local-user"}
+        return {
+            "policy_version": "claim-conflict-v1",
+            "compared_scopes": 1,
+            "created_groups": 1,
+            "created_members": 2,
+            "skipped_closed_groups": 0,
+        }
+
+    def list_conflicts(self, project_id, **kwargs):
+        assert project_id == PROJECT_ID
+        assert kwargs == {"status": "open", "subject_entity_id": ENTITY_ID}
+        return [
+            {
+                "id": "conflict-1",
+                "predicate": "game.name",
+                "status": "open",
+                "member_count": 2,
+            }
+        ]
+
+
 def test_disabled_mode_blocks_before_enqueue() -> None:
     repository = FakeKnowledgeRepository()
     workspace = FakeWorkspace()
@@ -229,3 +253,23 @@ def test_knowledge_delivery_routes_and_replay_capability() -> None:
         assert archived.status_code == 200 and archived.json()["status"] == "archived"
     finally:
         knowledge._repository, knowledge._knowledge_workspace, knowledge.get_settings = originals
+
+
+def test_deterministic_conflict_reconciliation_and_reads_are_project_scoped() -> None:
+    conflicts = FakeConflictService()
+    original = knowledge._conflicts
+    knowledge._conflicts = lambda: conflicts
+    try:
+        client = TestClient(create_app())
+        reconciled = client.post(f"/api/projects/{PROJECT_ID}/knowledge-conflicts/reconcile")
+        listed = client.get(
+            f"/api/projects/{PROJECT_ID}/knowledge-conflicts",
+            params={"status": "open", "subject_entity_id": str(ENTITY_ID)},
+        )
+
+        assert reconciled.status_code == 200
+        assert reconciled.json()["created_groups"] == 1
+        assert listed.status_code == 200
+        assert listed.json()["items"][0]["predicate"] == "game.name"
+    finally:
+        knowledge._conflicts = original
