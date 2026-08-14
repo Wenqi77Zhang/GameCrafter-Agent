@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from hashlib import sha256
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -34,6 +34,11 @@ from gamecrafter.infrastructure.database.knowledge_workspace_service import (
     DatabaseKnowledgeWorkspaceService,
     KnowledgeWorkspaceConflictError,
     KnowledgeWorkspaceNotFoundError,
+)
+from gamecrafter.infrastructure.database.review_service import (
+    DatabaseReviewService,
+    ReviewServiceConflictError,
+    ReviewServiceNotFoundError,
 )
 from gamecrafter.infrastructure.database.session import get_session_factory
 from gamecrafter.infrastructure.database.workspace_service import (
@@ -95,6 +100,31 @@ class KnowledgeEntityArchive(BaseModel):
         return value
 
 
+class ClaimReviewCreate(BaseModel):
+    decision: Literal["approve", "approve_with_edit", "reject", "defer"]
+    approved_value: Any | None = None
+    reason: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_must_not_be_whitespace(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("reason must not be blank")
+        return value
+
+
+class ConflictClosureCreate(BaseModel):
+    outcome: Literal["resolved", "dismissed"]
+    reason: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_must_not_be_whitespace(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("reason must not be blank")
+        return value
+
+
 @lru_cache
 def _repository() -> DatabaseKnowledgeRepository:
     return DatabaseKnowledgeRepository(get_session_factory())
@@ -115,6 +145,11 @@ def _conflicts() -> DatabaseConflictService:
     return DatabaseConflictService(get_session_factory())
 
 
+@lru_cache
+def _reviews() -> DatabaseReviewService:
+    return DatabaseReviewService(get_session_factory())
+
+
 def _state_error(error: Exception) -> HTTPException:
     detail = str(error)
     code = status.HTTP_404_NOT_FOUND if "not found" in detail else status.HTTP_409_CONFLICT
@@ -125,6 +160,15 @@ def _delivery_error(error: Exception) -> HTTPException:
     code = (
         status.HTTP_404_NOT_FOUND
         if isinstance(error, KnowledgeWorkspaceNotFoundError)
+        else status.HTTP_409_CONFLICT
+    )
+    return HTTPException(status_code=code, detail=str(error))
+
+
+def _review_error(error: Exception) -> HTTPException:
+    code = (
+        status.HTTP_404_NOT_FOUND
+        if isinstance(error, ReviewServiceNotFoundError)
         else status.HTTP_409_CONFLICT
     )
     return HTTPException(status_code=code, detail=str(error))
@@ -311,6 +355,52 @@ def list_knowledge_claims(
         raise _state_error(error) from error
 
 
+@router.post(
+    "/projects/{project_id}/knowledge-claims/{claim_id}/reviews",
+    status_code=status.HTTP_201_CREATED,
+)
+def review_knowledge_claim(
+    project_id: UUID,
+    claim_id: UUID,
+    command: ClaimReviewCreate,
+    idempotency_key: IdempotencyKey,
+    response: Response,
+) -> dict[str, object]:
+    try:
+        review, created = _reviews().review_claim(
+            project_id=project_id,
+            claim_id=claim_id,
+            decision=command.decision,
+            approved_value=command.approved_value,
+            reason=command.reason,
+            actor_id="local-user",
+            command_key=idempotency_key,
+        )
+    except (ReviewServiceNotFoundError, ReviewServiceConflictError) as error:
+        raise _review_error(error) from error
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return review
+
+
+@router.get("/projects/{project_id}/knowledge-reviews")
+def list_knowledge_reviews(
+    project_id: UUID,
+    claim_id: UUID | None = None,
+    subject_entity_id: UUID | None = None,
+) -> dict[str, object]:
+    try:
+        return {
+            "items": _reviews().list_reviews(
+                project_id,
+                claim_id=claim_id,
+                subject_entity_id=subject_entity_id,
+            )
+        }
+    except (ReviewServiceNotFoundError, ReviewServiceConflictError) as error:
+        raise _review_error(error) from error
+
+
 @router.post("/projects/{project_id}/knowledge-conflicts/reconcile")
 def reconcile_knowledge_conflicts(project_id: UUID) -> dict[str, object]:
     """Run deterministic comparison without a model call or automatic resolution."""
@@ -340,6 +430,33 @@ def list_knowledge_conflicts(
         }
     except ConflictServiceNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post(
+    "/projects/{project_id}/knowledge-conflicts/{conflict_group_id}/closure",
+    status_code=status.HTTP_201_CREATED,
+)
+def close_knowledge_conflict(
+    project_id: UUID,
+    conflict_group_id: UUID,
+    command: ConflictClosureCreate,
+    idempotency_key: IdempotencyKey,
+    response: Response,
+) -> dict[str, object]:
+    try:
+        closure, created = _reviews().close_conflict(
+            project_id=project_id,
+            conflict_group_id=conflict_group_id,
+            outcome=command.outcome,
+            reason=command.reason,
+            actor_id="local-user",
+            command_key=idempotency_key,
+        )
+    except (ReviewServiceNotFoundError, ReviewServiceConflictError) as error:
+        raise _review_error(error) from error
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return closure
 
 
 def _preflight_replay(settings: Settings, target: ExtractionTarget) -> None:

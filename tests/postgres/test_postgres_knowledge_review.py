@@ -23,6 +23,7 @@ from gamecrafter.infrastructure.database.models import (
     KnowledgeSnapshotRecord,
     SourceRecord,
     SourceVersionRecord,
+    utc_now,
 )
 from gamecrafter.infrastructure.database.run_service import DatabaseRunService
 
@@ -177,6 +178,9 @@ def test_postgres_enforces_evidence_review_conflict_and_snapshot_lineage() -> No
         conflict.status = "resolved"
         conflict.resolution_summary = "Human confirmed the official title."
         conflict.resolved_by = "local-user"
+        conflict.resolved_at = utc_now()
+        conflict.resolution_command_key = f"postgres-review-{nonce}"
+        conflict.resolution_review_counts = {}
 
     with sessions.begin() as session:
         member = KnowledgeSnapshotMemberRecord(

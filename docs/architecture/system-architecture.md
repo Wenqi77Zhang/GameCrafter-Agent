@@ -27,7 +27,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M1-C C3b runtime
+## Implemented M1-A to M1-C C4 runtime
 
 ```mermaid
 flowchart LR
@@ -570,6 +570,37 @@ server read model, labels conflicts separately from potentially coexisting value
 human trace each member to the already validated quote and source version. Detection is explicit;
 no winner, approval, dismissal, or snapshot is inferred from model confidence or UI selection.
 
+## Implemented M1-C C4 append-only human control
+
+```mermaid
+flowchart LR
+    CLAIM["Immutable candidate Claim"]
+    EVIDENCE["Exact source-version evidence"]
+    COMMAND["Idempotent human review command"]
+    REVIEW["Append-only review and optional edited value"]
+    LATEST["Derived latest human state"]
+    GROUP["Open conflict group"]
+    GATE{"All members final and policy satisfied?"}
+    RESOLVED["Resolved with reason and actor"]
+    DISMISSED["Explicitly dismissed with reason"]
+    AUDIT["Causal audit event"]
+
+    CLAIM --> EVIDENCE --> COMMAND --> REVIEW --> LATEST
+    LATEST --> GROUP --> GATE
+    GATE -->|"yes"| RESOLVED --> AUDIT
+    GROUP -->|"human override"| DISMISSED --> AUDIT
+```
+
+The project row lock serializes decision commands with later publication. A command key is unique
+inside the project: an exact retry is safe, while reuse for different content fails. Approval
+copies the original value or stores a separate validated edit and never mutates the Claim. The
+latest state is a read-model projection over complete review history.
+
+Conflict resolution is deliberately stricter than clicking a winner. Every member needs a latest
+approve/reject decision, deferred decisions remain incomplete, at least one value must survive,
+and a single-valued relation must converge on one normalized value. Dismissal is separately
+labelled as a reasoned human override. Neither path creates a published knowledge snapshot.
+
 ## Marketing workflow state graph
 
 ```mermaid
@@ -718,8 +749,9 @@ deterministic source chunker, sequential extraction Harness, invocation manifest
 loader, and source-attributed NTE offline replay. C2.3a supplies the generic durable execution
 substrate. C2.3b registers its extraction handler, validates stored text, persists redacted
 invocations plus atomic claim/evidence/result lineage, and exposes preflighted command/read APIs.
-The live model call and human review action remain unimplemented. C3a supplies the deterministic
-conflict service; C3b exposes it in the product interface with exact-evidence navigation.
+The live model call and snapshot publication remain unimplemented. C3a supplies deterministic
+conflicts, C3b exposes exact-evidence navigation, and C4 adds append-only human review and guarded
+closure commands without promoting a decision into published knowledge.
 
 ## Observability
 

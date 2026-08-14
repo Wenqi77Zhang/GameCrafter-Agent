@@ -60,4 +60,7 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C3b implements explicit conflict scanning, bilingual relation/status visualization,
   deterministic policy disclosure, and one-click navigation from every conflict member to exact
   evidence on responsive desktop and mobile layouts.
-- M1-C C4 human reviews and C5 snapshot publication remain unimplemented.
+- M1-C C4 implements idempotent append-only Claim reviews, typed human edits, derived latest human
+  state, guarded conflict resolution/dismissal, causal audit records, PostgreSQL command lineage,
+  and bilingual evidence-adjacent review controls.
+- M1-C C5 immutable snapshot publication remains unimplemented.

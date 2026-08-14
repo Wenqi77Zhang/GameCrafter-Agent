@@ -107,6 +107,30 @@ function workspaceFetch(options?: {
         },
       );
     }
+    if (path.includes("/knowledge-claims/") && path.endsWith("/reviews") && init?.method === "POST") {
+      const payload = JSON.parse(String(init.body)) as {
+        decision: "approve" | "approve_with_edit" | "reject" | "defer";
+        approved_value: unknown;
+        reason: string;
+      };
+      const claimId = path.split("/knowledge-claims/")[1].split("/")[0];
+      const claim = claims.find((item) => item.id === claimId);
+      const review = {
+        id: "review-1",
+        decision: payload.decision,
+        approved_value_kind: payload.decision.startsWith("approve") ? claim?.value_kind : null,
+        approved_value: payload.decision === "approve" ? claim?.value : payload.approved_value,
+        reason: payload.reason,
+        reviewer_id: "local-user",
+        created_at: "2026-08-15T01:00:00Z",
+      };
+      if (claim) {
+        claim.latest_review = review;
+        claim.reviews = [...((claim.reviews as unknown[]) ?? []), review];
+        claim.status = payload.decision === "approve" ? "human_approved" : `human_${payload.decision}`;
+      }
+      return json(review, 201);
+    }
     if (path.includes("/knowledge-claims")) return json({ items: claims });
     if (path.endsWith("/knowledge-conflicts/reconcile") && init?.method === "POST") {
       return json({
@@ -116,6 +140,16 @@ function workspaceFetch(options?: {
         created_members: 0,
         skipped_closed_groups: 0,
       });
+    }
+    if (path.includes("/knowledge-conflicts/") && path.endsWith("/closure") && init?.method === "POST") {
+      const payload = JSON.parse(String(init.body)) as { outcome: "resolved" | "dismissed"; reason: string };
+      const groupId = path.split("/knowledge-conflicts/")[1].split("/")[0];
+      const group = conflicts.find((item) => item.id === groupId);
+      if (group) {
+        group.status = payload.outcome;
+        group.resolution_summary = payload.reason;
+      }
+      return json({ id: groupId, status: payload.outcome, resolution_summary: payload.reason }, 201);
     }
     if (path.includes("/knowledge-conflicts")) return json({ items: conflicts });
     if (path.endsWith("/knowledge-extractions") && init?.method === "POST") {
@@ -324,7 +358,7 @@ test("renders the server-stored exact quote and source lineage", async () => {
     "href",
     "https://nte.perfectworld.com/en/",
   );
-  expect(screen.getAllByText("AI 候选 · 未经人工审核").length).toBeGreaterThan(0);
+  expect(screen.getByText("AI 候选 · 每条显示独立人工状态")).toBeInTheDocument();
   expect(screen.getByText("8–36")).toBeInTheDocument();
 });
 
@@ -392,6 +426,8 @@ test("shows deterministic conflict relations and preserves evidence navigation",
     region: "global",
     status: "candidate_unreviewed",
     created_at: "2026-08-15T00:00:00Z",
+    reviews: [],
+    latest_review: null,
     evidence: [
       {
         source_version_id: "version-1",
@@ -423,6 +459,7 @@ test("shows deterministic conflict relations and preserves evidence navigation",
         member_count: 2,
         distinct_value_count: 2,
         subject: entity,
+        resolution_summary: null,
         members: [
           {
             relation: "conflicting",
@@ -460,4 +497,34 @@ test("shows deterministic conflict relations and preserves evidence navigation",
   expect(await screen.findByText(/冲突检查完成/)).toBeInTheDocument();
   fireEvent.click(screen.getAllByRole("button", { name: /Neverness to Everness/ }).at(-1)!);
   expect(screen.getByText("0–21")).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText("决定理由"), {
+    target: { value: "与官网标题及精确证据一致。" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "记录人工决定" }));
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/knowledge-claims/claim-conflict-1/reviews",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "Idempotency-Key": expect.stringContaining("claim-review-") }),
+      }),
+    ),
+  );
+  expect(await screen.findByText(/人工决定已追加/)).toBeInTheDocument();
+  expect(screen.getByText("与官网标题及精确证据一致。")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "关闭冲突组" }));
+  fireEvent.change(screen.getByLabelText("关闭冲突组"), { target: { value: "dismissed" } });
+  fireEvent.change(screen.getByLabelText("关闭理由"), {
+    target: { value: "人工确认该组无需继续处理。" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "确认关闭" }));
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/knowledge-conflicts/conflict-1/closure",
+      expect.objectContaining({ method: "POST" }),
+    ),
+  );
+  expect(await screen.findByText("人工确认该组无需继续处理。")).toBeInTheDocument();
 });

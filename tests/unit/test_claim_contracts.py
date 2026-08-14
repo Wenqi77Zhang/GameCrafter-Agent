@@ -31,7 +31,10 @@ def test_candidate_claim_requires_typed_value_and_exact_evidence() -> None:
     [
         (ClaimValueKind.STRING, ""),
         (ClaimValueKind.NUMBER, True),
+        (ClaimValueKind.NUMBER, float("nan")),
         (ClaimValueKind.BOOLEAN, "true"),
+        (ClaimValueKind.DATE, "August 15"),
+        (ClaimValueKind.DATETIME, "2026-08-15T12:00:00"),
         (ClaimValueKind.ENTITY_REF, {"name": "Hotta Studio"}),
         (ClaimValueKind.STRING_LIST, []),
     ],
