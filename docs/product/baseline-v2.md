@@ -108,6 +108,13 @@ Public sources must not be described as an internal GDD. For existing games, the
 - If no entity or evidence version exists, the workspace offers a direct route to create the game
   identity or add sources. Entity corrections append history; archival is explicit and terminal.
   Simplified Chinese is the product default and English remains a remembered option.
+- C2.5 acceptance uses the committed, source-attributed public NTE snapshot rather than a current
+  live-site capture. It rebinds that reviewed response to a unique immutable version only inside a
+  disposable PostgreSQL test database, then verifies the real leased worker and persistence
+  constraints with zero input, output, and total tokens.
+- The acceptance command rejects remote hosts and database names without `test` or `acceptance`.
+  It does not delete its auditable rows or print credentials. Live-site capture evidence remains a
+  separate, explicitly uncompleted acceptance boundary.
 - The confirmed M1-C order is C2.3a workflow substrate, C2.3b durable extraction, C2.4 extraction
   UI, C2.5 NTE PostgreSQL acceptance, C3 conflicts, C4 reviews, and C5 publication.
 - The committed NTE replay is a small, source-attributed snapshot of public English official-site
