@@ -60,6 +60,7 @@ function workspaceFetch(options?: {
   entities?: Array<Record<string, unknown>>;
   versions?: Array<Record<string, unknown>>;
   claims?: Array<Record<string, unknown>>;
+  conflicts?: Array<Record<string, unknown>>;
   capability?: Record<string, unknown>;
 }) {
   const projects = options?.projects ?? [project];
@@ -67,6 +68,7 @@ function workspaceFetch(options?: {
   const entities = [...(options?.entities ?? [])];
   const versions = [...(options?.versions ?? [])];
   const claims = [...(options?.claims ?? [])];
+  const conflicts = [...(options?.conflicts ?? [])];
   const runs: Array<Record<string, unknown>> = [];
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const path = String(input);
@@ -106,6 +108,16 @@ function workspaceFetch(options?: {
       );
     }
     if (path.includes("/knowledge-claims")) return json({ items: claims });
+    if (path.endsWith("/knowledge-conflicts/reconcile") && init?.method === "POST") {
+      return json({
+        policy_version: "claim-conflict-v1",
+        compared_scopes: conflicts.length,
+        created_groups: 0,
+        created_members: 0,
+        skipped_closed_groups: 0,
+      });
+    }
+    if (path.includes("/knowledge-conflicts")) return json({ items: conflicts });
     if (path.endsWith("/knowledge-extractions") && init?.method === "POST") {
       const run = {
         id: "knowledge-run-1",
@@ -364,4 +376,88 @@ test("offers a direct Sources shortcut when no evidence version exists", async (
 
   expect(screen.getByRole("button", { name: /^来源/ })).toHaveClass("active");
   expect(screen.getByText("暂无待选候选。先运行一次来源发现。")).toBeInTheDocument();
+});
+
+test("shows deterministic conflict relations and preserves evidence navigation", async () => {
+  const conflictingClaim = {
+    id: "claim-conflict-1",
+    subject_entity_id: "entity-1",
+    extraction_run_id: "knowledge-run-1",
+    predicate: "game.name",
+    value_kind: "string",
+    value: "Neverness to Everness",
+    normalized_value: "neverness to everness",
+    confidence: 0.91,
+    locale: "en",
+    region: "global",
+    status: "candidate_unreviewed",
+    created_at: "2026-08-15T00:00:00Z",
+    evidence: [
+      {
+        source_version_id: "version-1",
+        source_id: "source-1",
+        source_url: "https://nte.perfectworld.com/en/",
+        source_title: "NTE official homepage",
+        source_version_number: 1,
+        locale: "en",
+        region: "global",
+        fetched_at: "2026-08-15T00:00:00Z",
+        ordinal: 0,
+        start_offset: 0,
+        end_offset: 21,
+        quote: "Neverness to Everness",
+        quote_sha256: "d".repeat(64),
+      },
+    ],
+  };
+  const fetchMock = workspaceFetch({
+    entities: [entity],
+    versions: [sourceVersion],
+    claims: [conflictingClaim],
+    conflicts: [
+      {
+        id: "conflict-1",
+        predicate: "game.name",
+        status: "open",
+        policy_version: "claim-conflict-v1",
+        member_count: 2,
+        distinct_value_count: 2,
+        subject: entity,
+        members: [
+          {
+            relation: "conflicting",
+            basis: "claim-conflict-v1: single-valued exact scope",
+            claim: conflictingClaim,
+          },
+          {
+            relation: "conflicting",
+            basis: "claim-conflict-v1: single-valued exact scope",
+            claim: {
+              ...conflictingClaim,
+              id: "claim-conflict-2",
+              value: "NTE",
+              normalized_value: "nte",
+            },
+          },
+        ],
+      },
+    ],
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "知识" }));
+
+  expect(await screen.findByRole("heading", { name: "事实冲突检查" })).toBeInTheDocument();
+  expect(await screen.findByText("待处理")).toBeInTheDocument();
+  expect(screen.getAllByText("冲突").length).toBeGreaterThan(0);
+  expect(screen.getByText("2 个不同值 · 2 条候选")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "检测冲突" }));
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/knowledge-conflicts/reconcile",
+      { method: "POST" },
+    ),
+  );
+  expect(await screen.findByText(/冲突检查完成/)).toBeInTheDocument();
+  fireEvent.click(screen.getAllByRole("button", { name: /Neverness to Everness/ }).at(-1)!);
+  expect(screen.getByText("0–21")).toBeInTheDocument();
 });

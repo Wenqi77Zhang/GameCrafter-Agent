@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C3a: deterministic conflict service**.
+The repository is currently in **M1-C C3b: explainable conflict workspace**.
 
-Implemented through M1-C C3a:
+Implemented through M1-C C3b:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -121,13 +121,18 @@ Implemented through M1-C C3a:
   human-closed groups, project-scoped reads, and append-only reconciliation audit events;
 - conflict reconcile/list APIs returning unreviewed candidates with their existing exact-evidence
   read models, without model calls, confidence ranking, or automatic resolution.
+- an explicit conflict-check control embedded in the bilingual Knowledge workspace;
+- responsive conflict and possible-coexistence cards that expose values, candidate counts, status,
+  policy version, and deterministic classification basis;
+- one-click navigation from every conflict member to its exact source evidence, while leaving all
+  selection, approval, and resolution decisions to the later human-review workflow.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- conflict-review and claim-review UI, snapshot publication commands, embeddings, or an approved
-  knowledge snapshot;
+- human conflict-resolution and claim-review controls, snapshot publication commands, embeddings,
+  or an approved knowledge snapshot;
 - live trend sources;
 - live LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
@@ -354,6 +359,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-C C2.4b Knowledge-workspace record](docs/migration/m1c-knowledge-workspace.md)
 - [M1-C C2.5 NTE PostgreSQL acceptance](docs/migration/m1c-nte-postgres-acceptance.md)
 - [M1-C C3a deterministic-conflict service](docs/migration/m1c-deterministic-conflicts.md)
+- [M1-C C3b conflict-workspace record](docs/migration/m1c-conflict-workspace.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles
