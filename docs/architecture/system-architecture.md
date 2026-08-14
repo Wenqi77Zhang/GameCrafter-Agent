@@ -27,12 +27,12 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M1-C C2.4a runtime
+## Implemented M1-A to M1-C C2.4b runtime
 
 ```mermaid
 flowchart LR
     USER["Local user"]
-    WEB["React Sources and Runs workspace"]
+    WEB["React Sources, Knowledge, and Runs workspace"]
     API["FastAPI"]
     COMMAND["Validated workspace commands and queries"]
     RUNS[("workflow_runs")]
@@ -59,8 +59,8 @@ The worker-to-handler arrow is implemented in M1-B B3; the commands, queries, an
 implemented in B4. C2.3a renames the substrate without replacing rows and adds `workflow_kind` to
 make each run's business purpose explicit. PostgreSQL owns project, candidate, run, job, and audit
 consistency. The worker never claims a website or model capability until its typed handler is
-implemented and registered. C2.4a adds Knowledge delivery queries and correction commands without
-claiming that the C2.4b interface exists.
+implemented and registered. C2.4a adds Knowledge delivery queries and correction commands; C2.4b
+connects them to a bilingual, responsive interface without weakening the human-review boundary.
 
 ## Implemented M1-B B1 evidence contracts
 
@@ -425,7 +425,7 @@ remain observable. PostgreSQL triggers keep run, source, subject, and project li
 make the result marker immutable. C2.3b remains one deterministic specialist node: it does not add
 ReAct, self-learning, agent-to-agent conversation, or an MCP service.
 
-## Implemented M1-C C2.4a Knowledge delivery boundary
+## Implemented M1-C C2.4a-C2.4b Knowledge delivery workspace
 
 ```mermaid
 flowchart LR
@@ -439,7 +439,10 @@ flowchart LR
     EXTRACT["Existing knowledge.extract command"]
     CLAIM_API["Filtered candidate-claim API"]
     EVIDENCE["Stored quote and source metadata"]
-    UI_NEXT["C2.4b Knowledge workspace"]
+    UI["Knowledge workspace"]
+    PROGRESS["Persisted run and audit progress"]
+    RUNS_UI["Full Runs trace"]
+    SOURCES_UI["Add-source shortcut"]
 
     HUMAN --> ENTITY_API
     ENTITY_API --> STABLE
@@ -448,10 +451,14 @@ flowchart LR
     STABLE --> CAPABILITY
     VERSIONS --> CAPABILITY
     CAPABILITY -->|"available"| EXTRACT
-    CAPABILITY -->|"safe reason code"| UI_NEXT
-    EXTRACT --> CLAIM_API --> EVIDENCE --> UI_NEXT
-    REVISIONS --> UI_NEXT
-    VERSION_API --> UI_NEXT
+    CAPABILITY -->|"safe reason code"| UI
+    CAPABILITY -->|"available"| UI --> EXTRACT
+    EXTRACT --> PROGRESS --> UI
+    PROGRESS --> RUNS_UI
+    EXTRACT --> CLAIM_API --> EVIDENCE --> UI
+    REVISIONS --> UI
+    VERSION_API --> UI
+    UI -->|"no evidence"| SOURCES_UI
 ```
 
 Entity IDs, project ownership, type, and canonical keys remain stable. A correction appends a new
@@ -463,8 +470,16 @@ The capability endpoint is read-only and reports disabled, missing, invalid, tar
 fixture-incomplete, or available states without exposing local paths or constructing a live model
 client. Source-version reads default naturally to the latest item while retaining every historical
 version. Candidate claims can be filtered by subject or extraction run and include the exact stored
-quote plus source URL, title, locale, region, fetch time, and version number needed by the C2.4b
-evidence panel. No review or publication command is introduced here.
+quote plus source URL, title, locale, region, fetch time, and version number rendered by the C2.4b
+evidence panel.
+
+The Knowledge workspace defaults to the latest usable source version while keeping historical
+versions selectable. It creates or corrects game identities, shows safe capability reason codes,
+starts the existing durable extraction command, derives its four-stage display from persisted run
+and audit records, and links to the complete Runs trace. Claims remain explicitly labelled as AI
+candidates that have not been reviewed. Missing evidence leads back to Sources. No review or
+publication command is introduced here, so the interface cannot visually promote a candidate into
+an approved fact.
 
 ## Marketing workflow state graph
 

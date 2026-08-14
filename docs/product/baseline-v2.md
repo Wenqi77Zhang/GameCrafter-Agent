@@ -98,6 +98,16 @@ Public sources must not be described as an internal GDD. For existing games, the
   read-only capability preflight that reports why an exact zero-cost replay is or is not available.
   Candidate reads remain explicitly unreviewed and return server-stored evidence quotes with source
   metadata; C2.4a does not approve, reject, or publish knowledge.
+- C2.4b keeps extraction in a dedicated Knowledge workspace. It defaults to the latest available
+  immutable evidence version but permits explicit historical selection, displays capability reason
+  codes without implying a model call, and keeps the user on the page while the durable run starts.
+- Progress is derived only from persisted run and audit state. Candidate claims remain visibly
+  unreviewed, are grouped by controlled predicate, and open an evidence panel using server-returned
+  quotes and provenance. The interface does not expose review or publication actions before their
+  guarded backend commands exist.
+- If no entity or evidence version exists, the workspace offers a direct route to create the game
+  identity or add sources. Entity corrections append history; archival is explicit and terminal.
+  Simplified Chinese is the product default and English remains a remembered option.
 - The confirmed M1-C order is C2.3a workflow substrate, C2.3b durable extraction, C2.4 extraction
   UI, C2.5 NTE PostgreSQL acceptance, C3 conflicts, C4 reviews, and C5 publication.
 - The committed NTE replay is a small, source-attributed snapshot of public English official-site

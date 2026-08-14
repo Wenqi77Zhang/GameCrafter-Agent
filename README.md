@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C2.4a: Knowledge delivery API**.
+The repository is currently in **M1-C C2.4b: Knowledge extraction workspace**.
 
-Implemented through M1-C C2.4a:
+Implemented through M1-C C2.4b:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -99,13 +99,21 @@ Implemented through M1-C C2.4a:
 - a non-mutating extraction-capability preflight that distinguishes disabled, missing, invalid,
   mismatched, incomplete, and exact offline replay states;
 - filterable unreviewed-claim reads with server-returned evidence quotes and source/version metadata.
+- a responsive Knowledge workspace that keeps entity identity, immutable evidence-version choice,
+  exact-replay capability, extraction progress, candidate claims, and exact evidence in one flow;
+- beginner-safe game-entity creation plus append-only correction and archival controls;
+- explicit zero-cost disabled/mismatch states, Knowledge-to-Runs trace navigation, and a Sources
+  shortcut when no evidence exists;
+- grouped candidate claims and a server-rendered evidence inspector that never re-slices Unicode
+  offsets in the browser;
+- default Simplified Chinese, remembered English switching, and desktop/mobile browser coverage.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- extraction UI, deterministic conflict processing, review UI, snapshot publication commands,
-  embeddings, or an approved knowledge snapshot;
+- deterministic conflict processing, review UI, snapshot publication commands, embeddings, or an
+  approved knowledge snapshot;
 - live trend sources;
 - live LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
@@ -183,7 +191,9 @@ C2.3b registers durable extraction, persists redacted invocation and exact-evide
 exposes project-scoped commands and read models under exact offline-replay preflight.
 C2.4a adds the stable delivery contracts required by the Knowledge interface: correctable entity
 labels with immutable history, source-version selection, honest replay capability, and enriched
-candidate/evidence reads. The user-facing extraction workspace remains C2.4b.
+candidate/evidence reads. C2.4b composes those contracts into the bilingual, responsive Knowledge
+workspace while keeping human review and publication out of scope until their guarded commands
+exist.
 
 ```mermaid
 flowchart TB
@@ -228,6 +238,7 @@ flowchart TB
 ```
 
 See [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md) for the knowledge-ingestion and marketing state graphs, data trust boundaries, and design rationale.
+See [`docs/migration/m1c-knowledge-workspace.md`](docs/migration/m1c-knowledge-workspace.md) for the C2.4b interface boundary and verification evidence.
 
 ## Repository layout
 

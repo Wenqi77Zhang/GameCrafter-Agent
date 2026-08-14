@@ -4,6 +4,34 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { App } from "./App";
 
 const project = { id: "project-1", slug: "nte", name: "异环", default_locale: "zh-CN" };
+const entity = {
+  id: "entity-1",
+  project_id: "project-1",
+  entity_type: "game",
+  canonical_key: "game:nte",
+  display_name: "异环",
+  aliases: ["NTE: Neverness to Everness"],
+  status: "active",
+  revision_number: 1,
+  created_at: "2026-08-15T00:00:00Z",
+  revised_at: "2026-08-15T00:00:00Z",
+};
+const sourceVersion = {
+  id: "version-1",
+  source_id: "source-1",
+  version_number: 1,
+  is_latest: true,
+  title: "NTE official homepage",
+  url: "https://nte.perfectworld.com/en/",
+  site: "nte-global",
+  locale: "en",
+  region: "global",
+  source_type: "overview",
+  source_status: "active",
+  fetched_at: "2026-08-15T00:00:00Z",
+  normalized_text_sha256: "a".repeat(64),
+  normalized_text_available: true,
+};
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
@@ -26,9 +54,20 @@ function json(value: unknown, status = 200): Response {
   });
 }
 
-function workspaceFetch(options?: { projects?: typeof project[]; candidates?: unknown[] }) {
+function workspaceFetch(options?: {
+  projects?: typeof project[];
+  candidates?: unknown[];
+  entities?: Array<Record<string, unknown>>;
+  versions?: Array<Record<string, unknown>>;
+  claims?: Array<Record<string, unknown>>;
+  capability?: Record<string, unknown>;
+}) {
   const projects = options?.projects ?? [project];
   const candidates = options?.candidates ?? [];
+  const entities = [...(options?.entities ?? [])];
+  const versions = [...(options?.versions ?? [])];
+  const claims = [...(options?.claims ?? [])];
+  const runs: Array<Record<string, unknown>> = [];
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const path = String(input);
     if (path === "/api/health") return json({ status: "ok" });
@@ -36,7 +75,52 @@ function workspaceFetch(options?: { projects?: typeof project[]; candidates?: un
     if (path === "/api/projects") return json({ items: projects });
     if (path.endsWith("/candidates")) return json({ items: candidates });
     if (path.endsWith("/sources")) return json({ items: [] });
-    if (path.endsWith("/runs")) return json({ items: [] });
+    if (path.endsWith("/runs")) return json({ items: runs });
+    if (path.endsWith("/knowledge-entities") && init?.method === "POST") {
+      const payload = JSON.parse(String(init.body)) as { display_name: string; aliases: string[] };
+      const created = { ...entity, display_name: payload.display_name, aliases: payload.aliases };
+      entities.splice(0, entities.length, created);
+      return json(created, 201);
+    }
+    if (path.endsWith("/knowledge-entities")) return json({ items: entities });
+    if (path.includes("/knowledge-entities/entity-1") && init?.method === "PUT") {
+      const payload = JSON.parse(String(init.body)) as { display_name: string; aliases: string[] };
+      const corrected = {
+        ...entity,
+        display_name: payload.display_name,
+        aliases: payload.aliases,
+        revision_number: 2,
+      };
+      entities.splice(0, entities.length, corrected);
+      return json(corrected);
+    }
+    if (path.endsWith("/source-versions")) return json({ items: versions });
+    if (path.includes("/knowledge-extraction-capability")) {
+      return json(
+        options?.capability ?? {
+          available: false,
+          mode: "disabled",
+          reason_code: "provider_disabled",
+          reason: "disabled",
+        },
+      );
+    }
+    if (path.includes("/knowledge-claims")) return json({ items: claims });
+    if (path.endsWith("/knowledge-extractions") && init?.method === "POST") {
+      const run = {
+        id: "knowledge-run-1",
+        workflow_kind: "knowledge.extract",
+        task_type: "knowledge.extract",
+        status: "queued",
+        checkpoint: "created",
+        last_error_code: null,
+        last_error_detail: null,
+        created_at: "2026-08-15T00:00:00Z",
+        finished_at: null,
+      };
+      runs.splice(0, runs.length, run);
+      return json(run, 202);
+    }
     if (path.endsWith("/source-imports")) {
       return json(
         {
@@ -147,4 +231,137 @@ test("shows a visible API failure instead of a fake healthy state", async () => 
 
   expect(await screen.findByRole("heading", { name: "本地 API 暂不可用" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "重试连接" })).toBeInTheDocument();
+});
+
+test("runs exact zero-cost extraction without leaving the Knowledge workspace", async () => {
+  const fetchMock = workspaceFetch({
+    entities: [entity],
+    versions: [sourceVersion],
+    capability: {
+      available: true,
+      mode: "offline_replay",
+      reason_code: "available",
+      reason: "available",
+    },
+  });
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "知识" }));
+  expect(await screen.findByRole("heading", { name: "知识提取工作台" })).toBeInTheDocument();
+  expect(await screen.findByText("离线回放可用")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "开始提取" }));
+
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/knowledge-extractions",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ source_version_id: "version-1", subject_entity_id: "entity-1" }),
+      }),
+    ),
+  );
+  expect(await screen.findByText("知识提取已进入本地队列。")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "知识" })).toHaveClass("active");
+  expect(FakeEventSource.instances.at(-1)?.url).toBe("/api/runs/knowledge-run-1/events");
+});
+
+test("renders the server-stored exact quote and source lineage", async () => {
+  workspaceFetch({
+    entities: [entity],
+    versions: [sourceVersion],
+    claims: [
+      {
+        id: "claim-1",
+        subject_entity_id: "entity-1",
+        extraction_run_id: "knowledge-run-1",
+        predicate: "game.developer",
+        value_kind: "string",
+        value: "Hotta Studio",
+        confidence: 0.96,
+        locale: "en",
+        region: "global",
+        status: "candidate_unreviewed",
+        created_at: "2026-08-15T00:00:00Z",
+        evidence: [
+          {
+            source_version_id: "version-1",
+            source_id: "source-1",
+            source_url: "https://nte.perfectworld.com/en/",
+            source_title: "NTE official homepage",
+            source_version_number: 1,
+            locale: "en",
+            region: "global",
+            fetched_at: "2026-08-15T00:00:00Z",
+            ordinal: 0,
+            start_offset: 8,
+            end_offset: 36,
+            quote: "Developed by Hotta Studio.",
+            quote_sha256: "b".repeat(64),
+          },
+        ],
+      },
+    ],
+  });
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "知识" }));
+
+  expect(await screen.findByText("Developed by Hotta Studio.")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "NTE official homepage" })).toHaveAttribute(
+    "href",
+    "https://nte.perfectworld.com/en/",
+  );
+  expect(screen.getAllByText("AI 候选 · 未经人工审核").length).toBeGreaterThan(0);
+  expect(screen.getByText("8–36")).toBeInTheDocument();
+});
+
+test("creates and corrects a generic game entity through auditable forms", async () => {
+  const fetchMock = workspaceFetch({ entities: [], versions: [] });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "知识" }));
+
+  fireEvent.click(await screen.findByRole("button", { name: "新建游戏实体" }));
+  fireEvent.change(screen.getByLabelText("游戏名称"), { target: { value: "异环" } });
+  fireEvent.change(screen.getByLabelText(/^英文名或其他别名/), {
+    target: { value: "NTE, Neverness to Everness" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "创建实体" }));
+
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/knowledge-entities",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          display_name: "异环",
+          aliases: ["NTE", "Neverness to Everness"],
+        }),
+      }),
+    ),
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "纠正名称" }));
+  fireEvent.change(screen.getByLabelText("游戏名称"), {
+    target: { value: "异环（Neverness to Everness）" },
+  });
+  fireEvent.change(screen.getByLabelText("修改原因"), { target: { value: "修正输入错误" } });
+  fireEvent.click(screen.getByRole("button", { name: "保存纠正" }));
+
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/knowledge-entities/entity-1",
+      expect.objectContaining({ method: "PUT" }),
+    ),
+  );
+});
+
+test("offers a direct Sources shortcut when no evidence version exists", async () => {
+  workspaceFetch({ entities: [entity], versions: [] });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "知识" }));
+
+  fireEvent.click(await screen.findByRole("button", { name: "去添加来源" }));
+
+  expect(screen.getByRole("button", { name: /^来源/ })).toHaveClass("active");
+  expect(screen.getByText("暂无待选候选。先运行一次来源发现。")).toBeInTheDocument();
 });
