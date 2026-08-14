@@ -1,7 +1,11 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
-type Language = "zh-CN" | "en";
-type Tab = "sources" | "runs";
+import { api, formatDate, idempotencyKey } from "./client";
+import type { Language } from "./client";
+import { KnowledgeWorkspace } from "./KnowledgeWorkspace";
+import type { WorkspaceAuditEvent, WorkspaceRun } from "./KnowledgeWorkspace";
+
+type Tab = "sources" | "knowledge" | "runs";
 type Project = { id: string; slug: string; name: string; default_locale: Language };
 type Candidate = {
   id: string;
@@ -28,28 +32,13 @@ type Source = {
   latest_version: number | null;
   updated_at: string;
 };
-type Run = {
-  id: string;
-  workflow_kind: string;
-  task_type: string;
-  status: string;
-  checkpoint: string;
-  last_error_code: string | null;
-  last_error_detail: string | null;
-  created_at: string;
-  finished_at: string | null;
-};
-type AuditEvent = {
-  id: string;
-  event_type: string;
-  actor_type: string;
-  payload: Record<string, unknown>;
-  occurred_at: string;
-};
+type Run = WorkspaceRun;
+type AuditEvent = WorkspaceAuditEvent;
 
 const copy = {
   "zh-CN": {
     sources: "来源",
+    knowledge: "知识",
     runs: "运行记录",
     createNte: "创建《异环》项目",
     emptyProject: "先创建本地《异环》验证项目，再开始采集官方公开资料。",
@@ -95,6 +84,7 @@ const copy = {
   },
   en: {
     sources: "Sources",
+    knowledge: "Knowledge",
     runs: "Runs",
     createNte: "Create NTE project",
     emptyProject: "Create the local NTE validation project before collecting public official sources.",
@@ -163,33 +153,6 @@ const quickProfiles = [
   },
 ] as const;
 
-function idempotencyKey(prefix: string): string {
-  return `${prefix}-${crypto.randomUUID()}`;
-}
-
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
-  if (!response.ok) {
-    let detail = `HTTP ${response.status}`;
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      detail = payload.detail ?? detail;
-    } catch {
-      // A non-JSON proxy error is still represented by its status.
-    }
-    throw new Error(detail);
-  }
-  return (await response.json()) as T;
-}
-
-function formatDate(value: string | null, language: Language): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(language, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 function targetUrls(site: string, category: string, pages: number): string[] {
   const urls: string[] = [];
   for (let page = 1; page <= pages; page += 1) {
@@ -226,6 +189,7 @@ export function App() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [knowledgeRefreshToken, setKnowledgeRefreshToken] = useState(0);
   const t = copy[language];
 
   const loadProjects = useCallback(async () => {
@@ -301,6 +265,10 @@ export function App() {
   const selectedRunRecord = useMemo(
     () => runs.find((run) => run.id === selectedRun) ?? null,
     [runs, selectedRun],
+  );
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === projectId) ?? null,
+    [projects, projectId],
   );
 
   const toggleLanguage = () => {
@@ -382,12 +350,23 @@ export function App() {
       `candidate-${candidate.id}`,
     );
 
+  const acceptKnowledgeRun = (run: Run) => {
+    setSelectedRun(run.id);
+    setRuns((current) => [run, ...current.filter((item) => item.id !== run.id)]);
+    void refreshWorkspace();
+  };
+
+  const refreshAll = () => {
+    setKnowledgeRefreshToken((current) => current + 1);
+    void refreshWorkspace();
+  };
+
   return (
     <main className="workspace-shell">
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">G</span>
-          <div><strong>GameCrafter</strong><small>Knowledge Hub · M1-B</small></div>
+          <div><strong>GameCrafter</strong><small>Knowledge Hub · M1-C</small></div>
         </div>
         <div className="top-actions">
           <span className="privacy-note">{t.privacy}</span>
@@ -436,10 +415,13 @@ export function App() {
                 <button className={tab === "sources" ? "active" : ""} type="button" onClick={() => setTab("sources")}>
                   {t.sources}<span>{sources.length}</span>
                 </button>
+                <button className={tab === "knowledge" ? "active" : ""} type="button" onClick={() => setTab("knowledge")}>
+                  {t.knowledge}
+                </button>
                 <button className={tab === "runs" ? "active" : ""} type="button" onClick={() => setTab("runs")}>
                   {t.runs}<span>{runs.length}</span>
                 </button>
-                <button className="refresh-button" type="button" onClick={() => void refreshWorkspace()}>{t.refresh}</button>
+                <button className="refresh-button" type="button" onClick={refreshAll}>{t.refresh}</button>
               </nav>
 
               {message && <div className={`notice notice--${message.kind}`} role="status">{message.text}</div>}
@@ -508,6 +490,22 @@ export function App() {
                     </section>
                   </div>
                 </div>
+              ) : tab === "knowledge" && selectedProject ? (
+                <KnowledgeWorkspace
+                  projectId={projectId}
+                  projectName={selectedProject.name}
+                  language={language}
+                  runs={runs}
+                  selectedRunId={selectedRun}
+                  events={events}
+                  refreshToken={knowledgeRefreshToken}
+                  onRunQueued={acceptKnowledgeRun}
+                  onOpenRun={(runId) => {
+                    setSelectedRun(runId);
+                    setTab("runs");
+                  }}
+                  onGoSources={() => setTab("sources")}
+                />
               ) : (
                 <div className="runs-layout">
                   <section className="run-list">
