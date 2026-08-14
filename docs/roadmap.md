@@ -51,5 +51,8 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C2.4b implements the bilingual responsive Knowledge workspace, entity and immutable-version
   selection, explicit zero-cost capability states, extraction start/progress, grouped candidate
   claims, exact evidence inspection, and navigation to Sources or the full run trace.
-- M1-C C2.5 NTE PostgreSQL acceptance, C3 deterministic conflicts, C4 human reviews, and C5 snapshot
-  publication remain unimplemented.
+- M1-C C2.5 proves the reviewed public NTE snapshot through migrated PostgreSQL, the shared leased
+  queue, zero-token exact replay, atomic candidate/evidence persistence, audit completion, and
+  redacted read models. It deliberately does not claim current live-site capture evidence.
+- M1-C C3 deterministic conflicts, C4 human reviews, and C5 snapshot publication remain
+  unimplemented.

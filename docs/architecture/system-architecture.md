@@ -27,7 +27,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M1-C C2.4b runtime
+## Implemented M1-A to M1-C C2.5 runtime
 
 ```mermaid
 flowchart LR
@@ -480,6 +480,37 @@ and audit records, and links to the complete Runs trace. Claims remain explicitl
 candidates that have not been reviewed. Missing evidence leads back to Sources. No review or
 publication command is introduced here, so the interface cannot visually promote a candidate into
 an approved fact.
+
+## Implemented M1-C C2.5 NTE PostgreSQL acceptance
+
+```mermaid
+flowchart LR
+    FIXTURE["Reviewed public NTE snapshot"]
+    REBIND["Unique acceptance source version and entity key"]
+    SAFE{"Disposable localhost test database?"}
+    MIGRATE["Alembic upgrade to head"]
+    COMMAND["Idempotent knowledge.extract command"]
+    QUEUE[("PostgreSQL leased queue")]
+    REPLAY["Exact offline replay: zero tokens"]
+    ATOMIC[("Claims, exact evidence, result, audit")]
+    READS["Redacted result and provenance reads"]
+
+    SAFE -->|"yes"| MIGRATE --> REBIND
+    SAFE -->|"no"| REJECT["Reject before migration or test"]
+    FIXTURE --> REBIND --> COMMAND --> QUEUE --> REPLAY --> ATOMIC --> READS
+```
+
+The acceptance uses a unique project, source version, entity, command key, and filesystem object
+root. The reviewed fixture output is rebound to the exact unique request fingerprint in test code;
+no approximate match or live model fallback is allowed. PostgreSQL must persist one job, one
+zero-token invocation, two candidate Claims, two evidence spans, the immutable result marker, and
+the completion audit events. Every returned quote must exist in the normalized snapshot and carry
+the same source-version lineage.
+
+The local runner accepts only localhost URLs whose database name contains `test` or `acceptance`.
+Rows are not silently deleted because audit history is part of the contract. This proves the
+production PostgreSQL path for the reviewed NTE snapshot, but it is not current live-site capture
+evidence and is labelled accordingly.
 
 ## Marketing workflow state graph
 

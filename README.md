@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C2.4b: Knowledge extraction workspace**.
+The repository is currently in **M1-C C2.5: NTE PostgreSQL acceptance**.
 
-Implemented through M1-C C2.4b:
+Implemented through M1-C C2.5:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -107,6 +107,12 @@ Implemented through M1-C C2.4b:
 - grouped candidate claims and a server-rendered evidence inspector that never re-slices Unicode
   offsets in the browser;
 - default Simplified Chinese, remembered English switching, and desktop/mobile browser coverage.
+- a real PostgreSQL acceptance that binds the reviewed public NTE snapshot to a unique immutable
+  source version and runs it through the leased `knowledge.extract` worker;
+- acceptance assertions for command idempotence, zero-token exact replay, atomic Claim/evidence
+  persistence, source lineage, audit completion, and redacted result reads;
+- a safety-gated PowerShell acceptance command that only accepts disposable localhost databases
+  whose names contain `test` or `acceptance`.
 
 Not implemented yet:
 
@@ -193,7 +199,8 @@ C2.4a adds the stable delivery contracts required by the Knowledge interface: co
 labels with immutable history, source-version selection, honest replay capability, and enriched
 candidate/evidence reads. C2.4b composes those contracts into the bilingual, responsive Knowledge
 workspace while keeping human review and publication out of scope until their guarded commands
-exist.
+exist. C2.5 proves the NTE fixture path against migrated PostgreSQL, the real leased queue, and the
+production persistence constraints; it is not represented as a current live-site capture.
 
 ```mermaid
 flowchart TB
@@ -295,6 +302,18 @@ Run all locally available checks:
 .\scripts\verify.ps1
 ```
 
+Run the isolated NTE PostgreSQL acceptance only against a disposable localhost database. Its name
+must contain `test` or `acceptance`:
+
+```powershell
+$env:GAMECRAFTER_TEST_DATABASE_URL = "postgresql+psycopg://USER:PASSWORD@127.0.0.1:5432/gamecrafter_test"
+.\scripts\acceptance.ps1
+```
+
+The command migrates that disposable database, executes the zero-cost NTE extraction acceptance,
+and never prints the connection URL. Acceptance rows are intentionally auditable, so do not point
+the command at a personal product database.
+
 Static HTTP capture does not require a browser download. Before a later JavaScript-rendered
 acceptance test, inspect or install the isolated Chromium headless shell explicitly:
 
@@ -324,6 +343,8 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-C C2.3a workflow-foundation record](docs/migration/m1c-workflow-foundation.md)
 - [M1-C C2.3b durable-extraction record](docs/migration/m1c-durable-extraction.md)
 - [M1-C C2.4a Knowledge-delivery API record](docs/migration/m1c-knowledge-delivery-api.md)
+- [M1-C C2.4b Knowledge-workspace record](docs/migration/m1c-knowledge-workspace.md)
+- [M1-C C2.5 NTE PostgreSQL acceptance](docs/migration/m1c-nte-postgres-acceptance.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles
