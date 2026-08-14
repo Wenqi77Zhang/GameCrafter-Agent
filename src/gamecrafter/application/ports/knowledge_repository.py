@@ -78,5 +78,11 @@ class KnowledgeRepository(Protocol):
     def extraction_result(self, *, project_id: UUID, run_id: UUID) -> dict[str, object]:
         """Return one project-scoped result and its redacted invocation trace."""
 
-    def list_claims(self, project_id: UUID) -> list[dict[str, object]]:
+    def list_claims(
+        self,
+        project_id: UUID,
+        *,
+        subject_entity_id: UUID | None = None,
+        extraction_run_id: UUID | None = None,
+    ) -> list[dict[str, object]]:
         """Return immutable candidate claims with exact evidence spans."""

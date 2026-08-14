@@ -45,5 +45,8 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C2.3b implements the durable `knowledge.extract` handler, verified object loading, redacted
   invocation traces, atomic claim/evidence/result persistence, idempotent retries, and project-scoped
   APIs under disabled-or-exact-replay zero-cost preflight.
-- M1-C C2.4 extraction UI, C2.5 NTE PostgreSQL acceptance, C3 deterministic conflicts, C4 human
+- M1-C C2.4a implements stable game-entity creation, append-only correction and archival history,
+  immutable source-version selection reads, honest zero-cost capability preflight, and enriched
+  candidate/evidence delivery contracts.
+- M1-C C2.4b extraction UI, C2.5 NTE PostgreSQL acceptance, C3 deterministic conflicts, C4 human
   reviews, and C5 snapshot publication remain unimplemented.

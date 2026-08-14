@@ -91,6 +91,13 @@ Public sources must not be described as an internal GDD. For existing games, the
 - The extraction command is unavailable while the model provider is disabled and is accepted in C2
   only when a validated local fixture exactly covers the deterministic request fingerprints. This
   preserves strict zero API cost; no approximate fixture or paid fallback exists.
+- C2.4a keeps stable entity identity immutable while allowing human-entered display names and aliases
+  to be corrected through append-only revisions. Archival is terminal, old values remain auditable,
+  and existing claims are never silently moved to another subject.
+- C2.4a exposes immutable source versions latest-first with explicit historical selection, plus a
+  read-only capability preflight that reports why an exact zero-cost replay is or is not available.
+  Candidate reads remain explicitly unreviewed and return server-stored evidence quotes with source
+  metadata; C2.4a does not approve, reject, or publish knowledge.
 - The confirmed M1-C order is C2.3a workflow substrate, C2.3b durable extraction, C2.4 extraction
   UI, C2.5 NTE PostgreSQL acceptance, C3 conflicts, C4 reviews, and C5 publication.
 - The committed NTE replay is a small, source-attributed snapshot of public English official-site

@@ -1,12 +1,15 @@
 import os
 from hashlib import sha256
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
 
+from gamecrafter.infrastructure.database.knowledge_workspace_service import (
+    DatabaseKnowledgeWorkspaceService,
+)
 from gamecrafter.infrastructure.database.models import (
     ClaimConflictGroupRecord,
     ClaimConflictMemberRecord,
@@ -14,6 +17,7 @@ from gamecrafter.infrastructure.database.models import (
     ClaimReviewRecord,
     KnowledgeClaimRecord,
     KnowledgeEntityRecord,
+    KnowledgeEntityRevisionRecord,
     KnowledgeExtractionResultRecord,
     KnowledgeSnapshotMemberRecord,
     KnowledgeSnapshotRecord,
@@ -341,6 +345,49 @@ def test_postgres_enforces_extraction_lineage_and_immutable_result() -> None:
         result = session.get(KnowledgeExtractionResultRecord, run_id)
         assert result is not None
         result.manifest_sha256 = "f" * 64
+
+
+def test_postgres_entity_corrections_are_append_only_and_archival_is_terminal() -> None:
+    sessions = postgres_sessions()
+    nonce = uuid4().hex
+    project_id = DatabaseRunService(sessions).create_project(
+        slug=f"entity-revision-{nonce}",
+        name="Entity revisions",
+    )
+    service = DatabaseKnowledgeWorkspaceService(sessions)
+    entity, _ = service.create_entity(
+        project_id=project_id,
+        display_name="Incorrect game name",
+        aliases=[],
+        actor_id="local-user",
+    )
+    entity_id = UUID(str(entity["id"]))
+    corrected, _ = service.correct_entity(
+        project_id=project_id,
+        entity_id=entity_id,
+        display_name="Correct game name",
+        aliases=["Correct alias"],
+        change_reason="Fix a user input mistake.",
+        actor_id="local-user",
+    )
+    archived, _ = service.archive_entity(
+        project_id=project_id,
+        entity_id=entity_id,
+        change_reason="The subject was created by mistake.",
+        actor_id="local-user",
+    )
+    assert corrected["revision_number"] == 2
+    assert archived["revision_number"] == 3
+
+    with pytest.raises(DBAPIError, match="immutable"), sessions.begin() as session:
+        revision = session.scalar(
+            select(KnowledgeEntityRevisionRecord).where(
+                KnowledgeEntityRevisionRecord.entity_id == entity_id,
+                KnowledgeEntityRevisionRecord.revision_number == 2,
+            )
+        )
+        assert revision is not None
+        revision.display_name = "Silently rewritten"
 
 
 def _extraction_result(

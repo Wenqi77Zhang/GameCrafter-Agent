@@ -27,7 +27,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M1-C C2.3b runtime
+## Implemented M1-A to M1-C C2.4a runtime
 
 ```mermaid
 flowchart LR
@@ -43,6 +43,7 @@ flowchart LR
 
     USER --> WEB --> API
     API -->|"sources, candidates, runs"| WEB
+    API -->|"entities, versions, capability, claims"| COMMAND
     API -. "resumable SSE audit events" .-> WEB
     API -->|"database readiness"| RUNS
     API --> COMMAND
@@ -58,7 +59,8 @@ The worker-to-handler arrow is implemented in M1-B B3; the commands, queries, an
 implemented in B4. C2.3a renames the substrate without replacing rows and adds `workflow_kind` to
 make each run's business purpose explicit. PostgreSQL owns project, candidate, run, job, and audit
 consistency. The worker never claims a website or model capability until its typed handler is
-implemented and registered.
+implemented and registered. C2.4a adds Knowledge delivery queries and correction commands without
+claiming that the C2.4b interface exists.
 
 ## Implemented M1-B B1 evidence contracts
 
@@ -422,6 +424,47 @@ marker makes later delivery of the same run a no-op, while attempts that stop be
 remain observable. PostgreSQL triggers keep run, source, subject, and project lineage aligned and
 make the result marker immutable. C2.3b remains one deterministic specialist node: it does not add
 ReAct, self-learning, agent-to-agent conversation, or an MCP service.
+
+## Implemented M1-C C2.4a Knowledge delivery boundary
+
+```mermaid
+flowchart LR
+    HUMAN["Local user"]
+    ENTITY_API["Entity create, correct, archive APIs"]
+    STABLE[("Immutable entity identity")]
+    REVISIONS[("Append-only label revisions")]
+    VERSION_API["Latest-first source-version API"]
+    VERSIONS[("Immutable evidence versions")]
+    CAPABILITY{"Exact replay available?"}
+    EXTRACT["Existing knowledge.extract command"]
+    CLAIM_API["Filtered candidate-claim API"]
+    EVIDENCE["Stored quote and source metadata"]
+    UI_NEXT["C2.4b Knowledge workspace"]
+
+    HUMAN --> ENTITY_API
+    ENTITY_API --> STABLE
+    ENTITY_API --> REVISIONS
+    HUMAN --> VERSION_API --> VERSIONS
+    STABLE --> CAPABILITY
+    VERSIONS --> CAPABILITY
+    CAPABILITY -->|"available"| EXTRACT
+    CAPABILITY -->|"safe reason code"| UI_NEXT
+    EXTRACT --> CLAIM_API --> EVIDENCE --> UI_NEXT
+    REVISIONS --> UI_NEXT
+    VERSION_API --> UI_NEXT
+```
+
+Entity IDs, project ownership, type, and canonical keys remain stable. A correction appends a new
+display-name/alias revision; it never updates or relocates existing claims. Archival appends one
+terminal revision and archived subjects cannot start extraction. The migration backfills one
+baseline revision for every existing entity, and PostgreSQL makes all revision rows immutable.
+
+The capability endpoint is read-only and reports disabled, missing, invalid, target-mismatched,
+fixture-incomplete, or available states without exposing local paths or constructing a live model
+client. Source-version reads default naturally to the latest item while retaining every historical
+version. Candidate claims can be filtered by subject or extraction run and include the exact stored
+quote plus source URL, title, locale, region, fetch time, and version number needed by the C2.4b
+evidence panel. No review or publication command is introduced here.
 
 ## Marketing workflow state graph
 

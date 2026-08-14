@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C2.3b: durable zero-cost knowledge extraction**.
+The repository is currently in **M1-C C2.4a: Knowledge delivery API**.
 
-Implemented through M1-C C2.3b:
+Implemented through M1-C C2.4a:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -92,6 +92,13 @@ Implemented through M1-C C2.3b:
   retry behavior;
 - project-scoped extraction command/result/claim APIs with strict local replay preflight;
 - disabled-by-default execution where only an exact offline fixture can be enqueued at zero cost.
+- project-scoped game-entity create/list APIs with server-owned stable keys and duplicate-safe
+  identity handling;
+- append-only entity correction and terminal archival history without rewriting claims or evidence;
+- latest-first immutable source-version read models with normalized-text availability;
+- a non-mutating extraction-capability preflight that distinguishes disabled, missing, invalid,
+  mismatched, incomplete, and exact offline replay states;
+- filterable unreviewed-claim reads with server-returned evidence quotes and source/version metadata.
 
 Not implemented yet:
 
@@ -174,6 +181,9 @@ offline extraction orchestration, and the source-attributed NTE replay fixture. 
 the durable run/job substrate so later knowledge and marketing workflows reuse the same queue.
 C2.3b registers durable extraction, persists redacted invocation and exact-evidence lineage, and
 exposes project-scoped commands and read models under exact offline-replay preflight.
+C2.4a adds the stable delivery contracts required by the Knowledge interface: correctable entity
+labels with immutable history, source-version selection, honest replay capability, and enriched
+candidate/evidence reads. The user-facing extraction workspace remains C2.4b.
 
 ```mermaid
 flowchart TB
@@ -302,6 +312,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-C C2.2 extraction-Harness record](docs/migration/m1c-extraction-harness.md)
 - [M1-C C2.3a workflow-foundation record](docs/migration/m1c-workflow-foundation.md)
 - [M1-C C2.3b durable-extraction record](docs/migration/m1c-durable-extraction.md)
+- [M1-C C2.4a Knowledge-delivery API record](docs/migration/m1c-knowledge-delivery-api.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

@@ -643,6 +643,58 @@ class KnowledgeEntityRecord(Base):
     )
 
 
+class KnowledgeEntityRevisionRecord(Base):
+    """Append-only user correction or archival state for one stable entity."""
+
+    __tablename__ = "knowledge_entity_revisions"
+    __table_args__ = (
+        CheckConstraint(
+            "revision_number > 0",
+            name="ck_knowledge_entity_revisions_number_positive",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'archived')",
+            name="ck_knowledge_entity_revisions_status",
+        ),
+        CheckConstraint(
+            "length(trim(display_name)) > 0 AND length(trim(change_reason)) > 0 "
+            "AND length(trim(actor_id)) > 0",
+            name="ck_knowledge_entity_revisions_text_nonblank",
+        ),
+        UniqueConstraint(
+            "entity_id",
+            "revision_number",
+            name="uq_knowledge_entity_revisions_entity_number",
+        ),
+        Index(
+            "ix_knowledge_entity_revisions_project_created",
+            "project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    entity_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_entities.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    revision_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(300), nullable=False)
+    aliases: Mapped[list[str]] = mapped_column(json_type, nullable=False, default=list)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    change_reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
 class KnowledgeClaimRecord(Base):
     """Immutable model-produced claim awaiting an append-only human decision."""
 

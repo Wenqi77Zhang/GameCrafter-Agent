@@ -28,6 +28,7 @@ from gamecrafter.infrastructure.database.models import (
     ClaimEvidenceSpanRecord,
     KnowledgeClaimRecord,
     KnowledgeEntityRecord,
+    KnowledgeEntityRevisionRecord,
     KnowledgeExtractionResultRecord,
     ModelInvocationRecord,
     ProjectRecord,
@@ -370,15 +371,30 @@ class DatabaseKnowledgeRepository:
                 "invocations": [self._invocation(item) for item in invocations],
             }
 
-    def list_claims(self, project_id: UUID) -> list[dict[str, object]]:
+    def list_claims(
+        self,
+        project_id: UUID,
+        *,
+        subject_entity_id: UUID | None = None,
+        extraction_run_id: UUID | None = None,
+    ) -> list[dict[str, object]]:
         with self._session_factory() as session:
             if session.get(ProjectRecord, project_id) is None:
                 raise KnowledgeStateError("project not found")
+            statement = select(KnowledgeClaimRecord).where(
+                KnowledgeClaimRecord.project_id == project_id
+            )
+            if subject_entity_id is not None:
+                statement = statement.where(
+                    KnowledgeClaimRecord.subject_entity_id == subject_entity_id
+                )
+            if extraction_run_id is not None:
+                statement = statement.where(
+                    KnowledgeClaimRecord.extraction_run_id == extraction_run_id
+                )
             claims = list(
                 session.scalars(
-                    select(KnowledgeClaimRecord)
-                    .where(KnowledgeClaimRecord.project_id == project_id)
-                    .order_by(KnowledgeClaimRecord.created_at, KnowledgeClaimRecord.id)
+                    statement.order_by(KnowledgeClaimRecord.created_at, KnowledgeClaimRecord.id)
                 )
             )
             items: list[dict[str, object]] = []
@@ -411,21 +427,39 @@ class DatabaseKnowledgeRepository:
                         "model_name": claim.model_name,
                         "prompt_version": claim.prompt_version,
                         "schema_version": claim.schema_version,
+                        "status": "candidate_unreviewed",
                         "created_at": claim.created_at.isoformat(),
-                        "evidence": [
-                            {
-                                "source_version_id": str(span.source_version_id),
-                                "ordinal": span.ordinal,
-                                "start_offset": span.start_offset,
-                                "end_offset": span.end_offset,
-                                "quote": span.quote,
-                                "quote_sha256": span.quote_sha256,
-                            }
-                            for span in spans
-                        ],
+                        "evidence": [self._evidence(session, span) for span in spans],
                     }
                 )
             return items
+
+    @staticmethod
+    def _evidence(
+        session: Session,
+        span: ClaimEvidenceSpanRecord,
+    ) -> dict[str, object]:
+        version = session.get(SourceVersionRecord, span.source_version_id)
+        if version is None:
+            raise KnowledgeStateError("claim evidence source version not found")
+        source = session.get(SourceRecord, version.source_id)
+        if source is None:
+            raise KnowledgeStateError("claim evidence source not found")
+        return {
+            "source_version_id": str(span.source_version_id),
+            "source_id": str(source.id),
+            "source_url": source.canonical_url,
+            "source_title": version.title,
+            "source_version_number": version.version_number,
+            "locale": source.locale,
+            "region": source.region,
+            "fetched_at": version.fetched_at.isoformat(),
+            "ordinal": span.ordinal,
+            "start_offset": span.start_offset,
+            "end_offset": span.end_offset,
+            "quote": span.quote,
+            "quote_sha256": span.quote_sha256,
+        }
 
     @staticmethod
     def _target(
@@ -438,6 +472,14 @@ class DatabaseKnowledgeRepository:
         entity = session.get(KnowledgeEntityRecord, subject_entity_id)
         if entity is None or entity.project_id != project_id:
             raise KnowledgeStateError("subject entity must belong to the extraction project")
+        latest_entity_revision = session.scalar(
+            select(KnowledgeEntityRevisionRecord)
+            .where(KnowledgeEntityRevisionRecord.entity_id == entity.id)
+            .order_by(KnowledgeEntityRevisionRecord.revision_number.desc())
+            .limit(1)
+        )
+        if latest_entity_revision is not None and latest_entity_revision.status == "archived":
+            raise KnowledgeStateError("archived subject entity cannot be extracted")
         version = session.get(SourceVersionRecord, source_version_id)
         if version is None:
             raise KnowledgeStateError("source version not found")
