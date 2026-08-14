@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from hashlib import sha256
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -23,6 +23,10 @@ from gamecrafter.application.ports.model_gateway import (
 )
 from gamecrafter.application.text_chunking import DeterministicTextChunker
 from gamecrafter.config.settings import Settings, get_settings
+from gamecrafter.infrastructure.database.conflict_service import (
+    ConflictServiceNotFoundError,
+    DatabaseConflictService,
+)
 from gamecrafter.infrastructure.database.knowledge_repository import (
     DatabaseKnowledgeRepository,
 )
@@ -104,6 +108,11 @@ def _workspace() -> DatabaseWorkspaceService:
 @lru_cache
 def _knowledge_workspace() -> DatabaseKnowledgeWorkspaceService:
     return DatabaseKnowledgeWorkspaceService(get_session_factory())
+
+
+@lru_cache
+def _conflicts() -> DatabaseConflictService:
+    return DatabaseConflictService(get_session_factory())
 
 
 def _state_error(error: Exception) -> HTTPException:
@@ -300,6 +309,37 @@ def list_knowledge_claims(
         }
     except KnowledgeStateError as error:
         raise _state_error(error) from error
+
+
+@router.post("/projects/{project_id}/knowledge-conflicts/reconcile")
+def reconcile_knowledge_conflicts(project_id: UUID) -> dict[str, object]:
+    """Run deterministic comparison without a model call or automatic resolution."""
+
+    try:
+        return _conflicts().reconcile(project_id=project_id, actor_id="local-user")
+    except ConflictServiceNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/projects/{project_id}/knowledge-conflicts")
+def list_knowledge_conflicts(
+    project_id: UUID,
+    status_filter: Annotated[
+        Literal["open", "resolved", "dismissed"] | None,
+        Query(alias="status"),
+    ] = None,
+    subject_entity_id: UUID | None = None,
+) -> dict[str, object]:
+    try:
+        return {
+            "items": _conflicts().list_conflicts(
+                project_id,
+                status=status_filter,
+                subject_entity_id=subject_entity_id,
+            )
+        }
+    except ConflictServiceNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 def _preflight_replay(settings: Settings, target: ExtractionTarget) -> None:

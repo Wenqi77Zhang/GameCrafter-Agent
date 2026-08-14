@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C2.5: NTE PostgreSQL acceptance**.
+The repository is currently in **M1-C C3a: deterministic conflict service**.
 
-Implemented through M1-C C2.5:
+Implemented through M1-C C3a:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -113,13 +113,21 @@ Implemented through M1-C C2.5:
   persistence, source lineage, audit completion, and redacted result reads;
 - a safety-gated PowerShell acceptance command that only accepts disposable localhost databases
   whose names contain `test` or `acceptance`.
+- a versioned deterministic conflict policy that compares only immutable Claims sharing the same
+  subject, controlled predicate, and exact locale/region/time/game-version scope;
+- conservative cardinality rules: only game name, release status/date, and primary genre are
+  treated as single-valued; every other differing value is marked `possibly_coexisting`;
+- serialized, idempotent conflict reconciliation with explainable member basis, safe handling of
+  human-closed groups, project-scoped reads, and append-only reconciliation audit events;
+- conflict reconcile/list APIs returning unreviewed candidates with their existing exact-evidence
+  read models, without model calls, confidence ranking, or automatic resolution.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- deterministic conflict processing, review UI, snapshot publication commands, embeddings, or an
-  approved knowledge snapshot;
+- conflict-review and claim-review UI, snapshot publication commands, embeddings, or an approved
+  knowledge snapshot;
 - live trend sources;
 - live LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
@@ -345,6 +353,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-C C2.4a Knowledge-delivery API record](docs/migration/m1c-knowledge-delivery-api.md)
 - [M1-C C2.4b Knowledge-workspace record](docs/migration/m1c-knowledge-workspace.md)
 - [M1-C C2.5 NTE PostgreSQL acceptance](docs/migration/m1c-nte-postgres-acceptance.md)
+- [M1-C C3a deterministic-conflict service](docs/migration/m1c-deterministic-conflicts.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

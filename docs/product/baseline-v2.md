@@ -115,6 +115,15 @@ Public sources must not be described as an internal GDD. For existing games, the
 - The acceptance command rejects remote hosts and database names without `test` or `acceptance`.
   It does not delete its auditable rows or print credentials. Live-site capture evidence remains a
   separate, explicitly uncompleted acceptance boundary.
+- C3a compares Claims only when project, subject, predicate, and the precomputed scope fingerprint
+  match and at least two distinct normalized values exist. Confidence never decides the relation.
+- Policy `claim-conflict-v1` treats `game.name`, `release.status`, `release.date`, and
+  `genre.primary` as single-valued in one exact scope. Other predicates fail conservatively to
+  `possibly_coexisting` because developers, aliases, platforms, features, and descriptions may
+  legitimately have multiple supported values.
+- Reconciliation is serialized per project and idempotently appends missing groups/members. It
+  never reopens a resolved or dismissed group; instead it reports that a closed scope was skipped
+  so a later human-review workflow can handle new evidence explicitly.
 - The confirmed M1-C order is C2.3a workflow substrate, C2.3b durable extraction, C2.4 extraction
   UI, C2.5 NTE PostgreSQL acceptance, C3 conflicts, C4 reviews, and C5 publication.
 - The committed NTE replay is a small, source-attributed snapshot of public English official-site

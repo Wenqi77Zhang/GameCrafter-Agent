@@ -54,5 +54,8 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C2.5 proves the reviewed public NTE snapshot through migrated PostgreSQL, the shared leased
   queue, zero-token exact replay, atomic candidate/evidence persistence, audit completion, and
   redacted read models. It deliberately does not claim current live-site capture evidence.
-- M1-C C3 deterministic conflicts, C4 human reviews, and C5 snapshot publication remain
+- M1-C C3a implements versioned deterministic conflict classification, serialized idempotent
+  reconciliation, explainable member relations, closed-group protection, project-scoped delivery,
+  audit events, and SQLite/PostgreSQL verification.
+- M1-C C3b conflict visualization, C4 human reviews, and C5 snapshot publication remain
   unimplemented.
