@@ -88,6 +88,31 @@ type Claim = {
   evidence: Evidence[];
 };
 
+type ConflictMember = {
+  relation: "conflicting" | "possibly_coexisting";
+  basis: string;
+  claim: Claim & { normalized_value: string };
+};
+
+type ConflictGroup = {
+  id: string;
+  predicate: string;
+  status: "open" | "resolved" | "dismissed";
+  policy_version: string;
+  member_count: number;
+  distinct_value_count: number;
+  members: ConflictMember[];
+  subject: Entity | null;
+};
+
+type ReconcileResult = {
+  policy_version: string;
+  compared_scopes: number;
+  created_groups: number;
+  created_members: number;
+  skipped_closed_groups: number;
+};
+
 type Props = {
   projectId: string;
   projectName: string;
@@ -147,6 +172,19 @@ const text = {
     failed: "操作失败",
     loading: "正在加载知识工作区…",
     refresh: "刷新知识数据",
+    conflicts: "事实冲突检查",
+    conflictsHint: "仅比较同一实体、谓词和精确作用域；不会自动选择或批准任何值。",
+    scanConflicts: "检测冲突",
+    scanningConflicts: "正在确定性比较…",
+    noConflicts: "尚未发现具有不同规范化值的可比较候选知识。",
+    conflicting: "冲突",
+    possiblyCoexisting: "可能共存",
+    values: "个不同值",
+    members: "条候选",
+    policyBasis: "查看判定依据",
+    conflictScanDone: "冲突检查完成",
+    closedSkipped: "个人工已关闭组未被自动重开",
+    conflictStatuses: { open: "待处理", resolved: "已解决", dismissed: "已忽略" },
     confirmArchive: "归档后不能恢复该实体，已有 Claim 仍保留。确认继续吗？",
     archiveReason: "用户确认该实体创建错误",
     capabilityReasons: {
@@ -204,6 +242,19 @@ const text = {
     failed: "Action failed",
     loading: "Loading Knowledge workspace…",
     refresh: "Refresh Knowledge data",
+    conflicts: "Fact conflict check",
+    conflictsHint: "Only identical subjects, predicates, and exact scopes are compared. No value is selected or approved automatically.",
+    scanConflicts: "Check conflicts",
+    scanningConflicts: "Comparing deterministically…",
+    noConflicts: "No comparable candidate knowledge with differing normalized values was found.",
+    conflicting: "Conflicting",
+    possiblyCoexisting: "Possibly coexisting",
+    values: "distinct values",
+    members: "candidates",
+    policyBasis: "View classification basis",
+    conflictScanDone: "Conflict check completed",
+    closedSkipped: "human-closed groups were not reopened",
+    conflictStatuses: { open: "Open", resolved: "Resolved", dismissed: "Dismissed" },
     confirmArchive: "Archival is terminal. Existing Claims remain attached. Continue?",
     archiveReason: "User confirmed that this entity was created by mistake",
     capabilityReasons: {
@@ -287,6 +338,7 @@ export function KnowledgeWorkspace({
   const [entities, setEntities] = useState<Entity[]>([]);
   const [versions, setVersions] = useState<SourceVersion[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
+  const [conflicts, setConflicts] = useState<ConflictGroup[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState("");
   const [selectedVersionId, setSelectedVersionId] = useState("");
   const [selectedClaimId, setSelectedClaimId] = useState("");
@@ -364,6 +416,21 @@ export function KnowledgeWorkspace({
     }
   }, [projectId, selectedEntityId, t.failed]);
 
+  const loadConflicts = useCallback(async () => {
+    if (!projectId || !selectedEntityId) {
+      setConflicts([]);
+      return;
+    }
+    try {
+      const payload = await api<{ items: ConflictGroup[] }>(
+        `/api/projects/${projectId}/knowledge-conflicts?subject_entity_id=${selectedEntityId}`,
+      );
+      setConflicts(payload.items);
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
+    }
+  }, [projectId, selectedEntityId, t.failed]);
+
   useEffect(() => {
     setSelectedEntityId("");
     setSelectedVersionId("");
@@ -378,7 +445,8 @@ export function KnowledgeWorkspace({
 
   useEffect(() => {
     void loadClaims();
-  }, [loadClaims]);
+    void loadConflicts();
+  }, [loadClaims, loadConflicts]);
 
   useEffect(() => {
     if (!selectedEntity || !selectedVersionId) {
@@ -412,8 +480,11 @@ export function KnowledgeWorkspace({
   }, [projectId, selectedEntity, selectedVersionId, t.failed]);
 
   useEffect(() => {
-    if (activeRun?.status === "succeeded") void loadClaims();
-  }, [activeRun?.status, loadClaims]);
+    if (activeRun?.status === "succeeded") {
+      void loadClaims();
+      void loadConflicts();
+    }
+  }, [activeRun?.status, loadClaims, loadConflicts]);
 
   useEffect(() => {
     if (!selectedEntity || showCorrect) return;
@@ -429,6 +500,14 @@ export function KnowledgeWorkspace({
     }
     return [...groups.entries()];
   }, [claims]);
+
+  const conflictByClaim = useMemo(() => {
+    const index = new Map<string, ConflictMember>();
+    for (const group of conflicts) {
+      for (const member of group.members) index.set(member.claim.id, member);
+    }
+    return index;
+  }, [conflicts]);
 
   const submitEntity = async (event: FormEvent) => {
     event.preventDefault();
@@ -522,6 +601,30 @@ export function KnowledgeWorkspace({
     }
   };
 
+  const reconcileConflicts = async () => {
+    if (!selectedEntity) return;
+    setBusy("conflicts");
+    setMessage(null);
+    try {
+      const result = await api<ReconcileResult>(
+        `/api/projects/${projectId}/knowledge-conflicts/reconcile`,
+        { method: "POST" },
+      );
+      await loadConflicts();
+      const closed = result.skipped_closed_groups
+        ? ` · ${result.skipped_closed_groups} ${t.closedSkipped}`
+        : "";
+      setMessage({
+        kind: "ok",
+        text: `${t.conflictScanDone}: ${result.compared_scopes} · ${result.policy_version}${closed}`,
+      });
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const capabilityReason = capability
     ? (t.capabilityReasons[capability.reason_code as keyof typeof t.capabilityReasons] ?? capability.reason)
     : "";
@@ -545,7 +648,7 @@ export function KnowledgeWorkspace({
     <section className="knowledge-workspace" aria-labelledby="knowledge-title">
       <div className="knowledge-intro">
         <div>
-          <p className="eyebrow">Knowledge · C2.4</p>
+          <p className="eyebrow">Knowledge · C3</p>
           <h2 id="knowledge-title">{t.title}</h2>
           <p>{t.subtitle}</p>
         </div>
@@ -661,6 +764,64 @@ export function KnowledgeWorkspace({
         )}
       </section>
 
+      <section className="panel conflict-browser" aria-labelledby="conflict-title">
+        <div className="conflict-heading">
+          <div>
+            <h2 id="conflict-title">{t.conflicts}</h2>
+            <p>{t.conflictsHint}</p>
+          </div>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={busy !== null || !selectedEntity || claims.length === 0}
+            onClick={() => void reconcileConflicts()}
+          >
+            {busy === "conflicts" ? t.scanningConflicts : t.scanConflicts}
+          </button>
+        </div>
+        {conflicts.length === 0 ? (
+          <div className="empty-state">{t.noConflicts}</div>
+        ) : (
+          <div className="conflict-grid">
+            {conflicts.map((group) => {
+              const relation = group.members[0]?.relation ?? "possibly_coexisting";
+              return (
+                <article className={`conflict-card conflict-card--${relation}`} key={group.id}>
+                  <div className="conflict-card-title">
+                    <div>
+                      <span className={`relation-badge relation-badge--${relation}`}>
+                        {relation === "conflicting" ? t.conflicting : t.possiblyCoexisting}
+                      </span>
+                      <h3>{predicateNames[language][group.predicate] ?? group.predicate}</h3>
+                    </div>
+                    <span>{t.conflictStatuses[group.status]}</span>
+                  </div>
+                  <p className="conflict-counts">
+                    {group.distinct_value_count} {t.values} · {group.member_count} {t.members}
+                  </p>
+                  <div className="conflict-values">
+                    {group.members.map((member) => (
+                      <button
+                        type="button"
+                        key={member.claim.id}
+                        onClick={() => setSelectedClaimId(member.claim.id)}
+                      >
+                        <strong>{displayValue(member.claim.value)}</strong>
+                        <span>{member.claim.evidence[0]?.source_title ?? "—"}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <details>
+                    <summary>{t.policyBasis} · {group.policy_version}</summary>
+                    <p>{group.members[0]?.basis}</p>
+                  </details>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       <div className="claim-evidence-layout">
         <section className="panel claim-browser">
           <div className="list-heading"><h2>{t.candidates}</h2><span>{claims.length}</span></div>
@@ -672,6 +833,11 @@ export function KnowledgeWorkspace({
                 <button className={selectedClaimId === claim.id ? "claim-card active" : "claim-card"} type="button" key={claim.id} aria-pressed={selectedClaimId === claim.id} onClick={() => setSelectedClaimId(claim.id)}>
                   <strong>{displayValue(claim.value)}</strong>
                   <span>{Math.round(claim.confidence * 100)}% · {claim.locale} · {claim.region}</span>
+                  {conflictByClaim.has(claim.id) && (
+                    <em className={`claim-relation claim-relation--${conflictByClaim.get(claim.id)?.relation}`}>
+                      {conflictByClaim.get(claim.id)?.relation === "conflicting" ? t.conflicting : t.possiblyCoexisting}
+                    </em>
+                  )}
                 </button>
               ))}
             </div>

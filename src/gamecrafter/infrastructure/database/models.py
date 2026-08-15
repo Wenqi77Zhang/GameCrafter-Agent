@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from threading import Lock
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -33,11 +34,25 @@ from gamecrafter.domain.knowledge.claims import (
 )
 from gamecrafter.domain.runs.state import JobStatus, RunStatus
 
+_timestamp_lock = Lock()
+_last_timestamp: datetime | None = None
+
 
 def utc_now() -> datetime:
-    """Return an aware UTC timestamp for database defaults."""
+    """Return a process-monotonic aware UTC timestamp for database defaults.
 
-    return datetime.now(UTC)
+    Some Windows clocks return the same wall-clock value for several consecutive calls. The
+    audit stream uses ``(occurred_at, id)`` as its cursor, so equal timestamps would let random
+    UUID ordering obscure the causal order of events created by this process.
+    """
+
+    global _last_timestamp
+    with _timestamp_lock:
+        current = datetime.now(UTC)
+        if _last_timestamp is not None and current <= _last_timestamp:
+            current = _last_timestamp + timedelta(microseconds=1)
+        _last_timestamp = current
+        return current
 
 
 json_type = JSON().with_variant(JSONB(), "postgresql")

@@ -124,6 +124,12 @@ Public sources must not be described as an internal GDD. For existing games, the
 - Reconciliation is serialized per project and idempotently appends missing groups/members. It
   never reopens a resolved or dismissed group; instead it reports that a closed scope was skipped
   so a later human-review workflow can handle new evidence explicitly.
+- C3b keeps conflict detection an explicit user action. It displays `conflicting` and
+  `possibly_coexisting` separately, localizes group status, and exposes the policy version and
+  classification basis instead of hiding the deterministic rule behind a score.
+- Selecting any conflict member selects the same immutable Claim in the candidate browser and
+  opens its exact source-version evidence. C3b never picks a winner, edits a Claim, approves a
+  value, closes a group, or publishes a snapshot.
 - The confirmed M1-C order is C2.3a workflow substrate, C2.3b durable extraction, C2.4 extraction
   UI, C2.5 NTE PostgreSQL acceptance, C3 conflicts, C4 reviews, and C5 publication.
 - The committed NTE replay is a small, source-attributed snapshot of public English official-site

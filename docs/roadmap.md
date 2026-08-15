@@ -57,5 +57,7 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C3a implements versioned deterministic conflict classification, serialized idempotent
   reconciliation, explainable member relations, closed-group protection, project-scoped delivery,
   audit events, and SQLite/PostgreSQL verification.
-- M1-C C3b conflict visualization, C4 human reviews, and C5 snapshot publication remain
-  unimplemented.
+- M1-C C3b implements explicit conflict scanning, bilingual relation/status visualization,
+  deterministic policy disclosure, and one-click navigation from every conflict member to exact
+  evidence on responsive desktop and mobile layouts.
+- M1-C C4 human reviews and C5 snapshot publication remain unimplemented.

@@ -27,7 +27,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M1-C C3a runtime
+## Implemented M1-A to M1-C C3b runtime
 
 ```mermaid
 flowchart LR
@@ -548,6 +548,28 @@ The project lock serializes concurrent reconciliation. Existing unique keys and 
 checks make retries idempotent. A resolved or dismissed group is never silently reopened when new
 Claims appear; the command reports the skipped closed scope in its response and audit payload.
 
+## Implemented M1-C C3b explainable conflict workspace
+
+```mermaid
+flowchart LR
+    USER["Human requests conflict check"]
+    API["Deterministic reconcile API"]
+    GROUPS["Conflict groups and member Claims"]
+    CARDS["Localized relation and status cards"]
+    BASIS["Policy version and classification basis"]
+    CLAIM["Selected immutable Claim"]
+    EVIDENCE["Exact source-version evidence"]
+
+    USER --> API --> GROUPS --> CARDS
+    CARDS --> BASIS
+    CARDS -->|"select member"| CLAIM --> EVIDENCE
+```
+
+The browser does not reproduce conflict logic or re-slice evidence. It renders the project-scoped
+server read model, labels conflicts separately from potentially coexisting values, and lets a
+human trace each member to the already validated quote and source version. Detection is explicit;
+no winner, approval, dismissal, or snapshot is inferred from model confidence or UI selection.
+
 ## Marketing workflow state graph
 
 ```mermaid
@@ -696,7 +718,8 @@ deterministic source chunker, sequential extraction Harness, invocation manifest
 loader, and source-attributed NTE offline replay. C2.3a supplies the generic durable execution
 substrate. C2.3b registers its extraction handler, validates stored text, persists redacted
 invocations plus atomic claim/evidence/result lineage, and exposes preflighted command/read APIs.
-The product interface, live model call, conflict classifier, and review action remain unimplemented.
+The live model call and human review action remain unimplemented. C3a supplies the deterministic
+conflict service; C3b exposes it in the product interface with exact-evidence navigation.
 
 ## Observability
 
