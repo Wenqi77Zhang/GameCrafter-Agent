@@ -64,6 +64,9 @@ function workspaceFetch(options?: {
   capability?: Record<string, unknown>;
   snapshots?: Array<Record<string, unknown>>;
   snapshotReadiness?: Record<string, unknown>;
+  marketingTasks?: Array<Record<string, unknown>>;
+  trendSignals?: Array<Record<string, unknown>>;
+  topicCandidates?: Array<Record<string, unknown>>;
 }) {
   const projects = options?.projects ?? [project];
   const candidates = options?.candidates ?? [];
@@ -72,6 +75,9 @@ function workspaceFetch(options?: {
   const claims = [...(options?.claims ?? [])];
   const conflicts = [...(options?.conflicts ?? [])];
   const snapshots = [...(options?.snapshots ?? [])];
+  const marketingTasks = [...(options?.marketingTasks ?? [])];
+  const trendSignals = [...(options?.trendSignals ?? [])];
+  const topicCandidates = [...(options?.topicCandidates ?? [])];
   const runs: Array<Record<string, unknown>> = [];
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const path = String(input);
@@ -210,6 +216,25 @@ function workspaceFetch(options?: {
       return json(snapshot, 201);
     }
     if (path.endsWith("/knowledge-snapshots")) return json({ items: snapshots });
+    if (path.endsWith("/marketing-tasks")) return json({ items: marketingTasks });
+    if (path.endsWith("/trend-signals")) return json({ items: trendSignals });
+    if (path.endsWith("/topic-candidates") && init?.method !== "POST") {
+      return json({ items: topicCandidates });
+    }
+    if (path.endsWith("/topic-analysis") && init?.method === "POST") {
+      return json({ items: topicCandidates });
+    }
+    if (path.includes("/topic-candidates/") && path.endsWith("/reviews") && init?.method === "POST") {
+      const payload = JSON.parse(String(init.body)) as { decision: string; reason: string };
+      const candidateId = path.split("/topic-candidates/")[1].split("/")[0];
+      const candidate = topicCandidates.find((item) => item.id === candidateId);
+      const review = { id: "topic-review-1", candidate_id: candidateId, decision: payload.decision, reason: payload.reason, reviewer_id: "local-user", created_at: "2026-08-15T03:00:00Z" };
+      if (candidate) {
+        candidate.status = payload.decision;
+        candidate.review_history = [...((candidate.review_history as unknown[]) ?? []), review];
+      }
+      return json(review, 201);
+    }
     if (path.endsWith("/knowledge-extractions") && init?.method === "POST") {
       const run = {
         id: "knowledge-run-1",
@@ -671,4 +696,75 @@ test("publishes and renders an immutable approved knowledge snapshot", async () 
   expect(await screen.findByText(/知识快照已发布/)).toBeInTheDocument();
   expect(screen.getByText("《异环》官网英文资料首轮人工确认")).toBeInTheDocument();
   expect(screen.getByText("1 条事实")).toBeInTheDocument();
+});
+
+test("shows traceable deterministic topic fit and records the human gate", async () => {
+  const trend = {
+    id: "trend-1",
+    source_name: "TikTok Creative Center",
+    source_url: "https://ads.tiktok.com/business/creativecenter/trend-1",
+    observed_at: "2026-08-15T02:00:00Z",
+    region: "US",
+    signal_type: "hashtag",
+    title: "#NTE",
+    keywords: ["NTE"],
+    metric_name: "posts",
+    metric_value: 1250,
+    notes: "Manually verified.",
+  };
+  const task = {
+    id: "marketing-task-1",
+    knowledge_snapshot_id: "snapshot-1",
+    knowledge_snapshot_version: 1,
+    platform: "TikTok",
+    markets: ["US", "UK"],
+    audience: "Potential new players",
+    goal: "Awareness",
+    output_language: "en",
+    duration_seconds: 30,
+    candidate_count: 1,
+    approved_candidate_id: null,
+    created_at: "2026-08-15T02:10:00Z",
+  };
+  const candidate = {
+    id: "topic-1",
+    trend_signal: trend,
+    score: 100,
+    dimensions: {
+      freshness: { score: 25, max: 25 },
+      market_alignment: { score: 25, max: 25 },
+      source_completeness: { score: 25, max: 25 },
+      knowledge_relevance: { score: 25, max: 25 },
+    },
+    matched_snapshot_member_ids: ["member-1"],
+    angle: "Use #NTE as the verified TikTok angle.",
+    hook: "What if #NTE happened inside Neverness to Everness?",
+    rationale: "Deterministic trend-fit-v1 score 100/100. No model was used.",
+    risks: ["manual_source_observation_not_independently_verified"],
+    rule_version: "trend-fit-v1",
+    status: "unreviewed",
+    review_history: [],
+  };
+  const fetchMock = workspaceFetch({
+    snapshots: [{ id: "snapshot-1", version_number: 1, member_count: 1, published_at: "2026-08-15T01:00:00Z" }],
+    marketingTasks: [task],
+    trendSignals: [trend],
+    topicCandidates: [candidate],
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "营销" }));
+
+  expect(await screen.findByText("确定性规则 · 无模型调用")).toBeInTheDocument();
+  expect(screen.getByText("What if #NTE happened inside Neverness to Everness?")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("决定理由"), {
+    target: { value: "趋势来源、市场与知识证据均符合本次目标。" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "记录人工决定" }));
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/marketing-tasks/marketing-task-1/topic-candidates/topic-1/reviews",
+      expect.objectContaining({ method: "POST" }),
+    ),
+  );
+  expect(await screen.findByText("趋势来源、市场与知识证据均符合本次目标。")).toBeInTheDocument();
 });

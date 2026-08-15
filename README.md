@@ -13,7 +13,7 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C5: immutable knowledge publication**.
+The repository is currently in **M3: explainable fit and human topic approval**.
 
 Implemented through M1-C C5:
 
@@ -144,13 +144,22 @@ Implemented through M1-C C5:
   PostgreSQL publication, retry, audit, and mutation-rejection tests;
 - responsive bilingual publication controls and version history in the Knowledge workspace, with
   desktop and mobile browser verification.
+- immutable manual trend observations with source URL, observation time, market, type, keywords,
+  optional metric, verification notes, strict HTTPS validation, and idempotent retry;
+- immutable marketing tasks that freeze one published knowledge snapshot plus TikTok platform,
+  English-market audience, objective, output language, and duration;
+- deterministic four-dimension topic-fit analysis covering freshness, market alignment, source
+  completeness, and approved-knowledge relevance without a model call;
+- explicit risk disclosures, exact trend/snapshot lineage, append-only topic decisions, and a
+  single-current-approved-topic human gate;
+- a bilingual responsive Marketing workspace verified on Chinese desktop and English mobile.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
 - embeddings or retrieval over approved knowledge snapshots;
-- live trend sources;
+- automated live trend connectors (the first release uses human-verified authorized-source input);
 - live LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
 
@@ -379,6 +388,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-C C3b conflict-workspace record](docs/migration/m1c-conflict-workspace.md)
 - [M1-C C4 human-review record](docs/migration/m1c-human-review.md)
 - [M1-C C5 snapshot-publication record](docs/migration/m1c-snapshot-publication.md)
+- [M2/M3 trend-fit and topic-approval record](docs/migration/m2-trend-topic.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

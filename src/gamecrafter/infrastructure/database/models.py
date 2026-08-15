@@ -1075,3 +1075,152 @@ class KnowledgeSnapshotMemberRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class MarketingTaskRecord(Base):
+    """Immutable marketing objective bound to one published knowledge snapshot."""
+
+    __tablename__ = "marketing_tasks"
+    __table_args__ = (
+        CheckConstraint("duration_seconds BETWEEN 5 AND 180", name="ck_marketing_tasks_duration"),
+        CheckConstraint(
+            "length(trim(platform)) > 0 AND length(trim(audience)) > 0 "
+            "AND length(trim(goal)) > 0 AND length(trim(output_language)) > 0 "
+            "AND length(trim(created_by)) > 0",
+            name="ck_marketing_tasks_text_nonblank",
+        ),
+        UniqueConstraint("project_id", "command_key", name="uq_marketing_tasks_project_command"),
+        Index("ix_marketing_tasks_project_created", "project_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
+    )
+    knowledge_snapshot_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("knowledge_snapshots.id", ondelete="RESTRICT"), nullable=False
+    )
+    platform: Mapped[str] = mapped_column(String(80), nullable=False)
+    markets: Mapped[list[str]] = mapped_column(json_type, nullable=False, default=list)
+    audience: Mapped[str] = mapped_column(String(500), nullable=False)
+    goal: Mapped[str] = mapped_column(String(500), nullable=False)
+    output_language: Mapped[str] = mapped_column(String(40), nullable=False)
+    duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_by: Mapped[str] = mapped_column(String(120), nullable=False)
+    command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class TrendSignalRecord(Base):
+    """Immutable user-verified observation from an authorized public trend source."""
+
+    __tablename__ = "trend_signals"
+    __table_args__ = (
+        CheckConstraint(
+            "signal_type IN ('hashtag', 'sound', 'topic', 'search')",
+            name="ck_trend_signals_type",
+        ),
+        CheckConstraint(
+            "metric_value IS NULL OR metric_value >= 0",
+            name="ck_trend_signals_metric_nonnegative",
+        ),
+        CheckConstraint(
+            "length(trim(source_name)) > 0 AND length(trim(source_url)) > 0 "
+            "AND length(trim(region)) > 0 AND length(trim(title)) > 0 "
+            "AND length(trim(created_by)) > 0",
+            name="ck_trend_signals_text_nonblank",
+        ),
+        UniqueConstraint("project_id", "command_key", name="uq_trend_signals_project_command"),
+        Index("ix_trend_signals_project_observed", "project_id", "observed_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    region: Mapped[str] = mapped_column(String(80), nullable=False)
+    signal_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    keywords: Mapped[list[str]] = mapped_column(json_type, nullable=False, default=list)
+    metric_name: Mapped[str | None] = mapped_column(String(120))
+    metric_value: Mapped[float | None] = mapped_column(Numeric(20, 4))
+    notes: Mapped[str | None] = mapped_column(String(1000))
+    created_by: Mapped[str] = mapped_column(String(120), nullable=False)
+    command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class TopicCandidateRecord(Base):
+    """Deterministic fit analysis for one task and one observed trend signal."""
+
+    __tablename__ = "topic_candidates"
+    __table_args__ = (
+        CheckConstraint("score BETWEEN 0 AND 100", name="ck_topic_candidates_score"),
+        CheckConstraint(
+            "length(trim(angle)) > 0 AND length(trim(hook)) > 0 "
+            "AND length(trim(rationale)) > 0 AND length(trim(rule_version)) > 0",
+            name="ck_topic_candidates_text_nonblank",
+        ),
+        UniqueConstraint("task_id", "trend_signal_id", name="uq_topic_candidates_task_signal"),
+        Index("ix_topic_candidates_task_score", "task_id", "score"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    task_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("marketing_tasks.id", ondelete="RESTRICT"), nullable=False
+    )
+    trend_signal_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("trend_signals.id", ondelete="RESTRICT"), nullable=False
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    dimensions: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False, default=dict)
+    matched_snapshot_member_ids: Mapped[list[str]] = mapped_column(
+        json_type, nullable=False, default=list
+    )
+    angle: Mapped[str] = mapped_column(String(500), nullable=False)
+    hook: Mapped[str] = mapped_column(String(500), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    risks: Mapped[list[str]] = mapped_column(json_type, nullable=False, default=list)
+    rule_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class TopicReviewRecord(Base):
+    """Append-only human gate over a deterministic topic candidate."""
+
+    __tablename__ = "topic_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "decision IN ('approve', 'reject', 'defer')", name="ck_topic_reviews_decision"
+        ),
+        CheckConstraint(
+            "length(trim(reason)) > 0 AND length(trim(reviewer_id)) > 0",
+            name="ck_topic_reviews_text_nonblank",
+        ),
+        UniqueConstraint("task_id", "command_key", name="uq_topic_reviews_task_command"),
+        Index("ix_topic_reviews_task_created", "task_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    task_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("marketing_tasks.id", ondelete="RESTRICT"), nullable=False
+    )
+    candidate_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topic_candidates.id", ondelete="RESTRICT"), nullable=False
+    )
+    decision: Mapped[str] = mapped_column(String(24), nullable=False)
+    reason: Mapped[str] = mapped_column(String(1000), nullable=False)
+    reviewer_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )

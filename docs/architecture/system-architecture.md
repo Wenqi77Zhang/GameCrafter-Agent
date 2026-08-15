@@ -27,7 +27,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M1-C C5 runtime
+## Implemented M1-A to M3 runtime
 
 ```mermaid
 flowchart LR
@@ -662,6 +662,37 @@ stateDiagram-v2
 ```
 
 The run freezes the task definition, knowledge snapshot, source policy, model, prompt, skill, and rule versions before generation. The revision loop has a fixed budget. A model score never replaces topic or final-output approval, and an exhausted budget cannot silently convert a low-quality script into an accepted one. The Agent Harness routes retryable model or tool failures back to the last safe checkpoint and exposes terminal failures for human recovery.
+
+## Implemented M2/M3 trend evidence and topic gate
+
+```mermaid
+flowchart LR
+    USER["Human verifies an authorized public trend page"]
+    SIGNAL["Immutable trend observation with source, time, region, and metric"]
+    TASK["Immutable task bound to one knowledge snapshot"]
+    RULES["trend-fit-v1 deterministic four-dimension scorer"]
+    CANDIDATE["Explainable topic candidate with risks and exact lineage"]
+    REVIEW{"Append-only human topic decision"}
+    APPROVED["One current approved topic"]
+
+    USER --> SIGNAL
+    SIGNAL --> RULES
+    TASK --> RULES
+    RULES --> CANDIDATE --> REVIEW
+    REVIEW -->|"approve"| APPROVED
+    REVIEW -->|"reject or defer"| CANDIDATE
+```
+
+No trend connector, scraper, or model call runs in this slice. Manual observations are immutable and
+explicitly labelled as not independently verified. A task references an immutable knowledge
+snapshot, so later entity/review changes cannot alter fit inputs. PostgreSQL triggers reject
+cross-project task/snapshot, task/signal, or task/candidate lineage and prevent mutation or deletion
+of tasks, signals, candidates, and reviews.
+
+The scorer freezes results instead of recomputing them on every read. Freshness is measured against
+the signal's immutable record time, market alignment uses the frozen task markets, source
+completeness reports whether a metric was recorded, and relevance preserves exact matching snapshot
+member IDs. Scores rank candidates but cannot pass the human approval gate.
 
 ## Component relationships
 

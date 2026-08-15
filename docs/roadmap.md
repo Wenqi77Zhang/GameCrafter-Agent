@@ -66,4 +66,9 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C5 implements complete-project readiness checks, serialized idempotent publication,
   deterministic content digests, immutable version history, exact approval/evidence lineage,
   PostgreSQL enforcement, and bilingual publication controls. The M1 Knowledge Hub vertical slice
-  is complete; M2 is the next product milestone.
+  is complete.
+- M2 implements immutable user-verified public trend observations with source/time/region/metric
+  provenance, HTTPS and timezone validation, idempotent retry, and honest manual-source labelling.
+- M3 implements immutable snapshot-bound marketing tasks, deterministic four-dimension fit,
+  explainable risks and evidence links, append-only review history, and a single-approved-topic
+  human gate. M4 is the next product milestone.

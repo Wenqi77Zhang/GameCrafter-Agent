@@ -3,9 +3,10 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatDate, idempotencyKey } from "./client";
 import type { Language } from "./client";
 import { KnowledgeWorkspace } from "./KnowledgeWorkspace";
+import { MarketingWorkspace } from "./MarketingWorkspace";
 import type { WorkspaceAuditEvent, WorkspaceRun } from "./KnowledgeWorkspace";
 
-type Tab = "sources" | "knowledge" | "runs";
+type Tab = "sources" | "knowledge" | "marketing" | "runs";
 type Project = { id: string; slug: string; name: string; default_locale: Language };
 type Candidate = {
   id: string;
@@ -39,6 +40,7 @@ const copy = {
   "zh-CN": {
     sources: "来源",
     knowledge: "知识",
+    marketing: "营销",
     runs: "运行记录",
     createNte: "创建《异环》项目",
     emptyProject: "先创建本地《异环》验证项目，再开始采集官方公开资料。",
@@ -85,6 +87,7 @@ const copy = {
   en: {
     sources: "Sources",
     knowledge: "Knowledge",
+    marketing: "Marketing",
     runs: "Runs",
     createNte: "Create NTE project",
     emptyProject: "Create the local NTE validation project before collecting public official sources.",
@@ -418,6 +421,9 @@ export function App() {
                 <button className={tab === "knowledge" ? "active" : ""} type="button" onClick={() => setTab("knowledge")}>
                   {t.knowledge}
                 </button>
+                <button className={tab === "marketing" ? "active" : ""} type="button" onClick={() => setTab("marketing")}>
+                  {t.marketing}
+                </button>
                 <button className={tab === "runs" ? "active" : ""} type="button" onClick={() => setTab("runs")}>
                   {t.runs}<span>{runs.length}</span>
                 </button>
@@ -506,6 +512,8 @@ export function App() {
                   }}
                   onGoSources={() => setTab("sources")}
                 />
+              ) : tab === "marketing" && selectedProject ? (
+                <MarketingWorkspace projectId={projectId} language={language} />
               ) : (
                 <div className="runs-layout">
                   <section className="run-list">

@@ -32,6 +32,13 @@ def test_health_contract_is_published_in_openapi() -> None:
     assert "/api/projects/{project_id}/knowledge-snapshot-readiness" in schema["paths"]
     assert "/api/projects/{project_id}/knowledge-snapshots" in schema["paths"]
     assert "/api/projects/{project_id}/knowledge-snapshots/{snapshot_id}" in schema["paths"]
+    assert "/api/projects/{project_id}/marketing-tasks" in schema["paths"]
+    assert "/api/projects/{project_id}/trend-signals" in schema["paths"]
+    assert "/api/projects/{project_id}/marketing-tasks/{task_id}/topic-analysis" in schema["paths"]
+    assert (
+        "/api/projects/{project_id}/marketing-tasks/{task_id}/topic-candidates/"
+        "{candidate_id}/reviews" in schema["paths"]
+    )
     assert "/api/runs/{run_id}/events" in schema["paths"]
     response_schema = schema["paths"]["/health"]["get"]["responses"]["200"]
     assert "content" in response_schema
