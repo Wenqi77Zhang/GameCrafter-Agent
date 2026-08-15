@@ -27,7 +27,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M1-C C4 runtime
+## Implemented M1-A to M1-C C5 runtime
 
 ```mermaid
 flowchart LR
@@ -601,6 +601,35 @@ approve/reject decision, deferred decisions remain incomplete, at least one valu
 and a single-valued relation must converge on one normalized value. Dismissal is separately
 labelled as a reasoned human override. Neither path creates a published knowledge snapshot.
 
+## Implemented M1-C C5 immutable publication
+
+```mermaid
+flowchart LR
+    PROJECT["Project row lock"]
+    REVIEWS["Latest final reviews for every Claim"]
+    CONFLICTS{"All conflict groups human-closed?"}
+    POLICY{"Complete-project publication policy satisfied?"}
+    DIGEST["Deterministic content digest"]
+    SNAPSHOT["Immutable versioned snapshot"]
+    MEMBERS["Members with exact review and evidence lineage"]
+    AUDIT["Causal publication audit event"]
+
+    PROJECT --> REVIEWS --> CONFLICTS --> POLICY
+    POLICY -->|"yes"| DIGEST --> SNAPSHOT --> MEMBERS --> AUDIT
+    POLICY -->|"no"| BLOCKERS["Structured readiness blockers"]
+```
+
+Readiness and publication evaluate the same fail-closed policy. The service includes every current
+approved Claim, rejects missing or deferred reviews, open conflicts, archived approved entities,
+incomplete lineage, and unreconciled or multiply approved single-valued predicates. The browser can
+therefore explain all blockers before it sends the publication command.
+
+Publication takes the project lock, re-evaluates readiness, derives the content digest from sorted
+approved values plus their exact review and evidence lineage, and inserts the snapshot, members, and
+audit event in one transaction. A project-scoped command key makes exact retries return the same
+snapshot while rejecting different payloads. PostgreSQL prevents later update or deletion of the
+published lineage. Later marketing workflows must reference the snapshot ID, never mutable reviews.
+
 ## Marketing workflow state graph
 
 ```mermaid
@@ -749,9 +778,9 @@ deterministic source chunker, sequential extraction Harness, invocation manifest
 loader, and source-attributed NTE offline replay. C2.3a supplies the generic durable execution
 substrate. C2.3b registers its extraction handler, validates stored text, persists redacted
 invocations plus atomic claim/evidence/result lineage, and exposes preflighted command/read APIs.
-The live model call and snapshot publication remain unimplemented. C3a supplies deterministic
-conflicts, C3b exposes exact-evidence navigation, and C4 adds append-only human review and guarded
-closure commands without promoting a decision into published knowledge.
+Live model calls remain unimplemented. C3a supplies deterministic conflicts, C3b exposes
+exact-evidence navigation, C4 adds append-only human review and guarded closure commands, and C5
+publishes only a complete, human-approved, immutable knowledge version.
 
 ## Observability
 

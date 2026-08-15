@@ -1006,6 +1006,11 @@ class KnowledgeSnapshotRecord(Base):
             "version_number",
             name="uq_knowledge_snapshots_project_version",
         ),
+        UniqueConstraint(
+            "project_id",
+            "command_key",
+            name="uq_knowledge_snapshots_project_command_key",
+        ),
         Index("ix_knowledge_snapshots_project_published", "project_id", "published_at"),
     )
 
@@ -1017,6 +1022,10 @@ class KnowledgeSnapshotRecord(Base):
     )
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_version: Mapped[str] = mapped_column(
+        String(80), nullable=False, default="knowledge-snapshot-v1"
+    )
+    command_key: Mapped[str | None] = mapped_column(String(160))
     published_by: Mapped[str] = mapped_column(String(120), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     published_at: Mapped[datetime] = mapped_column(
@@ -1025,7 +1034,7 @@ class KnowledgeSnapshotRecord(Base):
 
 
 class KnowledgeSnapshotMemberRecord(Base):
-    """Immutable link to the exact approving review used by a snapshot."""
+    """Immutable links to the exact entity revision, Claim, and approving review."""
 
     __tablename__ = "knowledge_snapshot_members"
     __table_args__ = (
@@ -1040,6 +1049,7 @@ class KnowledgeSnapshotMemberRecord(Base):
             name="uq_knowledge_snapshot_members_snapshot_review",
         ),
         Index("ix_knowledge_snapshot_members_claim", "claim_id"),
+        Index("ix_knowledge_snapshot_members_entity_revision", "entity_revision_id"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -1057,6 +1067,10 @@ class KnowledgeSnapshotMemberRecord(Base):
         Uuid,
         ForeignKey("claim_reviews.id", ondelete="RESTRICT"),
         nullable=False,
+    )
+    entity_revision_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("knowledge_entity_revisions.id", ondelete="RESTRICT"),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now

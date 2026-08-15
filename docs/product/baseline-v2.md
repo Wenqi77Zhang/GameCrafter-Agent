@@ -103,8 +103,8 @@ Public sources must not be described as an internal GDD. For existing games, the
   codes without implying a model call, and keeps the user on the page while the durable run starts.
 - Progress is derived only from persisted run and audit state. Candidate claims remain visibly
   unreviewed, are grouped by controlled predicate, and open an evidence panel using server-returned
-  quotes and provenance. The interface does not expose review or publication actions before their
-  guarded backend commands exist.
+  quotes and provenance. Review and publication controls call guarded backend commands; the UI
+  never promotes selection state into approved knowledge.
 - If no entity or evidence version exists, the workspace offers a direct route to create the game
   identity or add sources. Entity corrections append history; archival is explicit and terminal.
   Simplified Chinese is the product default and English remains a remembered option.
@@ -144,6 +144,17 @@ Public sources must not be described as an internal GDD. For existing games, the
   remains an explicit reasoned human override.
 - The browser displays current status and all prior reviews beside the exact evidence. A new
   review never deletes or edits a prior review, and closing a group never publishes knowledge.
+- C5 publication is complete-project and fail-closed: every current Claim needs a latest final
+  review, at least one Claim must be approved, every approval needs exact evidence and complete
+  lineage, no entity containing approved knowledge may be archived, and every conflict group must
+  be human-closed. A single-valued predicate may contribute only one normalized approved value.
+- Users cannot manually omit an inconvenient current approval. Publication takes a project lock,
+  computes a deterministic digest over the full approved value plus exact entity-revision,
+  approving-review, and evidence lineage, and creates a monotonically versioned immutable snapshot. Exact command retries return
+  the same snapshot; reusing a command key for different content is rejected.
+- Downstream workflows consume a snapshot ID rather than mutable live reviews. Snapshot notes are
+  metadata and do not alter the content digest. The bilingual workspace exposes blockers before
+  publication and preserves inspectable version/member/evidence history afterward.
 - The confirmed M1-C order is C2.3a workflow substrate, C2.3b durable extraction, C2.4 extraction
   UI, C2.5 NTE PostgreSQL acceptance, C3 conflicts, C4 reviews, and C5 publication.
 - The committed NTE replay is a small, source-attributed snapshot of public English official-site

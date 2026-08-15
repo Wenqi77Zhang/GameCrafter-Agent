@@ -65,6 +65,17 @@ def test_postgres_enforces_evidence_review_conflict_and_snapshot_lineage() -> No
         )
         session.add_all([source, entity])
         session.flush()
+        entity_revision = KnowledgeEntityRevisionRecord(
+            entity_id=entity.id,
+            project_id=project_id,
+            revision_number=1,
+            display_name="Neverness to Everness",
+            aliases=["NTE"],
+            status="active",
+            change_reason="Entity created for PostgreSQL lineage verification.",
+            actor_id="test-user",
+        )
+        session.add(entity_revision)
         version = SourceVersionRecord(
             source_id=source.id,
             version_number=1,
@@ -99,6 +110,7 @@ def test_postgres_enforces_evidence_review_conflict_and_snapshot_lineage() -> No
         source_version_id = version.id
         claim_id = claim.id
         entity_id = entity.id
+        entity_revision_id = entity_revision.id
 
     with pytest.raises(DBAPIError, match="without evidence"), sessions.begin() as session:
         session.add(
@@ -169,6 +181,7 @@ def test_postgres_enforces_evidence_review_conflict_and_snapshot_lineage() -> No
                 snapshot_id=snapshot_id,
                 claim_id=claim_id,
                 review_id=review_id,
+                entity_revision_id=entity_revision_id,
             )
         )
 
@@ -187,6 +200,7 @@ def test_postgres_enforces_evidence_review_conflict_and_snapshot_lineage() -> No
             snapshot_id=snapshot_id,
             claim_id=claim_id,
             review_id=review_id,
+            entity_revision_id=entity_revision_id,
         )
         session.add(member)
         session.flush()

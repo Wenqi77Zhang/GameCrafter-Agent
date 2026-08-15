@@ -163,6 +163,47 @@ class FakeReviewService:
         return {"id": str(ENTITY_ID), "status": "resolved"}, True
 
 
+class FakeSnapshotService:
+    snapshot = {
+        "id": str(RUN_ID),
+        "project_id": str(PROJECT_ID),
+        "version_number": 1,
+        "schema_version": "knowledge-snapshot-v1",
+        "content_sha256": "a" * 64,
+        "member_count": 1,
+        "members": [],
+    }
+
+    def readiness(self, project_id):
+        assert project_id == PROJECT_ID
+        return {
+            "publishable": True,
+            "schema_version": "knowledge-snapshot-v1",
+            "content_sha256": "a" * 64,
+            "stats": {"approved_count": 1},
+            "blockers": [],
+            "next_version_number": 1,
+            "latest_snapshot_id": None,
+        }
+
+    def publish(self, **kwargs):
+        assert kwargs == {
+            "project_id": PROJECT_ID,
+            "notes": "Reviewed NTE baseline.",
+            "actor_id": "local-user",
+            "command_key": "snapshot-command-1",
+        }
+        return self.snapshot, True
+
+    def list_snapshots(self, project_id):
+        assert project_id == PROJECT_ID
+        return [self.snapshot]
+
+    def get_snapshot(self, **kwargs):
+        assert kwargs == {"project_id": PROJECT_ID, "snapshot_id": RUN_ID}
+        return self.snapshot
+
+
 def test_disabled_mode_blocks_before_enqueue() -> None:
     repository = FakeKnowledgeRepository()
     workspace = FakeWorkspace()
@@ -338,3 +379,26 @@ def test_human_review_and_conflict_closure_commands_are_project_scoped() -> None
         assert closed.status_code == 201 and closed.json()["status"] == "resolved"
     finally:
         knowledge._reviews = original
+
+
+def test_snapshot_readiness_publication_and_versions_are_project_scoped() -> None:
+    snapshots = FakeSnapshotService()
+    original = knowledge._snapshots
+    knowledge._snapshots = lambda: snapshots
+    try:
+        client = TestClient(create_app())
+        readiness = client.get(f"/api/projects/{PROJECT_ID}/knowledge-snapshot-readiness")
+        published = client.post(
+            f"/api/projects/{PROJECT_ID}/knowledge-snapshots",
+            headers={"Idempotency-Key": "snapshot-command-1"},
+            json={"notes": "Reviewed NTE baseline."},
+        )
+        listed = client.get(f"/api/projects/{PROJECT_ID}/knowledge-snapshots")
+        fetched = client.get(f"/api/projects/{PROJECT_ID}/knowledge-snapshots/{RUN_ID}")
+
+        assert readiness.status_code == 200 and readiness.json()["publishable"] is True
+        assert published.status_code == 201 and published.json()["version_number"] == 1
+        assert listed.status_code == 200 and len(listed.json()["items"]) == 1
+        assert fetched.status_code == 200 and fetched.json()["id"] == str(RUN_ID)
+    finally:
+        knowledge._snapshots = original

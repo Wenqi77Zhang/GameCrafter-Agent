@@ -41,6 +41,11 @@ from gamecrafter.infrastructure.database.review_service import (
     ReviewServiceNotFoundError,
 )
 from gamecrafter.infrastructure.database.session import get_session_factory
+from gamecrafter.infrastructure.database.snapshot_service import (
+    DatabaseSnapshotService,
+    SnapshotServiceConflictError,
+    SnapshotServiceNotFoundError,
+)
 from gamecrafter.infrastructure.database.workspace_service import (
     DatabaseWorkspaceService,
     WorkspaceConflictError,
@@ -125,6 +130,10 @@ class ConflictClosureCreate(BaseModel):
         return value
 
 
+class KnowledgeSnapshotCreate(BaseModel):
+    notes: str | None = Field(default=None, max_length=2000)
+
+
 @lru_cache
 def _repository() -> DatabaseKnowledgeRepository:
     return DatabaseKnowledgeRepository(get_session_factory())
@@ -150,6 +159,11 @@ def _reviews() -> DatabaseReviewService:
     return DatabaseReviewService(get_session_factory())
 
 
+@lru_cache
+def _snapshots() -> DatabaseSnapshotService:
+    return DatabaseSnapshotService(get_session_factory())
+
+
 def _state_error(error: Exception) -> HTTPException:
     detail = str(error)
     code = status.HTTP_404_NOT_FOUND if "not found" in detail else status.HTTP_409_CONFLICT
@@ -169,6 +183,15 @@ def _review_error(error: Exception) -> HTTPException:
     code = (
         status.HTTP_404_NOT_FOUND
         if isinstance(error, ReviewServiceNotFoundError)
+        else status.HTTP_409_CONFLICT
+    )
+    return HTTPException(status_code=code, detail=str(error))
+
+
+def _snapshot_error(error: Exception) -> HTTPException:
+    code = (
+        status.HTTP_404_NOT_FOUND
+        if isinstance(error, SnapshotServiceNotFoundError)
         else status.HTTP_409_CONFLICT
     )
     return HTTPException(status_code=code, detail=str(error))
@@ -457,6 +480,54 @@ def close_knowledge_conflict(
     if not created:
         response.status_code = status.HTTP_200_OK
     return closure
+
+
+@router.get("/projects/{project_id}/knowledge-snapshot-readiness")
+def get_knowledge_snapshot_readiness(project_id: UUID) -> dict[str, object]:
+    try:
+        return _snapshots().readiness(project_id)
+    except (SnapshotServiceNotFoundError, SnapshotServiceConflictError) as error:
+        raise _snapshot_error(error) from error
+
+
+@router.post(
+    "/projects/{project_id}/knowledge-snapshots",
+    status_code=status.HTTP_201_CREATED,
+)
+def publish_knowledge_snapshot(
+    project_id: UUID,
+    command: KnowledgeSnapshotCreate,
+    idempotency_key: IdempotencyKey,
+    response: Response,
+) -> dict[str, object]:
+    try:
+        snapshot, created = _snapshots().publish(
+            project_id=project_id,
+            notes=command.notes,
+            actor_id="local-user",
+            command_key=idempotency_key,
+        )
+    except (SnapshotServiceNotFoundError, SnapshotServiceConflictError) as error:
+        raise _snapshot_error(error) from error
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return snapshot
+
+
+@router.get("/projects/{project_id}/knowledge-snapshots")
+def list_knowledge_snapshots(project_id: UUID) -> dict[str, object]:
+    try:
+        return {"items": _snapshots().list_snapshots(project_id)}
+    except (SnapshotServiceNotFoundError, SnapshotServiceConflictError) as error:
+        raise _snapshot_error(error) from error
+
+
+@router.get("/projects/{project_id}/knowledge-snapshots/{snapshot_id}")
+def get_knowledge_snapshot(project_id: UUID, snapshot_id: UUID) -> dict[str, object]:
+    try:
+        return _snapshots().get_snapshot(project_id=project_id, snapshot_id=snapshot_id)
+    except (SnapshotServiceNotFoundError, SnapshotServiceConflictError) as error:
+        raise _snapshot_error(error) from error
 
 
 def _preflight_replay(settings: Settings, target: ExtractionTarget) -> None:
