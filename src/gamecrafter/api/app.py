@@ -8,6 +8,7 @@ from gamecrafter.api.routes.health import router as health_router
 from gamecrafter.api.routes.knowledge import router as knowledge_router
 from gamecrafter.api.routes.marketing import router as marketing_router
 from gamecrafter.api.routes.readiness import router as readiness_router
+from gamecrafter.api.routes.scripts import router as scripts_router
 from gamecrafter.api.routes.workspace import router as workspace_router
 from gamecrafter.config.settings import get_settings
 
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
     application.include_router(workspace_router)
     application.include_router(knowledge_router)
     application.include_router(marketing_router)
+    application.include_router(scripts_router)
     return application
 
 

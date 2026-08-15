@@ -184,6 +184,21 @@ Public sources must not be described as an internal GDD. For existing games, the
 - Fit score is decision support, never automatic approval. Topic reviews are append-only and
   idempotent. One task can have only one current approved candidate; the user must explicitly reject
   that candidate before approving another. Script creation remains blocked without this human gate.
+- M4 freezes the exact task, approved candidate, approving topic-review row, and knowledge snapshot
+  before generating any script. The first generator is `tiktok-template-v1`: a deterministic
+  English template, not a simulated LLM response, and therefore has zero API or token cost.
+- Every section carries a continuous timestamp range, purpose, voiceover, on-screen text, visual
+  direction, and only IDs from the frozen knowledge snapshot or approved trend signal. Edited JSON
+  is capped at 64 KiB and rejected if its schema, duration, timeline, or lineage escapes that run.
+- `script-quality-v1` scores duration/timeline, hook, evidence lineage, CTA, TikTok structure, and
+  schema/safety for 100 total points. A score is advisory: export additionally requires a human
+  approval of the exact evaluated version. A failing version can never be approved.
+- Generated, human-edited, and automatic-revision versions are append-only and content-digested.
+  Automatic revision is user-triggered, only follows a failed evaluation, and stops at the frozen
+  budget (two by default). There is no self-running ReAct loop or unbounded evaluator optimizer.
+- Markdown and JSON export bind the exact version and final approval in an immutable digest receipt.
+  The local download contains public/approved content only; raw private sources, credentials, and
+  provider payloads are never included.
 
 ## Architecture policy
 

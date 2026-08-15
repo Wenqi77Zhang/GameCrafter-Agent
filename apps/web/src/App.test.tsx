@@ -67,6 +67,7 @@ function workspaceFetch(options?: {
   marketingTasks?: Array<Record<string, unknown>>;
   trendSignals?: Array<Record<string, unknown>>;
   topicCandidates?: Array<Record<string, unknown>>;
+  scriptRuns?: Array<Record<string, unknown>>;
 }) {
   const projects = options?.projects ?? [project];
   const candidates = options?.candidates ?? [];
@@ -78,6 +79,7 @@ function workspaceFetch(options?: {
   const marketingTasks = [...(options?.marketingTasks ?? [])];
   const trendSignals = [...(options?.trendSignals ?? [])];
   const topicCandidates = [...(options?.topicCandidates ?? [])];
+  const scriptRuns = [...(options?.scriptRuns ?? [])];
   const runs: Array<Record<string, unknown>> = [];
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const path = String(input);
@@ -86,7 +88,7 @@ function workspaceFetch(options?: {
     if (path === "/api/projects") return json({ items: projects });
     if (path.endsWith("/candidates")) return json({ items: candidates });
     if (path.endsWith("/sources")) return json({ items: [] });
-    if (path.endsWith("/runs")) return json({ items: runs });
+    if (path.endsWith("/runs") && !path.endsWith("/script-runs")) return json({ items: runs });
     if (path.endsWith("/knowledge-entities") && init?.method === "POST") {
       const payload = JSON.parse(String(init.body)) as { display_name: string; aliases: string[] };
       const created = { ...entity, display_name: payload.display_name, aliases: payload.aliases };
@@ -224,6 +226,7 @@ function workspaceFetch(options?: {
     if (path.endsWith("/topic-analysis") && init?.method === "POST") {
       return json({ items: topicCandidates });
     }
+    if (path.endsWith("/script-runs")) return json({ items: scriptRuns });
     if (path.includes("/topic-candidates/") && path.endsWith("/reviews") && init?.method === "POST") {
       const payload = JSON.parse(String(init.body)) as { decision: string; reason: string };
       const candidateId = path.split("/topic-candidates/")[1].split("/")[0];
@@ -767,4 +770,47 @@ test("shows traceable deterministic topic fit and records the human gate", async
     ),
   );
   expect(await screen.findByText("趋势来源、市场与知识证据均符合本次目标。")).toBeInTheDocument();
+});
+
+test("renders the zero-cost script evaluation and final human gate", async () => {
+  const task = {
+    id: "marketing-task-approved",
+    platform: "TikTok",
+    duration_seconds: 30,
+    output_language: "en",
+    approved_candidate_id: "topic-1",
+    created_at: "2026-08-15T02:10:00Z",
+  };
+  const content = {
+    schema_version: "tiktok-script-v1",
+    platform: "TikTok",
+    output_language: "en",
+    duration_seconds: 30,
+    title: "Neverness to Everness: #NTE",
+    caption: "A verified first look.",
+    hashtags: ["#NTE", "#GameTok"],
+    sections: [
+      { start_second: 0, end_second: 6, purpose: "hook", voiceover: "What if this trend entered NTE?", on_screen_text: "#NTE", visual_direction: "Official footage.", knowledge_member_ids: [], trend_signal_ids: ["trend-1"] },
+      { start_second: 6, end_second: 30, purpose: "cta", voiceover: "Would you play? Follow for verified updates.", on_screen_text: "Follow", visual_direction: "Official key art.", knowledge_member_ids: ["member-1"], trend_signal_ids: [] },
+    ],
+  };
+  workspaceFetch({
+    marketingTasks: [task],
+    scriptRuns: [{
+      id: "script-run-1", marketing_task_id: task.id, revision_budget: 2, revisions_used: 0,
+      score_threshold: 80, generator_version: "tiktok-template-v1", evaluator_version: "script-quality-v1",
+      created_at: "2026-08-15T03:00:00Z",
+      versions: [{ id: "script-version-1", version_number: 1, origin: "generated", content, content_sha256: "a".repeat(64), created_at: "2026-08-15T03:01:00Z" }],
+      evaluations: [{ id: "evaluation-1", script_version_id: "script-version-1", score: 100, passed: true, dimensions: { evidence_lineage: { score: 20, max: 20 } }, issues: [], rule_version: "script-quality-v1" }],
+      final_reviews: [],
+    }],
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "创作" }));
+
+  expect(await screen.findByRole("heading", { name: "证据约束的 TikTok 脚本" })).toBeInTheDocument();
+  expect(screen.getByText("确定性模板 + 确定性评测 · 零模型费用")).toBeInTheDocument();
+  expect(screen.getByText("100/100")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "导出 Markdown" })).toBeDisabled();
+  expect(screen.getByRole("heading", { name: "人工终审" })).toBeInTheDocument();
 });

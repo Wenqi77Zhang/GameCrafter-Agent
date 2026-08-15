@@ -27,12 +27,12 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M3 runtime
+## Implemented M1-A to M4 runtime
 
 ```mermaid
 flowchart LR
     USER["Local user"]
-    WEB["React Sources, Knowledge, and Runs workspace"]
+    WEB["React Sources, Knowledge, Marketing, Create, and Runs workspace"]
     API["FastAPI"]
     COMMAND["Validated workspace commands and queries"]
     RUNS[("workflow_runs")]
@@ -134,6 +134,45 @@ The first adapters accept only `nte.perfectworld.com` global pages under `en`, `
 directly imported as evidence. Homepage and article URLs are assigned deterministic locale, region,
 source type, raw category, and classification-basis metadata. A date segment in an article URL is
 kept only as a family-grouping signal; it is not asserted as the publication date.
+
+## Implemented M2-M4 marketing and script DAG
+
+```mermaid
+flowchart LR
+    SNAPSHOT["Immutable approved knowledge snapshot"]
+    SIGNAL["Human-verified public trend observation"]
+    FIT["trend-fit-v1 deterministic scoring"]
+    TOPIC{"Human topic gate"}
+    RUN["Frozen script run inputs and rule versions"]
+    GENERATE["tiktok-template-v1 generator"]
+    VERSION[("Append-only script version + SHA-256")]
+    EVALUATE["script-quality-v1 evaluator"]
+    PASS{"Score reaches frozen threshold?"}
+    BUDGET{"Revision budget remains?"}
+    REVISE["User-triggered deterministic revision"]
+    EDIT["Validated human edit"]
+    FINAL{"Final human gate"}
+    EXPORT[("Markdown or JSON + digest receipt")]
+    STOP["Stop and retain trace"]
+
+    SNAPSHOT --> FIT
+    SIGNAL --> FIT --> TOPIC
+    TOPIC -->|"approve exact candidate"| RUN --> GENERATE --> VERSION --> EVALUATE --> PASS
+    TOPIC -->|"reject or defer"| STOP
+    VERSION --> EDIT --> VERSION
+    PASS -->|"no"| BUDGET
+    BUDGET -->|"yes and user requests"| REVISE --> VERSION
+    BUDGET -->|"no"| STOP
+    PASS -->|"yes"| FINAL
+    FINAL -->|"reject"| EDIT
+    FINAL -->|"approve exact version"| EXPORT
+```
+
+This is a constrained perceive-reason-action pattern, not a conversational Agent swarm. Perception
+is the immutable knowledge/trend input, reasoning is deterministic fit and evaluation, action is a
+versioned script command, and learning is deliberately limited to append-only human feedback and
+future offline rule improvement. Runtime rules do not self-modify. PostgreSQL verifies cross-row
+lineage and immutability even if an API or UI client is bypassed.
 
 ## Implemented M1-B B3 ingestion and persistence flow
 

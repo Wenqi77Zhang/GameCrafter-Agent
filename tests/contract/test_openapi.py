@@ -34,6 +34,14 @@ def test_health_contract_is_published_in_openapi() -> None:
     assert "/api/projects/{project_id}/knowledge-snapshots/{snapshot_id}" in schema["paths"]
     assert "/api/projects/{project_id}/marketing-tasks" in schema["paths"]
     assert "/api/projects/{project_id}/trend-signals" in schema["paths"]
+    assert "/api/projects/{project_id}/script-runs" in schema["paths"]
+    assert "/api/projects/{project_id}/script-runs/{run_id}/versions/generate" in schema["paths"]
+    assert (
+        "/api/projects/{project_id}/script-runs/{run_id}/versions/{version_id}/evaluations"
+        in schema["paths"]
+    )
+    assert "/api/projects/{project_id}/script-runs/{run_id}/final-reviews" in schema["paths"]
+    assert "/api/projects/{project_id}/script-runs/{run_id}/exports" in schema["paths"]
     assert "/api/projects/{project_id}/marketing-tasks/{task_id}/topic-analysis" in schema["paths"]
     assert (
         "/api/projects/{project_id}/marketing-tasks/{task_id}/topic-candidates/"
