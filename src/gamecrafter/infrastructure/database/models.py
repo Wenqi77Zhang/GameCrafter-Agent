@@ -860,6 +860,11 @@ class ClaimReviewRecord(Base):
             "length(trim(reason)) > 0",
             name="ck_claim_reviews_reason_nonblank",
         ),
+        UniqueConstraint(
+            "project_id",
+            "command_key",
+            name="uq_claim_reviews_project_command_key",
+        ),
         Index("ix_claim_reviews_claim_created", "claim_id", "created_at"),
     )
 
@@ -880,6 +885,7 @@ class ClaimReviewRecord(Base):
     approved_normalized_value: Mapped[str | None] = mapped_column(Text)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     reviewer_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    command_key: Mapped[str | None] = mapped_column(String(160))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
@@ -902,12 +908,26 @@ class ClaimConflictGroupRecord(Base):
             "length(scope_fingerprint_sha256) = 64",
             name="ck_claim_conflict_groups_scope_fingerprint",
         ),
+        CheckConstraint(
+            "(status = 'open' AND resolution_summary IS NULL AND resolved_by IS NULL "
+            "AND resolved_at IS NULL AND resolution_command_key IS NULL "
+            "AND resolution_review_counts IS NULL) OR "
+            "(status IN ('resolved', 'dismissed') AND length(trim(resolution_summary)) > 0 "
+            "AND resolved_by IS NOT NULL AND resolved_at IS NOT NULL "
+            "AND resolution_command_key IS NOT NULL AND resolution_review_counts IS NOT NULL)",
+            name="ck_claim_conflict_groups_resolution_state",
+        ),
         UniqueConstraint(
             "project_id",
             "subject_entity_id",
             "predicate",
             "scope_fingerprint_sha256",
             name="uq_claim_conflict_groups_comparison_key",
+        ),
+        UniqueConstraint(
+            "project_id",
+            "resolution_command_key",
+            name="uq_claim_conflict_groups_project_resolution_command_key",
         ),
         Index("ix_claim_conflict_groups_project_status", "project_id", "status"),
     )
@@ -929,6 +949,8 @@ class ClaimConflictGroupRecord(Base):
     resolution_summary: Mapped[str | None] = mapped_column(Text)
     resolved_by: Mapped[str | None] = mapped_column(String(120))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolution_command_key: Mapped[str | None] = mapped_column(String(160))
+    resolution_review_counts: Mapped[dict[str, int] | None] = mapped_column(nullable_json_type)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

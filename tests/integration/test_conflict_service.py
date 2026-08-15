@@ -14,6 +14,7 @@ from gamecrafter.infrastructure.database.models import (
     ClaimConflictGroupRecord,
     ClaimConflictMemberRecord,
     KnowledgeClaimRecord,
+    utc_now,
 )
 from gamecrafter.infrastructure.database.run_service import DatabaseRunService
 
@@ -193,6 +194,9 @@ def test_reconciliation_never_silently_reopens_a_human_closed_group() -> None:
         group.status = "resolved"
         group.resolution_summary = "Human resolution retained."
         group.resolved_by = "test-user"
+        group.resolved_at = utc_now()
+        group.resolution_command_key = "test-human-resolution"
+        group.resolution_review_counts = {}
     with sessions.begin() as session:
         session.add(
             _claim(

@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C3b: explainable conflict workspace**.
+The repository is currently in **M1-C C4: append-only human review**.
 
-Implemented through M1-C C3b:
+Implemented through M1-C C4:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -126,13 +126,22 @@ Implemented through M1-C C3b:
   policy version, and deterministic classification basis;
 - one-click navigation from every conflict member to its exact source evidence, while leaving all
   selection, approval, and resolution decisions to the later human-review workflow.
+- append-only approve, approve-with-edit, reject, and defer commands whose exact retries are
+  idempotent and whose conflicting key reuse is rejected;
+- shared typed-value normalization for model candidates and human edits, evidence-required
+  approval, visible latest status, and complete review history without rewriting any Claim;
+- guarded conflict closure: resolution requires a final decision for every member, at least one
+  approval, and exactly one retained normalized value for a single-valued conflict;
+- explicit dismissal with a human reason, complete resolution metadata, causal audit events, and
+  PostgreSQL-enforced command lineage;
+- responsive bilingual review/closure controls beside the exact evidence, with desktop and mobile
+  browser verification.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- human conflict-resolution and claim-review controls, snapshot publication commands, embeddings,
-  or an approved knowledge snapshot;
+- snapshot publication commands, embeddings, or an approved knowledge snapshot;
 - live trend sources;
 - live LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
@@ -360,6 +369,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-C C2.5 NTE PostgreSQL acceptance](docs/migration/m1c-nte-postgres-acceptance.md)
 - [M1-C C3a deterministic-conflict service](docs/migration/m1c-deterministic-conflicts.md)
 - [M1-C C3b conflict-workspace record](docs/migration/m1c-conflict-workspace.md)
+- [M1-C C4 human-review record](docs/migration/m1c-human-review.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles

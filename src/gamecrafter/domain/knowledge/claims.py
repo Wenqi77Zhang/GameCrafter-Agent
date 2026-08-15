@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import math
 from dataclasses import dataclass
+from datetime import date, datetime
 from enum import StrEnum
 from hashlib import sha256
 from typing import Any
@@ -127,17 +130,41 @@ class CandidateClaim:
             raise ValueError("claim confidence must be between 0 and 1")
         if not self.evidence:
             raise ValueError("candidate claim must contain at least one evidence span")
-        _validate_value(self.value_kind, self.value)
+        validate_claim_value(self.value_kind, self.value)
 
 
-def _validate_value(kind: ClaimValueKind, value: Any) -> None:
-    if kind in {ClaimValueKind.STRING, ClaimValueKind.DATE, ClaimValueKind.DATETIME}:
+def validate_claim_value(kind: ClaimValueKind, value: Any) -> None:
+    """Validate a model or human-approved value against the controlled shape."""
+
+    if kind is ClaimValueKind.STRING:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{kind.value} claim value must be a non-empty string")
         return
+    if kind is ClaimValueKind.DATE:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("date claim value must be a non-empty ISO date")
+        try:
+            date.fromisoformat(value)
+        except ValueError as error:
+            raise ValueError("date claim value must be an ISO date") from error
+        return
+    if kind is ClaimValueKind.DATETIME:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("datetime claim value must be a non-empty ISO datetime")
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError as error:
+            raise ValueError("datetime claim value must be an ISO datetime") from error
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("datetime claim value must include a timezone offset")
+        return
     if kind is ClaimValueKind.NUMBER:
-        if isinstance(value, bool) or not isinstance(value, int | float):
-            raise ValueError("number claim value must be numeric")
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or (isinstance(value, float) and not math.isfinite(value))
+        ):
+            raise ValueError("number claim value must be a finite number")
         return
     if kind is ClaimValueKind.BOOLEAN:
         if not isinstance(value, bool):
@@ -158,3 +185,20 @@ def _validate_value(kind: ClaimValueKind, value: Any) -> None:
             raise ValueError("string_list claim value must contain non-empty strings")
         return
     raise ValueError(f"unsupported claim value kind: {kind}")
+
+
+def normalize_claim_value(kind: ClaimValueKind, value: Any) -> str:
+    """Return the canonical comparison form shared by extraction and human review."""
+
+    validate_claim_value(kind, value)
+    if kind in {
+        ClaimValueKind.STRING,
+        ClaimValueKind.DATE,
+        ClaimValueKind.DATETIME,
+    }:
+        return str(value).strip().casefold()
+    if kind is ClaimValueKind.ENTITY_REF:
+        return str(value["entity_key"]).strip().casefold()
+    if kind is ClaimValueKind.STRING_LIST:
+        value = sorted({item.strip().casefold() for item in value})
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)

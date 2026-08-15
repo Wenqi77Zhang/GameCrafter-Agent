@@ -21,8 +21,14 @@ def test_health_contract_is_published_in_openapi() -> None:
     assert "/api/projects/{project_id}/knowledge-entities/{entity_id}/revisions" in schema["paths"]
     assert "/api/projects/{project_id}/source-versions" in schema["paths"]
     assert "/api/projects/{project_id}/knowledge-claims" in schema["paths"]
+    assert "/api/projects/{project_id}/knowledge-claims/{claim_id}/reviews" in schema["paths"]
+    assert "/api/projects/{project_id}/knowledge-reviews" in schema["paths"]
     assert "/api/projects/{project_id}/knowledge-conflicts" in schema["paths"]
     assert "/api/projects/{project_id}/knowledge-conflicts/reconcile" in schema["paths"]
+    assert (
+        "/api/projects/{project_id}/knowledge-conflicts/{conflict_group_id}/closure"
+        in schema["paths"]
+    )
     assert "/api/runs/{run_id}/events" in schema["paths"]
     response_schema = schema["paths"]["/health"]["get"]["responses"]["200"]
     assert "content" in response_schema

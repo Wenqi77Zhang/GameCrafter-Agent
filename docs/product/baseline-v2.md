@@ -130,6 +130,20 @@ Public sources must not be described as an internal GDD. For existing games, the
 - Selecting any conflict member selects the same immutable Claim in the candidate browser and
   opens its exact source-version evidence. C3b never picks a winner, edits a Claim, approves a
   value, closes a group, or publishes a snapshot.
+- C4 reviews are append-only. `approve` copies the immutable candidate value;
+  `approve_with_edit` stores a separately typed and normalized approved value; `reject` and
+  `defer` cannot carry a value. Every approval requires exact Claim evidence and every command
+  requires a nonblank bounded human reason. Human-edited JSON is capped at 16,384 UTF-8 bytes
+  before validation or persistence.
+- Review and conflict-closure commands require idempotency keys. Replaying the exact command
+  returns the existing decision; reusing a key for different content is rejected. Audit payloads
+  record decision identity and type without duplicating the approved value or human reason.
+- Resolving a conflict requires a latest non-deferred decision for every member and at least one
+  approved value. A `conflicting` single-valued group must converge on exactly one approved
+  normalized value; a `possibly_coexisting` group may retain multiple approved values. Dismissal
+  remains an explicit reasoned human override.
+- The browser displays current status and all prior reviews beside the exact evidence. A new
+  review never deletes or edits a prior review, and closing a group never publishes knowledge.
 - The confirmed M1-C order is C2.3a workflow substrate, C2.3b durable extraction, C2.4 extraction
   UI, C2.5 NTE PostgreSQL acceptance, C3 conflicts, C4 reviews, and C5 publication.
 - The committed NTE replay is a small, source-attributed snapshot of public English official-site

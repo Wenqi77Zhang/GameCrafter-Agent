@@ -129,6 +129,40 @@ class FakeConflictService:
         ]
 
 
+class FakeReviewService:
+    def review_claim(self, **kwargs):
+        assert kwargs == {
+            "project_id": PROJECT_ID,
+            "claim_id": ENTITY_ID,
+            "decision": "approve",
+            "approved_value": None,
+            "reason": "Matches exact evidence.",
+            "actor_id": "local-user",
+            "command_key": "review-command-1",
+        }
+        return {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "claim_id": str(ENTITY_ID),
+            "decision": "approve",
+        }, True
+
+    def list_reviews(self, project_id, **kwargs):
+        assert project_id == PROJECT_ID
+        assert kwargs == {"claim_id": ENTITY_ID, "subject_entity_id": None}
+        return [{"id": "review-1", "decision": "approve"}]
+
+    def close_conflict(self, **kwargs):
+        assert kwargs == {
+            "project_id": PROJECT_ID,
+            "conflict_group_id": ENTITY_ID,
+            "outcome": "resolved",
+            "reason": "All members received a final human decision.",
+            "actor_id": "local-user",
+            "command_key": "closure-command-1",
+        }
+        return {"id": str(ENTITY_ID), "status": "resolved"}, True
+
+
 def test_disabled_mode_blocks_before_enqueue() -> None:
     repository = FakeKnowledgeRepository()
     workspace = FakeWorkspace()
@@ -273,3 +307,34 @@ def test_deterministic_conflict_reconciliation_and_reads_are_project_scoped() ->
         assert listed.json()["items"][0]["predicate"] == "game.name"
     finally:
         knowledge._conflicts = original
+
+
+def test_human_review_and_conflict_closure_commands_are_project_scoped() -> None:
+    reviews = FakeReviewService()
+    original = knowledge._reviews
+    knowledge._reviews = lambda: reviews
+    try:
+        client = TestClient(create_app())
+        reviewed = client.post(
+            f"/api/projects/{PROJECT_ID}/knowledge-claims/{ENTITY_ID}/reviews",
+            headers={"Idempotency-Key": "review-command-1"},
+            json={"decision": "approve", "reason": "Matches exact evidence."},
+        )
+        listed = client.get(
+            f"/api/projects/{PROJECT_ID}/knowledge-reviews",
+            params={"claim_id": str(ENTITY_ID)},
+        )
+        closed = client.post(
+            f"/api/projects/{PROJECT_ID}/knowledge-conflicts/{ENTITY_ID}/closure",
+            headers={"Idempotency-Key": "closure-command-1"},
+            json={
+                "outcome": "resolved",
+                "reason": "All members received a final human decision.",
+            },
+        )
+
+        assert reviewed.status_code == 201 and reviewed.json()["decision"] == "approve"
+        assert listed.status_code == 200 and listed.json()["items"][0]["id"] == "review-1"
+        assert closed.status_code == 201 and closed.json()["status"] == "resolved"
+    finally:
+        knowledge._reviews = original

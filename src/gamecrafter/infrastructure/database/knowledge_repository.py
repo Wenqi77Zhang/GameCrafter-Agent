@@ -22,10 +22,14 @@ from gamecrafter.application.ports.knowledge_repository import (
 )
 from gamecrafter.application.ports.model_gateway import ClaimExtractionRequest
 from gamecrafter.application.text_chunking import TextChunk
-from gamecrafter.domain.knowledge.claims import CandidateClaim, ClaimValueKind
+from gamecrafter.domain.knowledge.claims import (
+    CandidateClaim,
+    normalize_claim_value,
+)
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
     ClaimEvidenceSpanRecord,
+    ClaimReviewRecord,
     KnowledgeClaimRecord,
     KnowledgeEntityRecord,
     KnowledgeEntityRevisionRecord,
@@ -406,6 +410,15 @@ class DatabaseKnowledgeRepository:
                         .order_by(ClaimEvidenceSpanRecord.ordinal)
                     )
                 )
+                reviews = list(
+                    session.scalars(
+                        select(ClaimReviewRecord)
+                        .where(ClaimReviewRecord.claim_id == claim.id)
+                        .order_by(ClaimReviewRecord.created_at, ClaimReviewRecord.id)
+                    )
+                )
+                delivered_reviews = [self._review(review) for review in reviews]
+                latest_review = delivered_reviews[-1] if delivered_reviews else None
                 items.append(
                     {
                         "id": str(claim.id),
@@ -427,12 +440,27 @@ class DatabaseKnowledgeRepository:
                         "model_name": claim.model_name,
                         "prompt_version": claim.prompt_version,
                         "schema_version": claim.schema_version,
-                        "status": "candidate_unreviewed",
+                        "status": _claim_status(latest_review),
                         "created_at": claim.created_at.isoformat(),
                         "evidence": [self._evidence(session, span) for span in spans],
+                        "reviews": delivered_reviews,
+                        "latest_review": latest_review,
                     }
                 )
             return items
+
+    @staticmethod
+    def _review(review: ClaimReviewRecord) -> dict[str, object]:
+        return {
+            "id": str(review.id),
+            "decision": review.decision,
+            "approved_value_kind": review.approved_value_kind,
+            "approved_value": review.approved_value,
+            "approved_normalized_value": review.approved_normalized_value,
+            "reason": review.reason,
+            "reviewer_id": review.reviewer_id,
+            "created_at": review.created_at.isoformat(),
+        }
 
     @staticmethod
     def _evidence(
@@ -563,7 +591,7 @@ class DatabaseKnowledgeRepository:
         if provider is None or model is None:
             raise KnowledgeStateError("successful extraction is missing provider metadata")
         value_json = _json_value(claim.value)
-        normalized_value = _normalized_value(claim.value_kind, value_json)
+        normalized_value = normalize_claim_value(claim.value_kind, value_json)
         value_fingerprint = sha256(
             _canonical_json({"kind": claim.value_kind.value, "value": value_json}).encode("utf-8")
         ).hexdigest()
@@ -643,18 +671,15 @@ def _json_value(value: Any) -> Any:
     return list(value) if isinstance(value, tuple) else value
 
 
-def _normalized_value(kind: ClaimValueKind, value: Any) -> str:
-    if kind in {
-        ClaimValueKind.STRING,
-        ClaimValueKind.DATE,
-        ClaimValueKind.DATETIME,
-    }:
-        return str(value).strip().casefold()
-    if kind is ClaimValueKind.ENTITY_REF:
-        return str(value["entity_key"]).strip().casefold()
-    if kind is ClaimValueKind.STRING_LIST:
-        return _canonical_json(sorted({item.strip().casefold() for item in value}))
-    return _canonical_json(value)
+def _claim_status(latest_review: dict[str, object] | None) -> str:
+    if latest_review is None:
+        return "candidate_unreviewed"
+    return {
+        "approve": "human_approved",
+        "approve_with_edit": "human_approved_with_edit",
+        "reject": "human_rejected",
+        "defer": "human_deferred",
+    }[str(latest_review["decision"])]
 
 
 def _manifest_sha256(result: ExtractionRunResult) -> str:
