@@ -171,6 +171,19 @@ Public sources must not be described as an internal GDD. For existing games, the
 - Any later OpenAI call must use minimized logging and `store: false`, while product copy must still
   disclose that provider abuse-monitoring retention can apply unless the organization has eligible
   data-retention controls.
+- M2 never scrapes TikTok. A user verifies an authorized public trend page in the browser and records
+  its HTTPS URL, observation time with timezone, region, signal type, title, keywords, optional
+  metric, and verification note. The immutable record is evidence of the user's observation, not a
+  claim that GameCrafter has a live TikTok API connection or independently verified the metric.
+- A marketing task freezes one published knowledge snapshot, platform, target markets, audience,
+  goal, output language, and duration. The first NTE defaults are TikTok, US/UK/CA/AU/NZ, English,
+  potential new players, awareness, and 30 seconds, while the contracts remain configurable.
+- `trend-fit-v1` uses no model. It scores freshness, market alignment, source completeness, and
+  lexical overlap with exact approved snapshot members at 25 points each. The candidate preserves
+  dimension inputs, matched member IDs, rule version, rationale, hook, angle, and explicit risks.
+- Fit score is decision support, never automatic approval. Topic reviews are append-only and
+  idempotent. One task can have only one current approved candidate; the user must explicitly reject
+  that candidate before approving another. Script creation remains blocked without this human gate.
 
 ## Architecture policy
 
