@@ -71,4 +71,8 @@ The course game-marketing requirements remain the minimum acceptance line for M2
   provenance, HTTPS and timezone validation, idempotent retry, and honest manual-source labelling.
 - M3 implements immutable snapshot-bound marketing tasks, deterministic four-dimension fit,
   explainable risks and evidence links, append-only review history, and a single-approved-topic
-  human gate. M4 is the next product milestone.
+  human gate.
+- M4 implements evidence-bound English TikTok script generation, canonical version digests,
+  deterministic 100-point evaluation, a hard automatic-revision budget, human-edited versions,
+  mandatory final approval, and audited Markdown/JSON export. This closes the first complete local
+  product slice; M5 is the next milestone.

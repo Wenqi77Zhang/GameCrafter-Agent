@@ -4,9 +4,10 @@ import { api, formatDate, idempotencyKey } from "./client";
 import type { Language } from "./client";
 import { KnowledgeWorkspace } from "./KnowledgeWorkspace";
 import { MarketingWorkspace } from "./MarketingWorkspace";
+import { ScriptWorkspace } from "./ScriptWorkspace";
 import type { WorkspaceAuditEvent, WorkspaceRun } from "./KnowledgeWorkspace";
 
-type Tab = "sources" | "knowledge" | "marketing" | "runs";
+type Tab = "sources" | "knowledge" | "marketing" | "scripts" | "runs";
 type Project = { id: string; slug: string; name: string; default_locale: Language };
 type Candidate = {
   id: string;
@@ -41,6 +42,7 @@ const copy = {
     sources: "来源",
     knowledge: "知识",
     marketing: "营销",
+    scripts: "创作",
     runs: "运行记录",
     createNte: "创建《异环》项目",
     emptyProject: "先创建本地《异环》验证项目，再开始采集官方公开资料。",
@@ -88,6 +90,7 @@ const copy = {
     sources: "Sources",
     knowledge: "Knowledge",
     marketing: "Marketing",
+    scripts: "Create",
     runs: "Runs",
     createNte: "Create NTE project",
     emptyProject: "Create the local NTE validation project before collecting public official sources.",
@@ -369,7 +372,7 @@ export function App() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">G</span>
-          <div><strong>GameCrafter</strong><small>Knowledge Hub · M1-C</small></div>
+          <div><strong>GameCrafter</strong><small>Marketing Studio · M4</small></div>
         </div>
         <div className="top-actions">
           <span className="privacy-note">{t.privacy}</span>
@@ -423,6 +426,9 @@ export function App() {
                 </button>
                 <button className={tab === "marketing" ? "active" : ""} type="button" onClick={() => setTab("marketing")}>
                   {t.marketing}
+                </button>
+                <button className={tab === "scripts" ? "active" : ""} type="button" onClick={() => setTab("scripts")}>
+                  {t.scripts}
                 </button>
                 <button className={tab === "runs" ? "active" : ""} type="button" onClick={() => setTab("runs")}>
                   {t.runs}<span>{runs.length}</span>
@@ -514,6 +520,8 @@ export function App() {
                 />
               ) : tab === "marketing" && selectedProject ? (
                 <MarketingWorkspace projectId={projectId} language={language} />
+              ) : tab === "scripts" && selectedProject ? (
+                <ScriptWorkspace projectId={projectId} language={language} />
               ) : (
                 <div className="runs-layout">
                   <section className="run-list">

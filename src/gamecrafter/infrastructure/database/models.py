@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -1220,6 +1221,179 @@ class TopicReviewRecord(Base):
     decision: Mapped[str] = mapped_column(String(24), nullable=False)
     reason: Mapped[str] = mapped_column(String(1000), nullable=False)
     reviewer_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ScriptRunRecord(Base):
+    """Immutable script workflow inputs frozen at the approved-topic gate."""
+
+    __tablename__ = "script_runs"
+    __table_args__ = (
+        CheckConstraint("revision_budget BETWEEN 0 AND 5", name="ck_script_runs_budget"),
+        CheckConstraint("score_threshold BETWEEN 1 AND 100", name="ck_script_runs_threshold"),
+        CheckConstraint(
+            "length(trim(generator_version)) > 0 AND length(trim(evaluator_version)) > 0 "
+            "AND length(trim(created_by)) > 0",
+            name="ck_script_runs_text_nonblank",
+        ),
+        UniqueConstraint("project_id", "command_key", name="uq_script_runs_project_command"),
+        Index("ix_script_runs_project_created", "project_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
+    )
+    marketing_task_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("marketing_tasks.id", ondelete="RESTRICT"), nullable=False
+    )
+    topic_candidate_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topic_candidates.id", ondelete="RESTRICT"), nullable=False
+    )
+    topic_review_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("topic_reviews.id", ondelete="RESTRICT"), nullable=False
+    )
+    knowledge_snapshot_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("knowledge_snapshots.id", ondelete="RESTRICT"), nullable=False
+    )
+    revision_budget: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    score_threshold: Mapped[int] = mapped_column(Integer, nullable=False, default=80)
+    generator_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    evaluator_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(120), nullable=False)
+    command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ScriptVersionRecord(Base):
+    """Immutable generated, human-edited, or bounded auto-revised script version."""
+
+    __tablename__ = "script_versions"
+    __table_args__ = (
+        CheckConstraint("version_number > 0", name="ck_script_versions_number"),
+        CheckConstraint(
+            "origin IN ('generated', 'human_edit', 'auto_revision')",
+            name="ck_script_versions_origin",
+        ),
+        CheckConstraint("length(content_sha256) = 64", name="ck_script_versions_digest"),
+        CheckConstraint("length(trim(created_by)) > 0", name="ck_script_versions_actor_nonblank"),
+        UniqueConstraint("run_id", "version_number", name="uq_script_versions_run_number"),
+        UniqueConstraint("run_id", "command_key", name="uq_script_versions_run_command"),
+        Index("ix_script_versions_run_created", "run_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    run_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("script_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    parent_version_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("script_versions.id", ondelete="RESTRICT")
+    )
+    origin: Mapped[str] = mapped_column(String(24), nullable=False)
+    content: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(120), nullable=False)
+    command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ScriptEvaluationRecord(Base):
+    """Immutable deterministic quality report for one exact script version."""
+
+    __tablename__ = "script_evaluations"
+    __table_args__ = (
+        CheckConstraint("score BETWEEN 0 AND 100", name="ck_script_evaluations_score"),
+        CheckConstraint(
+            "length(trim(rule_version)) > 0", name="ck_script_evaluations_rule_nonblank"
+        ),
+        UniqueConstraint("run_id", "command_key", name="uq_script_evaluations_run_command"),
+        Index("ix_script_evaluations_version_created", "script_version_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    run_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("script_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    script_version_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("script_versions.id", ondelete="RESTRICT"), nullable=False
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    passed: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    dimensions: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False, default=dict)
+    issues: Mapped[list[str]] = mapped_column(json_type, nullable=False, default=list)
+    rule_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ScriptFinalReviewRecord(Base):
+    """Append-only mandatory human approval or rejection for one evaluated version."""
+
+    __tablename__ = "script_final_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "decision IN ('approve', 'reject')", name="ck_script_final_reviews_decision"
+        ),
+        CheckConstraint(
+            "length(trim(reason)) > 0 AND length(trim(reviewer_id)) > 0",
+            name="ck_script_final_reviews_text_nonblank",
+        ),
+        UniqueConstraint("run_id", "command_key", name="uq_script_final_reviews_run_command"),
+        Index("ix_script_final_reviews_run_created", "run_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    run_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("script_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    script_version_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("script_versions.id", ondelete="RESTRICT"), nullable=False
+    )
+    evaluation_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("script_evaluations.id", ondelete="RESTRICT"), nullable=False
+    )
+    decision: Mapped[str] = mapped_column(String(24), nullable=False)
+    reason: Mapped[str] = mapped_column(String(1000), nullable=False)
+    reviewer_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ScriptExportRecord(Base):
+    """Immutable audit receipt for an export of an approved exact version."""
+
+    __tablename__ = "script_exports"
+    __table_args__ = (
+        CheckConstraint("format IN ('markdown', 'json')", name="ck_script_exports_format"),
+        CheckConstraint("length(payload_sha256) = 64", name="ck_script_exports_digest"),
+        UniqueConstraint("run_id", "command_key", name="uq_script_exports_run_command"),
+        Index("ix_script_exports_run_created", "run_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    run_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("script_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    script_version_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("script_versions.id", ondelete="RESTRICT"), nullable=False
+    )
+    final_review_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("script_final_reviews.id", ondelete="RESTRICT"), nullable=False
+    )
+    format: Mapped[str] = mapped_column(String(24), nullable=False)
+    payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     command_key: Mapped[str] = mapped_column(String(160), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now

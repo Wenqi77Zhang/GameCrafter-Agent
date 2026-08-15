@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M3: explainable fit and human topic approval**.
+The repository has reached **M4: the first complete local product slice**.
 
-Implemented through M1-C C5:
+Implemented through M4:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -153,6 +153,16 @@ Implemented through M1-C C5:
 - explicit risk disclosures, exact trend/snapshot lineage, append-only topic decisions, and a
   single-current-approved-topic human gate;
 - a bilingual responsive Marketing workspace verified on Chinese desktop and English mobile.
+- immutable script runs that freeze the exact marketing task, approved topic decision, and
+  published knowledge snapshot;
+- deterministic English TikTok generation with section timelines, voiceover, on-screen text,
+  visual direction, hashtags, and exact knowledge/trend references at zero model cost;
+- a versioned 100-point evaluator covering timeline, hook, evidence, CTA, TikTok structure, and
+  schema safety, plus a configurable revision threshold and a hard automatic-revision budget;
+- append-only generated, human-edited, and auto-revised versions with canonical SHA-256 digests;
+- mandatory final human approval before Markdown or JSON export, with immutable export receipts;
+- a bilingual responsive Create workspace for preview, structured editing, evaluation, revision,
+  final review, and local file download.
 
 Not implemented yet:
 
@@ -160,7 +170,7 @@ Not implemented yet:
 - a live NTE acceptance capture committed as product evidence;
 - embeddings or retrieval over approved knowledge snapshots;
 - automated live trend connectors (the first release uses human-verified authorized-source input);
-- live LLM calls, RAG, or marketing agents;
+- live LLM calls, RAG, or model-generated marketing copy;
 - authentication, multi-tenancy, billing, or team collaboration.
 
 The earlier README described several of these as if they already existed. They did not. The original placeholder modules remain traceable in Git history and are documented under [`legacy/`](legacy/README.md).
@@ -389,6 +399,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-C C4 human-review record](docs/migration/m1c-human-review.md)
 - [M1-C C5 snapshot-publication record](docs/migration/m1c-snapshot-publication.md)
 - [M2/M3 trend-fit and topic-approval record](docs/migration/m2-trend-topic.md)
+- [M4 script-delivery record](docs/migration/m4-script-delivery.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles
