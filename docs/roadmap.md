@@ -63,4 +63,7 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M1-C C4 implements idempotent append-only Claim reviews, typed human edits, derived latest human
   state, guarded conflict resolution/dismissal, causal audit records, PostgreSQL command lineage,
   and bilingual evidence-adjacent review controls.
-- M1-C C5 immutable snapshot publication remains unimplemented.
+- M1-C C5 implements complete-project readiness checks, serialized idempotent publication,
+  deterministic content digests, immutable version history, exact approval/evidence lineage,
+  PostgreSQL enforcement, and bilingual publication controls. The M1 Knowledge Hub vertical slice
+  is complete; M2 is the next product milestone.

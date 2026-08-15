@@ -45,8 +45,9 @@ Database triggers provide a last line of defense in addition to future applicati
 7. a claim in an open conflict group cannot become a snapshot member;
 8. published lineage records cannot be updated or deleted.
 
-C4 will add an atomic publication service that also prevents empty snapshots and reports all
-blocking reasons before attempting the transaction.
+C5 adds the atomic publication service. It prevents empty or partial snapshots, reports all
+blocking reasons before attempting the transaction, freezes exact approving-review/evidence
+lineage, and provides immutable version history.
 
 ## Deliberately not implemented in C1
 

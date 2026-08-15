@@ -6,6 +6,7 @@ Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $repoRoot ".venv\Scripts\python.exe"
+$pytestTemp = Join-Path ([System.IO.Path]::GetTempPath()) "gamecrafter-pytest-$([guid]::NewGuid().ToString('N'))"
 
 if (-not (Test-Path -LiteralPath $python)) {
     throw "The project environment is missing. Run .\scripts\setup.ps1 first."
@@ -24,7 +25,7 @@ try {
     & $python -m ruff check src tests apps/api apps/worker migrations
     if ($LASTEXITCODE -ne 0) { throw "Python lint check failed." }
 
-    & $python -m pytest
+    & $python -m pytest --basetemp $pytestTemp
     if ($LASTEXITCODE -ne 0) { throw "Python tests failed." }
 
     & $pnpm.Source check:web

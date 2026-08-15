@@ -62,6 +62,8 @@ function workspaceFetch(options?: {
   claims?: Array<Record<string, unknown>>;
   conflicts?: Array<Record<string, unknown>>;
   capability?: Record<string, unknown>;
+  snapshots?: Array<Record<string, unknown>>;
+  snapshotReadiness?: Record<string, unknown>;
 }) {
   const projects = options?.projects ?? [project];
   const candidates = options?.candidates ?? [];
@@ -69,6 +71,7 @@ function workspaceFetch(options?: {
   const versions = [...(options?.versions ?? [])];
   const claims = [...(options?.claims ?? [])];
   const conflicts = [...(options?.conflicts ?? [])];
+  const snapshots = [...(options?.snapshots ?? [])];
   const runs: Array<Record<string, unknown>> = [];
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const path = String(input);
@@ -152,6 +155,61 @@ function workspaceFetch(options?: {
       return json({ id: groupId, status: payload.outcome, resolution_summary: payload.reason }, 201);
     }
     if (path.includes("/knowledge-conflicts")) return json({ items: conflicts });
+    if (path.endsWith("/knowledge-snapshot-readiness")) {
+      return json(
+        options?.snapshotReadiness ?? {
+          publishable: false,
+          schema_version: "knowledge-snapshot-v1",
+          content_sha256: null,
+          stats: {
+            claim_count: claims.length,
+            approved_count: 0,
+            rejected_count: 0,
+            deferred_count: 0,
+            unreviewed_count: claims.length,
+            open_conflict_count: conflicts.filter((item) => item.status === "open").length,
+          },
+          blockers: [{ code: claims.length ? "unreviewed_claims" : "no_claims", message: "blocked" }],
+          next_version_number: snapshots.length + 1,
+          latest_snapshot_id: snapshots[0]?.id ?? null,
+        },
+      );
+    }
+    if (path.endsWith("/knowledge-snapshots") && init?.method === "POST") {
+      const payload = JSON.parse(String(init.body)) as { notes: string | null };
+      const approved = claims.filter((item) => String(item.status).startsWith("human_approved"));
+      const snapshot = {
+        id: "snapshot-1",
+        version_number: snapshots.length + 1,
+        is_latest: true,
+        schema_version: "knowledge-snapshot-v1",
+        content_sha256: "f".repeat(64),
+        member_count: approved.length,
+        members: approved.map((item) => ({
+          claim_id: item.id,
+          review_id: (item.latest_review as Record<string, unknown>)?.id,
+          subject: {
+            entity_id: "entity-1",
+            entity_revision_id: "entity-revision-1",
+            revision_number: 1,
+            canonical_key: "game:nte",
+            display_name: "异环",
+          },
+          predicate: item.predicate,
+          value_kind: item.value_kind,
+          value: item.value,
+          review: item.latest_review,
+          evidence: item.evidence,
+        })),
+        published_by: "local-user",
+        notes: payload.notes,
+        published_at: "2026-08-15T02:00:00Z",
+      };
+      snapshots.forEach((item) => { item.is_latest = false; });
+      snapshots.unshift(snapshot);
+      return json(snapshot, 201);
+    }
+    if (path.endsWith("/knowledge-snapshots")) return json({ items: snapshots });
     if (path.endsWith("/knowledge-extractions") && init?.method === "POST") {
       const run = {
         id: "knowledge-run-1",
@@ -527,4 +585,90 @@ test("shows deterministic conflict relations and preserves evidence navigation",
     ),
   );
   expect(await screen.findByText("人工确认该组无需继续处理。")).toBeInTheDocument();
+});
+
+test("publishes and renders an immutable approved knowledge snapshot", async () => {
+  const approval = {
+    id: "review-approved-1",
+    decision: "approve",
+    approved_value_kind: "string",
+    approved_value: "Neverness to Everness",
+    reason: "Matches exact official evidence.",
+    reviewer_id: "local-user",
+    created_at: "2026-08-15T01:00:00Z",
+  };
+  const approvedClaim = {
+    id: "claim-approved-1",
+    subject_entity_id: "entity-1",
+    extraction_run_id: "knowledge-run-1",
+    predicate: "game.name",
+    value_kind: "string",
+    value: "Neverness to Everness",
+    normalized_value: "neverness to everness",
+    confidence: 0.91,
+    locale: "en",
+    region: "global",
+    status: "human_approved",
+    created_at: "2026-08-15T00:00:00Z",
+    reviews: [approval],
+    latest_review: approval,
+    evidence: [
+      {
+        source_version_id: "version-1",
+        source_id: "source-1",
+        source_url: "https://nte.perfectworld.com/en/",
+        source_title: "NTE official homepage",
+        source_version_number: 1,
+        locale: "en",
+        region: "global",
+        fetched_at: "2026-08-15T00:00:00Z",
+        ordinal: 0,
+        start_offset: 0,
+        end_offset: 21,
+        quote: "Neverness to Everness",
+        quote_sha256: "d".repeat(64),
+      },
+    ],
+  };
+  const fetchMock = workspaceFetch({
+    entities: [entity],
+    versions: [sourceVersion],
+    claims: [approvedClaim],
+    snapshotReadiness: {
+      publishable: true,
+      schema_version: "knowledge-snapshot-v1",
+      content_sha256: "f".repeat(64),
+      stats: {
+        claim_count: 1,
+        approved_count: 1,
+        rejected_count: 0,
+        deferred_count: 0,
+        unreviewed_count: 0,
+        open_conflict_count: 0,
+      },
+      blockers: [],
+      next_version_number: 1,
+      latest_snapshot_id: null,
+    },
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "知识" }));
+
+  expect(await screen.findByRole("heading", { name: "发布知识快照" })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("版本备注（可选）"), {
+    target: { value: "《异环》官网英文资料首轮人工确认" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "发布不可变快照" }));
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/knowledge-snapshots",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "Idempotency-Key": expect.stringContaining("knowledge-snapshot-") }),
+      }),
+    ),
+  );
+  expect(await screen.findByText(/知识快照已发布/)).toBeInTheDocument();
+  expect(screen.getByText("《异环》官网英文资料首轮人工确认")).toBeInTheDocument();
+  expect(screen.getByText("1 条事实")).toBeInTheDocument();
 });

@@ -133,6 +133,59 @@ type ReconcileResult = {
   skipped_closed_groups: number;
 };
 
+type SnapshotBlocker = {
+  code: string;
+  message: string;
+  count?: number;
+};
+
+type SnapshotReadiness = {
+  publishable: boolean;
+  schema_version: string;
+  content_sha256: string | null;
+  stats: {
+    claim_count: number;
+    approved_count: number;
+    rejected_count: number;
+    deferred_count: number;
+    unreviewed_count: number;
+    open_conflict_count: number;
+  };
+  blockers: SnapshotBlocker[];
+  next_version_number: number;
+  latest_snapshot_id: string | null;
+};
+
+type SnapshotMember = {
+  claim_id: string;
+  review_id: string;
+  subject: {
+    entity_id: string;
+    entity_revision_id: string | null;
+    revision_number: number;
+    canonical_key: string;
+    display_name: string;
+  };
+  predicate: string;
+  value_kind: string;
+  value: unknown;
+  review: ClaimReview;
+  evidence: Evidence[];
+};
+
+type KnowledgeSnapshot = {
+  id: string;
+  version_number: number;
+  is_latest: boolean;
+  schema_version: string;
+  content_sha256: string;
+  member_count: number;
+  members: SnapshotMember[];
+  published_by: string;
+  notes: string | null;
+  published_at: string;
+};
+
 type Props = {
   projectId: string;
   projectName: string;
@@ -230,6 +283,35 @@ const text = {
     closingConflict: "正在校验并关闭…",
     closureSaved: "冲突组已由人工关闭。",
     closureRule: "解决要求每条候选都有最终审核；单值冲突只能保留一个批准值。",
+    snapshotTitle: "发布知识快照",
+    snapshotHint: "把项目中全部当前批准值原子冻结为一个不可变版本，供后续营销流程使用。",
+    snapshotReady: "可以发布",
+    snapshotBlocked: "尚不能发布",
+    nextSnapshot: "下一版本",
+    approvedFacts: "批准值",
+    finalReviews: "已终审",
+    openConflicts: "开放冲突",
+    snapshotNotes: "版本备注（可选）",
+    snapshotNotesPlaceholder: "例如：《异环》官网英文资料首轮人工确认",
+    publishSnapshot: "发布不可变快照",
+    publishingSnapshot: "正在原子发布…",
+    snapshotPublished: "知识快照已发布，后续流程将引用这个不可变版本。",
+    snapshotHistory: "快照版本历史",
+    noSnapshots: "尚未发布知识快照。",
+    latestSnapshot: "最新",
+    snapshotFacts: "条事实",
+    snapshotBlockers: {
+      no_claims: "尚无候选知识。",
+      unreviewed_claims: "仍有候选尚未人工审核。",
+      deferred_claims: "仍有候选被标记为稍后决定。",
+      no_approved_claims: "至少需要一个当前批准值。",
+      open_conflicts: "所有开放冲突都必须先解决或明确忽略。",
+      approved_archived_entities: "已批准值关联了归档实体。",
+      unreconciled_conflicts: "存在尚未运行冲突检查的不同值。",
+      inconsistent_closed_conflict: "关闭后的单值冲突又出现多个当前批准值。",
+      inconsistent_approved_values: "人工修改导致单值谓词保留了多个批准值。",
+      incomplete_lineage: "批准值的证据谱系不完整。",
+    },
     confirmArchive: "归档后不能恢复该实体，已有 Claim 仍保留。确认继续吗？",
     archiveReason: "用户确认该实体创建错误",
     capabilityReasons: {
@@ -325,6 +407,35 @@ const text = {
     closingConflict: "Validating and closing…",
     closureSaved: "The conflict group was closed by a human.",
     closureRule: "Resolution requires a final review for every candidate; a single-valued conflict may retain only one approved value.",
+    snapshotTitle: "Publish knowledge snapshot",
+    snapshotHint: "Atomically freeze every currently approved project value into one immutable version for downstream marketing workflows.",
+    snapshotReady: "Ready to publish",
+    snapshotBlocked: "Not ready to publish",
+    nextSnapshot: "Next version",
+    approvedFacts: "Approved values",
+    finalReviews: "Final reviews",
+    openConflicts: "Open conflicts",
+    snapshotNotes: "Version notes (optional)",
+    snapshotNotesPlaceholder: "For example: first human-reviewed NTE English official-site baseline",
+    publishSnapshot: "Publish immutable snapshot",
+    publishingSnapshot: "Publishing atomically…",
+    snapshotPublished: "The knowledge snapshot was published; downstream workflows will reference this immutable version.",
+    snapshotHistory: "Snapshot version history",
+    noSnapshots: "No knowledge snapshot has been published yet.",
+    latestSnapshot: "Latest",
+    snapshotFacts: "facts",
+    snapshotBlockers: {
+      no_claims: "No candidate knowledge exists.",
+      unreviewed_claims: "Some candidates still lack a human review.",
+      deferred_claims: "Some candidates are still deferred.",
+      no_approved_claims: "At least one current approved value is required.",
+      open_conflicts: "Resolve or explicitly dismiss every open conflict first.",
+      approved_archived_entities: "An approved value belongs to an archived entity.",
+      unreconciled_conflicts: "Differing values have not passed conflict reconciliation.",
+      inconsistent_closed_conflict: "A closed single-valued conflict now retains multiple approved values.",
+      inconsistent_approved_values: "Human edits retain multiple approved values for a single-valued predicate.",
+      incomplete_lineage: "Approved evidence lineage is incomplete.",
+    },
     confirmArchive: "Archival is terminal. Existing Claims remain attached. Continue?",
     archiveReason: "User confirmed that this entity was created by mistake",
     capabilityReasons: {
@@ -458,6 +569,9 @@ export function KnowledgeWorkspace({
   const [closureGroupId, setClosureGroupId] = useState<string | null>(null);
   const [closureOutcome, setClosureOutcome] = useState<"resolved" | "dismissed">("resolved");
   const [closureReason, setClosureReason] = useState("");
+  const [snapshotReadiness, setSnapshotReadiness] = useState<SnapshotReadiness | null>(null);
+  const [snapshots, setSnapshots] = useState<KnowledgeSnapshot[]>([]);
+  const [snapshotNotes, setSnapshotNotes] = useState("");
 
   const selectedEntity = entities.find((item) => item.id === selectedEntityId) ?? null;
   const selectedVersion = versions.find((item) => item.id === selectedVersionId) ?? null;
@@ -532,6 +646,24 @@ export function KnowledgeWorkspace({
     }
   }, [projectId, selectedEntityId, t.failed]);
 
+  const loadPublication = useCallback(async () => {
+    if (!projectId) {
+      setSnapshotReadiness(null);
+      setSnapshots([]);
+      return;
+    }
+    try {
+      const [readiness, history] = await Promise.all([
+        api<SnapshotReadiness>(`/api/projects/${projectId}/knowledge-snapshot-readiness`),
+        api<{ items: KnowledgeSnapshot[] }>(`/api/projects/${projectId}/knowledge-snapshots`),
+      ]);
+      setSnapshotReadiness(readiness);
+      setSnapshots(history.items);
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
+    }
+  }, [projectId, t.failed]);
+
   useEffect(() => {
     setSelectedEntityId("");
     setSelectedVersionId("");
@@ -547,7 +679,8 @@ export function KnowledgeWorkspace({
   useEffect(() => {
     void loadClaims();
     void loadConflicts();
-  }, [loadClaims, loadConflicts]);
+    void loadPublication();
+  }, [loadClaims, loadConflicts, loadPublication]);
 
   useEffect(() => {
     if (!selectedEntity || !selectedVersionId) {
@@ -584,8 +717,9 @@ export function KnowledgeWorkspace({
     if (activeRun?.status === "succeeded") {
       void loadClaims();
       void loadConflicts();
+      void loadPublication();
     }
-  }, [activeRun?.status, loadClaims, loadConflicts]);
+  }, [activeRun?.status, loadClaims, loadConflicts, loadPublication]);
 
   useEffect(() => {
     if (!selectedEntity || showCorrect) return;
@@ -727,7 +861,7 @@ export function KnowledgeWorkspace({
         `/api/projects/${projectId}/knowledge-conflicts/reconcile`,
         { method: "POST" },
       );
-      await loadConflicts();
+      await Promise.all([loadConflicts(), loadPublication()]);
       const closed = result.skipped_closed_groups
         ? ` · ${result.skipped_closed_groups} ${t.closedSkipped}`
         : "";
@@ -763,7 +897,7 @@ export function KnowledgeWorkspace({
           reason: reviewReason,
         }),
       });
-      await Promise.all([loadClaims(), loadConflicts()]);
+      await Promise.all([loadClaims(), loadConflicts(), loadPublication()]);
       setReviewReason("");
       setMessage({ kind: "ok", text: t.reviewSaved });
     } catch (error) {
@@ -790,10 +924,34 @@ export function KnowledgeWorkspace({
           body: JSON.stringify({ outcome: closureOutcome, reason: closureReason }),
         },
       );
-      await loadConflicts();
+      await Promise.all([loadConflicts(), loadPublication()]);
       setClosureGroupId(null);
       setClosureReason("");
       setMessage({ kind: "ok", text: t.closureSaved });
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const publishSnapshot = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!snapshotReadiness?.publishable) return;
+    setBusy("snapshot");
+    setMessage(null);
+    try {
+      await api(`/api/projects/${projectId}/knowledge-snapshots`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey("knowledge-snapshot"),
+        },
+        body: JSON.stringify({ notes: snapshotNotes.trim() || null }),
+      });
+      await loadPublication();
+      setSnapshotNotes("");
+      setMessage({ kind: "ok", text: t.snapshotPublished });
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
     } finally {
@@ -824,7 +982,7 @@ export function KnowledgeWorkspace({
     <section className="knowledge-workspace" aria-labelledby="knowledge-title">
       <div className="knowledge-intro">
         <div>
-          <p className="eyebrow">Knowledge · C4</p>
+          <p className="eyebrow">Knowledge · C5</p>
           <h2 id="knowledge-title">{t.title}</h2>
           <p>{t.subtitle}</p>
         </div>
@@ -1153,6 +1311,89 @@ export function KnowledgeWorkspace({
           )}
         </aside>
       </div>
+
+      <section className="panel snapshot-workspace" aria-labelledby="snapshot-title">
+        <div className="snapshot-heading">
+          <div>
+            <h2 id="snapshot-title">{t.snapshotTitle}</h2>
+            <p>{t.snapshotHint}</p>
+          </div>
+          {snapshotReadiness && (
+            <span className={snapshotReadiness.publishable ? "snapshot-state snapshot-state--ready" : "snapshot-state snapshot-state--blocked"}>
+              {snapshotReadiness.publishable ? t.snapshotReady : t.snapshotBlocked}
+            </span>
+          )}
+        </div>
+        {snapshotReadiness && (
+          <>
+            <div className="snapshot-metrics">
+              <div><span>{t.nextSnapshot}</span><strong>v{snapshotReadiness.next_version_number}</strong></div>
+              <div><span>{t.approvedFacts}</span><strong>{snapshotReadiness.stats.approved_count}</strong></div>
+              <div><span>{t.finalReviews}</span><strong>{snapshotReadiness.stats.approved_count + snapshotReadiness.stats.rejected_count}/{snapshotReadiness.stats.claim_count}</strong></div>
+              <div><span>{t.openConflicts}</span><strong>{snapshotReadiness.stats.open_conflict_count}</strong></div>
+            </div>
+            {snapshotReadiness.blockers.length > 0 && (
+              <ul className="snapshot-blockers">
+                {snapshotReadiness.blockers.map((blocker, index) => (
+                  <li key={`${blocker.code}-${index}`}>
+                    <strong>{t.snapshotBlockers[blocker.code as keyof typeof t.snapshotBlockers] ?? blocker.message}</strong>
+                    {blocker.count !== undefined && <span>{blocker.count}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form className="snapshot-publish-form" onSubmit={publishSnapshot}>
+              <label>
+                <span>{t.snapshotNotes}</span>
+                <textarea
+                  maxLength={2000}
+                  placeholder={t.snapshotNotesPlaceholder}
+                  value={snapshotNotes}
+                  onChange={(event) => setSnapshotNotes(event.target.value)}
+                />
+              </label>
+              <button className="primary-button" disabled={busy !== null || !snapshotReadiness.publishable} type="submit">
+                {busy === "snapshot" ? t.publishingSnapshot : t.publishSnapshot}
+              </button>
+              {snapshotReadiness.content_sha256 && <code>{snapshotReadiness.schema_version} · {snapshotReadiness.content_sha256.slice(0, 16)}</code>}
+            </form>
+          </>
+        )}
+        <div className="snapshot-history">
+          <h3>{t.snapshotHistory}</h3>
+          {snapshots.length === 0 ? <p>{t.noSnapshots}</p> : (
+            <div className="snapshot-list">
+              {snapshots.map((snapshot) => (
+                <details key={snapshot.id} open={snapshot.is_latest}>
+                  <summary>
+                    <span>v{snapshot.version_number} {snapshot.is_latest && <em>{t.latestSnapshot}</em>}</span>
+                    <strong>{snapshot.member_count} {t.snapshotFacts}</strong>
+                    <time>{formatDate(snapshot.published_at, language)}</time>
+                  </summary>
+                  <div className="snapshot-detail">
+                    <code>{snapshot.schema_version} · {snapshot.content_sha256}</code>
+                    {snapshot.notes && <p>{snapshot.notes}</p>}
+                    <div className="snapshot-members">
+                      {snapshot.members.map((member) => (
+                        <article key={`${snapshot.id}-${member.review_id}`}>
+                          <span>{predicateNames[language][member.predicate] ?? member.predicate}</span>
+                          <strong>{displayValue(member.value)}</strong>
+                          <small>{member.subject.display_name} · {reviewLabel(member.review.decision)}</small>
+                          {member.evidence[0] && (
+                            <a href={member.evidence[0].source_url} target="_blank" rel="noreferrer">
+                              {member.evidence[0].source_title} · v{member.evidence[0].source_version_number}
+                            </a>
+                          )}
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     </section>
   );
 }

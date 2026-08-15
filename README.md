@@ -13,9 +13,9 @@ The first complete product slice focuses on marketing a real game to English-spe
 
 ## Current status
 
-The repository is currently in **M1-C C4: append-only human review**.
+The repository is currently in **M1-C C5: immutable knowledge publication**.
 
-Implemented through M1-C C4:
+Implemented through M1-C C5:
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -136,12 +136,20 @@ Implemented through M1-C C4:
   PostgreSQL-enforced command lineage;
 - responsive bilingual review/closure controls beside the exact evidence, with desktop and mobile
   browser verification.
+- a project-wide publication-readiness service that reports every unreviewed, deferred, conflicted,
+  archived, or incomplete-lineage blocker before attempting a write;
+- serialized and idempotent knowledge publication with deterministic content digests, monotonically
+  increasing versions, and exact approving-review/evidence lineage;
+- immutable snapshot history and member reads, enforced by PostgreSQL triggers and covered by real
+  PostgreSQL publication, retry, audit, and mutation-rejection tests;
+- responsive bilingual publication controls and version history in the Knowledge workspace, with
+  desktop and mobile browser verification.
 
 Not implemented yet:
 
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
-- snapshot publication commands, embeddings, or an approved knowledge snapshot;
+- embeddings or retrieval over approved knowledge snapshots;
 - live trend sources;
 - live LLM calls, RAG, or marketing agents;
 - authentication, multi-tenancy, billing, or team collaboration.
@@ -370,6 +378,7 @@ The PostgreSQL volume and raw local data are not stored in Git.
 - [M1-C C3a deterministic-conflict service](docs/migration/m1c-deterministic-conflicts.md)
 - [M1-C C3b conflict-workspace record](docs/migration/m1c-conflict-workspace.md)
 - [M1-C C4 human-review record](docs/migration/m1c-human-review.md)
+- [M1-C C5 snapshot-publication record](docs/migration/m1c-snapshot-publication.md)
 - [Security baseline](docs/security/local-development.md)
 
 ## Development principles
