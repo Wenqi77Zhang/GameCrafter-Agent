@@ -25,5 +25,6 @@ def development_commands(
             settings.log_level.lower(),
             "--reload",
         ],
+        [python, "-m", "apps.worker.main"],
         [pnpm, "--dir", "apps/web", "dev"],
     ]

@@ -25,4 +25,5 @@ def test_development_commands_use_validated_server_settings() -> None:
         "debug",
         "--reload",
     ]
-    assert commands[1] == ["pnpm.cmd", "--dir", "apps/web", "dev"]
+    assert commands[1] == ["python.exe", "-m", "apps.worker.main"]
+    assert commands[2] == ["pnpm.cmd", "--dir", "apps/web", "dev"]
