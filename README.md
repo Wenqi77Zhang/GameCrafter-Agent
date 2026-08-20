@@ -11,11 +11,28 @@ GameCrafter is being rebuilt from an early architecture shell into a long-term p
 
 The first complete product slice focuses on marketing a real game to English-speaking TikTok audiences. The default validation case is **NTE: Neverness to Everness (《异环》)**.
 
+For the current click-by-click flow and Agent responsibility boundaries, see
+[`docs/product/multi-agent-v1.md`](docs/product/multi-agent-v1.md).
+
 ## Current status
 
-The repository has reached **M4: the first complete local product slice**.
+The repository has reached **M4 plus the constrained multi-Agent knowledge-review upgrade**.
 
 Implemented through M4:
+
+- a six-role, versioned specialist topology coordinated by the durable Harness: Knowledge Curator,
+  Knowledge Reviewer, Trend Analyst, Campaign Strategist, Script Writer, and Quality/Compliance
+  Critic;
+- typed artifact handoffs instead of free-form Agent chat, with local-model versus deterministic
+  execution disclosed per role through `GET /agents`;
+- an independent loopback-only Ollama knowledge Reviewer with strict structured decisions,
+  exact claim-ID coverage, redacted failures, risk codes, bounded rationales, and token accounting;
+- extraction reuse for the same evidence/entity/prompt/schema target, per-batch Claim display,
+  deterministic duplicate handling, taxonomy-risk routing, and a maximum 15-fact proposed pack;
+- separate immutable Agent-review and human-review ledgers, plus one-command human confirmation of
+  clear keep/remove suggestions while unresolved candidates retain individual controls;
+- a bilingual pre-review interface with keep/remove/needs-human counts, filtered low-value items,
+  evidence-linked rationale, durable run progress, and unchanged human publication gates;
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -175,7 +192,7 @@ Not implemented yet:
 - a live NTE acceptance capture committed as product evidence;
 - embeddings or retrieval over approved knowledge snapshots;
 - automated live trend connectors (the first release uses human-verified authorized-source input);
-- live LLM calls, RAG, or model-generated marketing copy;
+- cloud LLM calls, RAG, or model-generated marketing copy (local Ollama knowledge roles are live);
 - authentication, multi-tenancy, billing, or team collaboration.
 
 The earlier README described several of these as if they already existed. They did not. The original placeholder modules remain traceable in Git history and are documented under [`legacy/`](legacy/README.md).

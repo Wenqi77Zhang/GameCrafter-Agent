@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field, field_validator
 
 from gamecrafter.api.routes.workspace import IdempotencyKey
+from gamecrafter.application.agent_review_jobs import REVIEW_KNOWLEDGE_TASK
 from gamecrafter.application.knowledge_jobs import EXTRACT_KNOWLEDGE_TASK
 from gamecrafter.application.ports.knowledge_repository import (
     ExtractionTarget,
@@ -23,6 +24,11 @@ from gamecrafter.application.ports.model_gateway import (
 )
 from gamecrafter.application.text_chunking import DeterministicTextChunker
 from gamecrafter.config.settings import Settings, get_settings
+from gamecrafter.infrastructure.database.agent_review_service import (
+    AgentReviewConflictError,
+    AgentReviewNotFoundError,
+    DatabaseAgentReviewService,
+)
 from gamecrafter.infrastructure.database.conflict_service import (
     ConflictServiceNotFoundError,
     DatabaseConflictService,
@@ -62,6 +68,10 @@ router = APIRouter(prefix="/api", tags=["knowledge"])
 class KnowledgeExtractionCreate(BaseModel):
     source_version_id: UUID
     subject_entity_id: UUID
+
+
+class KnowledgeAgentReviewCreate(BaseModel):
+    extraction_run_id: UUID
 
 
 class KnowledgeEntityCreate(BaseModel):
@@ -162,6 +172,11 @@ def _reviews() -> DatabaseReviewService:
 @lru_cache
 def _snapshots() -> DatabaseSnapshotService:
     return DatabaseSnapshotService(get_session_factory())
+
+
+@lru_cache
+def _agent_reviews() -> DatabaseAgentReviewService:
+    return DatabaseAgentReviewService(get_session_factory())
 
 
 def _state_error(error: Exception) -> HTTPException:
@@ -331,6 +346,16 @@ def create_knowledge_extraction(
             subject_entity_id=command.subject_entity_id,
         )
         _preflight_replay(get_settings(), target)
+        completed_run_id = _repository().completed_run_for_target(
+            project_id=project_id,
+            source_version_id=command.source_version_id,
+            subject_entity_id=command.subject_entity_id,
+            prompt_version=CLAIM_PROMPT_VERSION,
+            schema_version=CLAIM_SCHEMA_VERSION,
+        )
+        if completed_run_id is not None:
+            response.status_code = status.HTTP_200_OK
+            return _workspace().get_run(completed_run_id)
         run, created = _workspace().enqueue(
             project_id=project_id,
             idempotency_key=idempotency_key,
@@ -376,6 +401,85 @@ def list_knowledge_claims(
         }
     except KnowledgeStateError as error:
         raise _state_error(error) from error
+
+
+@router.get("/projects/{project_id}/knowledge-agent-review-capability")
+def get_agent_review_capability(project_id: UUID) -> dict[str, object]:
+    if get_settings().model_provider != "ollama":
+        return {
+            "available": False,
+            "mode": get_settings().model_provider,
+            "reason": "Knowledge Reviewer requires the configured local Ollama model.",
+        }
+    return {
+        "available": True,
+        "mode": "local_ollama",
+        "reason": "Independent local Knowledge Reviewer is available at zero API cost.",
+    }
+
+
+@router.post("/projects/{project_id}/knowledge-agent-reviews", status_code=202)
+def create_agent_review(
+    project_id: UUID,
+    command: KnowledgeAgentReviewCreate,
+    idempotency_key: IdempotencyKey,
+    response: Response,
+) -> dict[str, object]:
+    extraction_run_id = command.extraction_run_id
+    if get_settings().model_provider != "ollama":
+        raise HTTPException(status_code=409, detail="local Ollama reviewer is not configured")
+    try:
+        _agent_reviews().candidates(project_id=project_id, extraction_run_id=extraction_run_id)
+        completed = _agent_reviews().completed_run(
+            project_id=project_id, extraction_run_id=extraction_run_id
+        )
+        if completed is not None:
+            response.status_code = status.HTTP_200_OK
+            return _workspace().get_run(completed)
+        run, created = _workspace().enqueue(
+            project_id=project_id,
+            idempotency_key=idempotency_key,
+            task_type=REVIEW_KNOWLEDGE_TASK,
+            payload={"extraction_run_id": str(extraction_run_id)},
+            actor_id="local-user",
+        )
+    except (AgentReviewNotFoundError, AgentReviewConflictError) as error:
+        code = 404 if isinstance(error, AgentReviewNotFoundError) else 409
+        raise HTTPException(status_code=code, detail=str(error)) from error
+    except (WorkspaceNotFoundError, WorkspaceConflictError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return run
+
+
+@router.get("/projects/{project_id}/knowledge-agent-reviews")
+def get_agent_review(project_id: UUID, extraction_run_id: UUID) -> dict[str, object]:
+    try:
+        return _agent_reviews().get_summary(
+            project_id=project_id, extraction_run_id=extraction_run_id
+        )
+    except AgentReviewNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post("/projects/{project_id}/knowledge-agent-reviews/confirm")
+def confirm_agent_review_pack(
+    project_id: UUID,
+    command: KnowledgeAgentReviewCreate,
+    idempotency_key: IdempotencyKey,
+) -> dict[str, object]:
+    extraction_run_id = command.extraction_run_id
+    try:
+        return _agent_reviews().confirm_pack(
+            project_id=project_id,
+            extraction_run_id=extraction_run_id,
+            command_key=idempotency_key,
+            actor_id="local-user",
+        )
+    except (AgentReviewNotFoundError, AgentReviewConflictError) as error:
+        code = 404 if isinstance(error, AgentReviewNotFoundError) else 409
+        raise HTTPException(status_code=code, detail=str(error)) from error
 
 
 @router.post(

@@ -892,6 +892,102 @@ class ClaimReviewRecord(Base):
     )
 
 
+class AgentReviewResultRecord(Base):
+    """Immutable summary emitted by one independent Knowledge Reviewer run."""
+
+    __tablename__ = "agent_review_results"
+    __table_args__ = (
+        CheckConstraint(
+            "reviewed_count >= 0 AND approved_count >= 0 AND rejected_count >= 0 "
+            "AND needs_human_count >= 0 AND "
+            "reviewed_count = approved_count + rejected_count + needs_human_count",
+            name="ck_agent_review_results_counts",
+        ),
+        CheckConstraint(
+            "input_tokens >= 0 AND output_tokens >= 0 "
+            "AND total_tokens >= input_tokens + output_tokens",
+            name="ck_agent_review_results_usage",
+        ),
+        CheckConstraint(
+            "length(input_fingerprint_sha256) = 64",
+            name="ck_agent_review_results_fingerprint",
+        ),
+        UniqueConstraint(
+            "project_id",
+            "extraction_run_id",
+            "reviewer_version",
+            name="uq_agent_review_results_target_version",
+        ),
+        Index("ix_agent_review_results_project_created", "project_id", "created_at"),
+    )
+
+    run_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("workflow_runs.id", ondelete="RESTRICT"), primary_key=True
+    )
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
+    )
+    extraction_run_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("workflow_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    reviewer_agent_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    reviewer_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    provider: Mapped[str] = mapped_column(String(80), nullable=False)
+    model: Mapped[str] = mapped_column(String(120), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    input_fingerprint_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    reviewed_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    approved_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    rejected_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    needs_human_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ClaimAgentReviewRecord(Base):
+    """Append-only reviewer decision kept separate from the human approval ledger."""
+
+    __tablename__ = "claim_agent_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "decision IN ('agent_approved', 'agent_rejected', 'needs_human')",
+            name="ck_claim_agent_reviews_decision",
+        ),
+        CheckConstraint("priority BETWEEN 0 AND 100", name="ck_claim_agent_reviews_priority"),
+        CheckConstraint(
+            "length(trim(reason_code)) > 0 AND length(trim(rationale)) > 0",
+            name="ck_claim_agent_reviews_text_nonblank",
+        ),
+        UniqueConstraint("reviewer_run_id", "claim_id", name="uq_claim_agent_reviews_run_claim"),
+        Index("ix_claim_agent_reviews_claim_created", "claim_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
+    )
+    reviewer_run_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("agent_review_results.run_id", ondelete="RESTRICT"), nullable=False
+    )
+    claim_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("knowledge_claims.id", ondelete="RESTRICT"), nullable=False
+    )
+    decision: Mapped[str] = mapped_column(String(32), nullable=False)
+    suggested_predicate: Mapped[str | None] = mapped_column(String(80))
+    priority: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    rationale: Mapped[str] = mapped_column(String(300), nullable=False)
+    risk_codes: Mapped[list[str]] = mapped_column(json_type, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
 class ClaimConflictGroupRecord(Base):
     """Potentially conflicting claims sharing one deterministic comparison key."""
 

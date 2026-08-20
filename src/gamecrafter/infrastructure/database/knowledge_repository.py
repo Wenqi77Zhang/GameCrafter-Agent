@@ -11,6 +11,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from gamecrafter.application.agent_catalog import KNOWLEDGE_CURATOR
 from gamecrafter.application.knowledge_extraction import (
     ChunkInvocation,
     ExtractionObserver,
@@ -28,6 +29,7 @@ from gamecrafter.domain.knowledge.claims import (
 )
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
+    ClaimAgentReviewRecord,
     ClaimEvidenceSpanRecord,
     ClaimReviewRecord,
     KnowledgeClaimRecord,
@@ -227,6 +229,36 @@ class DatabaseKnowledgeRepository:
         with self._session_factory() as session:
             return session.get(KnowledgeExtractionResultRecord, run_id) is not None
 
+    def completed_run_for_target(
+        self,
+        *,
+        project_id: UUID,
+        source_version_id: UUID,
+        subject_entity_id: UUID,
+        prompt_version: str,
+        schema_version: str,
+    ) -> UUID | None:
+        """Reuse an exact completed extraction instead of duplicating its claims."""
+
+        with self._session_factory() as session:
+            return session.scalar(
+                select(KnowledgeExtractionResultRecord.run_id)
+                .join(
+                    WorkflowRunRecord,
+                    WorkflowRunRecord.id == KnowledgeExtractionResultRecord.run_id,
+                )
+                .where(
+                    KnowledgeExtractionResultRecord.project_id == project_id,
+                    KnowledgeExtractionResultRecord.source_version_id == source_version_id,
+                    KnowledgeExtractionResultRecord.subject_entity_id == subject_entity_id,
+                    KnowledgeExtractionResultRecord.prompt_version == prompt_version,
+                    KnowledgeExtractionResultRecord.schema_version == schema_version,
+                    WorkflowRunRecord.status == "succeeded",
+                )
+                .order_by(KnowledgeExtractionResultRecord.created_at.desc())
+                .limit(1)
+            )
+
     def observer(
         self,
         *,
@@ -332,6 +364,9 @@ class DatabaseKnowledgeRepository:
                         "claim_count": len(result.claims),
                         "total_tokens": result.usage.total_tokens,
                         "manifest_sha256": _manifest_sha256(result),
+                        "agent_key": KNOWLEDGE_CURATOR.key,
+                        "agent_version": KNOWLEDGE_CURATOR.version,
+                        "agent_mode": KNOWLEDGE_CURATOR.mode.value,
                     },
                 )
             )
@@ -419,6 +454,12 @@ class DatabaseKnowledgeRepository:
                 )
                 delivered_reviews = [self._review(review) for review in reviews]
                 latest_review = delivered_reviews[-1] if delivered_reviews else None
+                agent_review = session.scalar(
+                    select(ClaimAgentReviewRecord)
+                    .where(ClaimAgentReviewRecord.claim_id == claim.id)
+                    .order_by(ClaimAgentReviewRecord.created_at.desc())
+                    .limit(1)
+                )
                 items.append(
                     {
                         "id": str(claim.id),
@@ -445,6 +486,18 @@ class DatabaseKnowledgeRepository:
                         "evidence": [self._evidence(session, span) for span in spans],
                         "reviews": delivered_reviews,
                         "latest_review": latest_review,
+                        "agent_review": (
+                            {
+                                "decision": agent_review.decision,
+                                "suggested_predicate": agent_review.suggested_predicate,
+                                "priority": agent_review.priority,
+                                "reason_code": agent_review.reason_code,
+                                "rationale": agent_review.rationale,
+                                "risk_codes": agent_review.risk_codes,
+                            }
+                            if agent_review is not None
+                            else None
+                        ),
                     }
                 )
             return items

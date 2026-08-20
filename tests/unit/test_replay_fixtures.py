@@ -37,7 +37,7 @@ def test_official_nte_fixture_runs_as_exact_zero_cost_offline_replay(monkeypatch
         "game.developer",
     ]
     assert result.claims[1].evidence[0].quote == "Hotta Studio"
-    assert result.invocations[0].response_id == "nte-official-homepage-en-20260801-v1"
+    assert result.invocations[0].response_id == "nte-official-homepage-en-20260801-v2"
 
 
 def test_fixture_loader_rejects_tampered_source_text(tmp_path: Path) -> None:

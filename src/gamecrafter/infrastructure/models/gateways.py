@@ -34,6 +34,16 @@ Return an empty claims list when the text contains no supported fact.
 Return at most 8 high-value, non-duplicate claims for the supplied game entity.
 Prefer durable product facts and major update facts over minor numeric details.
 Use at most 2 exact evidence spans per claim and keep each quote as short as possible.
+Predicate meanings are strict:
+- game.name and game.alias are only names of the subject game.
+- character.identity is for named characters; character.ability is for their powers.
+- gameplay.combat is for combat mechanics, not character, weapon, or item names.
+- gameplay.multiplayer is only for interaction among multiple human players.
+- gameplay.quest is for a playable mission or quest and its supported description.
+- event.schedule is for bounded event timing; update.change is for patch changes.
+- feature.description is for supported product features that fit no narrower predicate.
+- unclassified is required when no predicate accurately describes the fact.
+Never force a proper name, cosmetic, weapon, currency, or item into a gameplay predicate.
 """
 
 

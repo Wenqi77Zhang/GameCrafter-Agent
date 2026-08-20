@@ -2,6 +2,45 @@
 
 GameCrafter v2 uses a modular monolith with explicit domain and adapter boundaries. The design prioritizes traceability, local development, testability, and a path to future multi-tenant operation without prematurely creating distributed services.
 
+## Implemented constrained multi-Agent topology
+
+```mermaid
+flowchart LR
+    HUMAN["Chinese studio user"]
+    HARNESS["Durable Harness: typed jobs, gates, retries, audit"]
+    CURATOR["Knowledge Curator v2: local Ollama"]
+    REVIEWER["Knowledge Reviewer v1: independent local Ollama"]
+    TREND["Trend Analyst v1: deterministic"]
+    STRATEGY["Campaign Strategist v1: deterministic"]
+    WRITER["Script Writer v1: deterministic"]
+    CRITIC["Quality and Compliance Critic v1: deterministic"]
+    PACK{"Human knowledge-pack confirmation"}
+    TOPIC{"Human topic choice"}
+    FINAL{"Human final export approval"}
+    STORE[("Typed immutable artifacts and audit events")]
+
+    HUMAN --> HARNESS --> CURATOR --> REVIEWER --> PACK --> STORE
+    STORE --> TREND --> STRATEGY --> TOPIC --> WRITER --> CRITIC --> FINAL
+    CURATOR --> STORE
+    REVIEWER --> STORE
+    TREND --> STORE
+    STRATEGY --> STORE
+    WRITER --> STORE
+    CRITIC --> STORE
+```
+
+The Harness is the orchestrator, not a seventh Agent. Specialists do not hold an unconstrained
+conversation: each receives a bounded, versioned input and emits a typed artifact. The two
+knowledge roles use the loopback-only local model; the four downstream roles expose their existing
+deterministic rules as versioned specialists and never pretend that a model was called. This is a
+workflow/DAG with independent evaluator stages, not ReAct, ReWOO, or a self-modifying swarm.
+
+The reviewer writes `agent_approved`, `agent_rejected`, or `needs_human` into a ledger separate
+from human reviews. Suggested predicate changes always route to a person. Deterministic governance
+removes exact duplicates and caps the proposed pack at 15 approved facts after all review batches.
+One explicit human command may confirm the clear keep/remove suggestions; ambiguous items, topic
+selection, and final export remain individual human gates.
+
 ## System context
 
 ```mermaid
@@ -269,8 +308,11 @@ stateDiagram-v2
     IngestionFailed --> Quarantined: cancel or retry budget exhausted
     ContentParsed --> ClaimsExtracted
     ClaimsExtracted --> EvidenceLinked
-    EvidenceLinked --> ConflictCheck
-    ConflictCheck --> HumanReview: new, uncertain, or conflicting claims
+    EvidenceLinked --> AgentReview
+    AgentReview --> HumanReview: needs human or taxonomy correction
+    AgentReview --> PackConfirmation: clear keep or remove suggestions
+    PackConfirmation --> ConflictCheck
+    ConflictCheck --> HumanReview: conflicting claims
     HumanReview --> ClaimsExtracted: edit and re-extract
     HumanReview --> Rejected: reject
     HumanReview --> SnapshotPublished: approve

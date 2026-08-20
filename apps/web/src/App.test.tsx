@@ -444,7 +444,7 @@ test("renders the server-stored exact quote and source lineage", async () => {
     "href",
     "https://nte.perfectworld.com/en/",
   );
-  expect(screen.getByText("AI 候选 · 每条显示独立人工状态")).toBeInTheDocument();
+  expect(screen.getByText(/仅显示当前提取批次/)).toBeInTheDocument();
   expect(screen.getByText("8–36")).toBeInTheDocument();
 });
 

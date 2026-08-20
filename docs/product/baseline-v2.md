@@ -211,6 +211,30 @@ Public sources must not be described as an internal GDD. For existing games, the
 - provider adapters instead of vendor coupling;
 - no MCP service unless cross-application reuse or independent permissions justify it.
 
+## Confirmed multi-Agent operating policy (2026-08-21)
+
+- The first complete release has six versioned specialists: Knowledge Curator, Knowledge Reviewer,
+  Trend Analyst, Campaign Strategist, Script Writer, and Quality and Compliance Critic.
+- The PostgreSQL-backed Harness owns sequencing, parallel-safe job leasing, retry limits,
+  idempotency, checkpoints, and audit history. It is not counted as an Agent.
+- Agents exchange typed persisted artifacts; free-form Agent-to-Agent conversation, shared hidden
+  memory, unbounded ReAct loops, and runtime self-modification are prohibited.
+- Curator and Reviewer use only loopback Ollama under the strict zero-API-cost baseline. Trend,
+  strategy, writing, and quality roles are deterministic in this release and disclose that fact.
+- Repeating the same source version, entity, prompt, and schema reuses the completed extraction
+  rather than creating duplicate Claims. A new prompt or immutable evidence version creates a new
+  traceable batch.
+- The independent Reviewer can propose keep, remove, or human-attention outcomes. Exact duplicate
+  removal, taxonomy-correction routing, and the 15-fact pack limit are deterministic guardrails.
+- Agent decisions never satisfy the publication gate by themselves. A user may confirm clear
+  suggestions once as a batch; ambiguous entries still require individual review. Topic choice and
+  exact-version export approval remain mandatory human gates.
+- Review storage contains hashes, IDs, bounded rationales, risk codes, provider/model/version
+  metadata, and usage counts. It does not store hidden reasoning, request bodies, response bodies,
+  credentials, or unrelated source content.
+- The API exposes the six-role catalog and every automated marketing/script audit event includes
+  the responsible Agent version and whether its execution is local-model or deterministic.
+
 ## Change control
 
 Changes to the product positioning, first complete slice, default validation case, data boundary, agent pattern, main technology stack, or milestone order require explicit approval from the project owner and synchronized documentation updates.

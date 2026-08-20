@@ -11,6 +11,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from gamecrafter.application.agent_catalog import CAMPAIGN_STRATEGIST, TREND_ANALYST
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
     ClaimReviewRecord,
@@ -304,7 +305,7 @@ class DatabaseMarketingService:
             return self._signal(signal)
 
     def analyze(self, *, project_id: UUID, task_id: UUID, actor_id: str) -> list[dict[str, object]]:
-        clean_actor = self._text(actor_id, "actor", 120)
+        self._text(actor_id, "actor", 120)
         with self._session_factory.begin() as session:
             self._lock_project(session, project_id)
             task = self._require_task(session, project_id, task_id)
@@ -350,13 +351,30 @@ class DatabaseMarketingService:
                     project_id=project_id,
                     event_type="marketing.topic_fit_analyzed",
                     actor_type="system",
-                    actor_id=clean_actor,
+                    actor_id=TREND_ANALYST.key,
                     payload={
                         "task_id": str(task.id),
                         "rule_version": FIT_RULE_VERSION,
                         "signal_count": len(signals),
                         "created_candidate_count": created_count,
                         "model_used": False,
+                        "agent_version": TREND_ANALYST.version,
+                        "agent_mode": TREND_ANALYST.mode.value,
+                    },
+                )
+            )
+            session.add(
+                AuditEventRecord(
+                    project_id=project_id,
+                    event_type="marketing.campaign_strategy_proposed",
+                    actor_type="system",
+                    actor_id=CAMPAIGN_STRATEGIST.key,
+                    payload={
+                        "task_id": str(task.id),
+                        "candidate_count": created_count,
+                        "agent_version": CAMPAIGN_STRATEGIST.version,
+                        "agent_mode": CAMPAIGN_STRATEGIST.mode.value,
+                        "human_topic_gate_required": True,
                     },
                 )
             )
