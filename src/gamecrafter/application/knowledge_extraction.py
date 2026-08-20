@@ -12,6 +12,7 @@ from gamecrafter.application.ports.model_gateway import (
     CLAIM_PROMPT_VERSION,
     CLAIM_SCHEMA_VERSION,
     ClaimExtractionRequest,
+    InvalidModelOutputError,
     ModelGateway,
     ModelTokenUsage,
 )
@@ -159,8 +160,10 @@ class ExtractionHarness:
                     request_fingerprint_sha256=request.fingerprint_sha256,
                     error_code=type(error).__name__,
                 )
+                safe_detail = f": {error}" if isinstance(error, InvalidModelOutputError) else ""
                 raise ExtractionHarnessError(
-                    f"claim extraction failed for chunk {chunk.index} ({type(error).__name__})"
+                    f"claim extraction failed for chunk {chunk.index} "
+                    f"({type(error).__name__}{safe_detail})"
                 ) from None
             if result.request_fingerprint_sha256 != request.fingerprint_sha256:
                 self._observer.failed(

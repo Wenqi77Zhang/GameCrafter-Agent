@@ -31,6 +31,9 @@ Use only the allowed predicates and value shapes in the response schema.
 Every claim must cite one or more exact chunk-relative character ranges.
 Do not infer missing facts, resolve conflicts, or approve claims.
 Return an empty claims list when the text contains no supported fact.
+Return at most 8 high-value, non-duplicate claims for the supplied game entity.
+Prefer durable product facts and major update facts over minor numeric details.
+Use at most 2 exact evidence spans per claim and keep each quote as short as possible.
 """
 
 
@@ -150,7 +153,7 @@ class OllamaLocalGateway:
         content = message.get("content") if isinstance(message, Mapping) else None
         if not isinstance(content, str) or not content.strip():
             raise InvalidModelOutputError("Ollama response contained no structured output")
-        claims = decode_claim_output(
+        claims = _decode_valid_local_claims(
             _canonicalize_unique_quote_offsets(content, request.text), request
         )
         input_tokens = _mapping_nonnegative(response, "prompt_eval_count")
@@ -278,7 +281,7 @@ def _mapping_nonnegative(payload: Mapping[str, Any], field: str) -> int:
 
 
 def _canonicalize_unique_quote_offsets(payload: str, text: str) -> dict[str, Any]:
-    """Correct local-model arithmetic only when an exact quote has one source position."""
+    """Correct offsets only from exact quotes with deterministic source positions."""
 
     try:
         parsed = json.loads(payload)
@@ -295,14 +298,83 @@ def _canonicalize_unique_quote_offsets(payload: str, text: str) -> dict[str, Any
         evidence = claim.get("evidence")
         if not isinstance(evidence, list):
             continue
+        unresolved: list[tuple[dict[str, Any], list[int]]] = []
+        anchors: list[int] = []
         for span in evidence:
             if not isinstance(span, dict):
                 continue
             quote = span.get("quote")
             if not isinstance(quote, str) or not quote:
                 continue
-            start = text.find(quote)
-            if start >= 0 and text.find(quote, start + 1) == -1:
+            positions = _exact_positions(text, quote)
+            if len(positions) == 1:
+                start = positions[0]
                 span["start_offset"] = start
                 span["end_offset"] = start + len(quote)
+                anchors.append(start)
+            elif positions:
+                unresolved.append((span, positions))
+        pending = list(unresolved)
+        while pending:
+            resolved_index: int | None = None
+            for index, (span, positions) in enumerate(pending):
+                references = anchors + [
+                    position
+                    for other_index, (_, other_positions) in enumerate(pending)
+                    if other_index != index
+                    for position in other_positions
+                ]
+                if not references:
+                    continue
+                distances = [
+                    (min(abs(position - reference) for reference in references), position)
+                    for position in positions
+                ]
+                distances.sort()
+                if len(distances) > 1 and distances[0][0] == distances[1][0]:
+                    continue
+                start = distances[0][1]
+                quote = span["quote"]
+                span["start_offset"] = start
+                span["end_offset"] = start + len(quote)
+                anchors.append(start)
+                resolved_index = index
+                break
+            if resolved_index is None:
+                break
+            pending.pop(resolved_index)
     return parsed
+
+
+def _exact_positions(text: str, quote: str) -> list[int]:
+    positions: list[int] = []
+    start = 0
+    while True:
+        position = text.find(quote, start)
+        if position < 0:
+            return positions
+        positions.append(position)
+        start = position + 1
+
+
+def _decode_valid_local_claims(
+    payload: dict[str, Any], request: ClaimExtractionRequest
+) -> tuple[Any, ...]:
+    """Keep only individually schema-valid claims with exact evidence spans."""
+
+    if set(payload) != {"claims"} or not isinstance(payload["claims"], list):
+        raise InvalidModelOutputError("Ollama output had an invalid claim envelope")
+    raw_claims = payload["claims"]
+    if len(raw_claims) > 8:
+        raise InvalidModelOutputError("Ollama output exceeded the claim limit")
+    if not raw_claims:
+        return ()
+    validated: list[Any] = []
+    for raw_claim in raw_claims:
+        try:
+            validated.extend(decode_claim_output({"claims": [raw_claim]}, request))
+        except InvalidModelOutputError:
+            continue
+    if not validated:
+        raise InvalidModelOutputError("Ollama returned no evidence-valid claims")
+    return tuple(validated)

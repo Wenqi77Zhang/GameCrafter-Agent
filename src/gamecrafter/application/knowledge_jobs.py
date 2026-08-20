@@ -82,9 +82,10 @@ class KnowledgeExtractionHandlers:
                 result=result,
             )
         except (ExtractionHarnessError, KnowledgeStateError, ObjectIntegrityError) as error:
-            raise TerminalJobError(
-                f"knowledge extraction stopped ({type(error).__name__})"
-            ) from None
+            detail = (
+                str(error) if isinstance(error, ExtractionHarnessError) else type(error).__name__
+            )
+            raise TerminalJobError(f"knowledge extraction stopped ({detail})") from None
         except (FileNotFoundError, UnicodeDecodeError, ValueError) as error:
             raise TerminalJobError(
                 f"knowledge extraction input is invalid ({type(error).__name__})"

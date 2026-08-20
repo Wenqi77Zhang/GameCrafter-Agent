@@ -243,6 +243,17 @@ export function App() {
   }, [refreshWorkspace]);
 
   useEffect(() => {
+    const hasActiveRun = runs.some((run) =>
+      ["queued", "running", "retry_wait"].includes(run.status),
+    );
+    if (!hasActiveRun) return;
+    const timer = globalThis.setInterval(() => {
+      void refreshWorkspace();
+    }, 2000);
+    return () => globalThis.clearInterval(timer);
+  }, [runs, refreshWorkspace]);
+
+  useEffect(() => {
     if (!selectedRun) {
       setEvents([]);
       return;

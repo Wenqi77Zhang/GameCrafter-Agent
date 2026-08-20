@@ -70,6 +70,8 @@ Implemented through M4:
   Ollama, and dependency-injected OpenAI Responses adapters;
 - strict structured claim output, exact quote/range validation, request fingerprints, redacted
   provider errors, and token-usage contracts;
+- bounded local-model output (up to eight high-value claims per chunk) with deterministic exact-quote
+  offset repair and per-candidate rejection when a small model returns unsupported evidence;
 - a zero-API-cost runtime boundary: cloud execution remains uncomposed, while optional local
   Ollama traffic is restricted to loopback and uses an injected transport.
 - a paragraph/sentence-aware deterministic Unicode chunker with exact source offsets, stable chunk
@@ -102,6 +104,8 @@ Implemented through M4:
 - filterable unreviewed-claim reads with server-returned evidence quotes and source/version metadata.
 - a responsive Knowledge workspace that keeps entity identity, immutable evidence-version choice,
   exact-replay capability, extraction progress, candidate claims, and exact evidence in one flow;
+- SSE progress updates with a two-second polling fallback while a run remains active, preventing a
+  completed or failed background job from appearing permanently stuck;
 - beginner-safe game-entity creation plus append-only correction and archival controls;
 - explicit zero-cost disabled/mismatch states, Knowledge-to-Runs trace navigation, and a Sources
   shortcut when no evidence exists;
