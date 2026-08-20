@@ -336,6 +336,15 @@ From PowerShell:
 .\scripts\start.ps1
 ```
 
+`start.ps1` is the foreground development launcher: keep that terminal open and
+press Ctrl+C when you want to stop. On Windows, the services can instead be
+detached from the terminal and managed explicitly:
+
+```powershell
+.\scripts\start-background.ps1
+.\scripts\stop-background.ps1
+```
+
 The local services will be available at:
 
 - web: `http://localhost:5173`
