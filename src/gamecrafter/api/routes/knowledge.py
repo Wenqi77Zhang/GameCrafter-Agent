@@ -544,6 +544,15 @@ def _replay_capability(settings: Settings, target: ExtractionTarget) -> dict[str
             "reason_code": "provider_disabled",
             "reason": "knowledge extraction is disabled; configure an exact local replay fixture",
         }
+    if settings.model_provider == "ollama":
+        return {
+            "available": True,
+            "mode": "local_ollama",
+            "reason_code": "ollama_available",
+            "reason": (
+                f"local Ollama model {settings.ollama_model} is configured with zero API cost"
+            ),
+        }
     path = settings.model_replay_fixture_path
     if path is None:
         return {

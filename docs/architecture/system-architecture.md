@@ -328,6 +328,7 @@ flowchart LR
     PORT["Application ModelGateway port"]
     DISABLED["Disabled gateway"]
     REPLAY["Exact offline Replay gateway"]
+    OLLAMA["Loopback-only local Ollama gateway"]
     OPENAI["Dependency-injected OpenAI Responses adapter"]
     SCHEMA["Strict structured claim schema"]
     EVIDENCE["Exact quote and range validator"]
@@ -336,6 +337,7 @@ flowchart LR
     REQUEST --> PORT
     PORT --> DISABLED
     PORT --> REPLAY --> SCHEMA
+    PORT --> OLLAMA --> SCHEMA
     PORT -. "implemented but not composed or called" .-> OPENAI --> SCHEMA
     SCHEMA --> EVIDENCE --> CANDIDATE
 ```
@@ -343,7 +345,10 @@ flowchart LR
 The application port owns provider-neutral requests, fingerprints, validated results, token usage,
 and safe failure types. Infrastructure adapters depend inward on that port. The disabled adapter
 fails closed. Replay accepts a fixture only when its key matches the exact source version, text,
-offset, subject, locale, region, prompt version, and schema version.
+offset, subject, locale, region, prompt version, and schema version. The Ollama adapter accepts an
+injected transport that is restricted to a loopback HTTP endpoint. It requests JSON Schema output,
+records local token counts, and deterministically corrects offset arithmetic only when the returned
+exact quote occurs once in the supplied chunk; missing or ambiguous quotes still fail closed.
 
 The OpenAI adapter constructs a Responses request with strict JSON Schema, `store: false`, bounded
 output, low reasoning effort, and no source identifier, URL, path, secret, raw HTML, image, or log
@@ -364,13 +369,13 @@ flowchart LR
     CHUNKER["unicode-boundary-v1 chunker"]
     CHUNKS["Ordered exact 4,000/400 slices"]
     REQUESTS["Fingerprint-bound extraction requests"]
-    REPLAY["Exact offline replay gateway"]
+    GATEWAY["Exact replay or local Ollama gateway"]
     VALIDATE["Strict schema and evidence validation"]
     DEDUPE["Stable predicate/value/evidence deduplication"]
     MANIFEST["Document result and invocation manifest"]
     FAIL["Safe whole-document failure"]
 
-    DOCUMENT --> CHUNKER --> CHUNKS --> REQUESTS --> REPLAY --> VALIDATE --> DEDUPE --> MANIFEST
+    DOCUMENT --> CHUNKER --> CHUNKS --> REQUESTS --> GATEWAY --> VALIDATE --> DEDUPE --> MANIFEST
     REQUESTS -. "missing fixture, invalid output, or fingerprint mismatch" .-> FAIL
 ```
 

@@ -66,12 +66,12 @@ Implemented through M4:
 - deterministic conflict-group and immutable knowledge-snapshot contracts;
 - PostgreSQL guards for evidence-required approval, unresolved-conflict publication blocking, and
   immutable review/snapshot lineage.
-- a provider-neutral `ModelGateway` with disabled, exact offline-replay, and dependency-injected
-  OpenAI Responses adapters;
+- a provider-neutral `ModelGateway` with disabled, exact offline-replay, loopback-only local
+  Ollama, and dependency-injected OpenAI Responses adapters;
 - strict structured claim output, exact quote/range validation, request fingerprints, redacted
   provider errors, and token-usage contracts;
-- a zero-cost runtime boundary: no model SDK, API key, network client, or live model call is
-  constructed in C2.1.
+- a zero-API-cost runtime boundary: cloud execution remains uncomposed, while optional local
+  Ollama traffic is restricted to loopback and uses an injected transport.
 - a paragraph/sentence-aware deterministic Unicode chunker with exact source offsets, stable chunk
   IDs, a 4,000-character limit, and 400-character overlap;
 - a sequential fail-closed extraction Harness with request/result fingerprint checks, exact
@@ -90,14 +90,15 @@ Implemented through M4:
 - durable redacted per-chunk invocation lifecycles and an immutable whole-document result marker;
 - atomic candidate-claim, exact-evidence, extraction-result, and audit persistence with idempotent
   retry behavior;
-- project-scoped extraction command/result/claim APIs with strict local replay preflight;
-- disabled-by-default execution where only an exact offline fixture can be enqueued at zero cost.
+- project-scoped extraction command/result/claim APIs with zero-cost provider preflight;
+- disabled-by-default execution with exact offline replay and loopback-only local Ollama as the
+  runnable zero-API-cost modes.
 - project-scoped game-entity create/list APIs with server-owned stable keys and duplicate-safe
   identity handling;
 - append-only entity correction and terminal archival history without rewriting claims or evidence;
 - latest-first immutable source-version read models with normalized-text availability;
-- a non-mutating extraction-capability preflight that distinguishes disabled, missing, invalid,
-  mismatched, incomplete, and exact offline replay states;
+- a non-mutating extraction-capability preflight that distinguishes disabled, local Ollama,
+  missing, invalid, mismatched, incomplete, and exact offline replay states;
 - filterable unreviewed-claim reads with server-returned evidence quotes and source/version metadata.
 - a responsive Knowledge workspace that keeps entity identity, immutable evidence-version choice,
   exact-replay capability, extraction progress, candidate claims, and exact evidence in one flow;

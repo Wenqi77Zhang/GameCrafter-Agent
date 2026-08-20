@@ -16,8 +16,10 @@ from gamecrafter.config.settings import Settings
 from gamecrafter.infrastructure.database.knowledge_repository import (
     DatabaseKnowledgeRepository,
 )
+from gamecrafter.infrastructure.local_ai.ollama import OllamaLoopbackTransport
 from gamecrafter.infrastructure.models.gateways import (
     DisabledModelGateway,
+    OllamaLocalGateway,
     ReplayModelGateway,
 )
 from gamecrafter.infrastructure.models.replay_fixtures import load_replay_fixture
@@ -49,6 +51,14 @@ def build_knowledge_handlers(
 def _configured_gateway(settings: Settings) -> ModelGateway:
     if settings.model_provider == "disabled":
         return DisabledModelGateway()
+    if settings.model_provider == "ollama":
+        return OllamaLocalGateway(
+            model=settings.ollama_model,
+            requester=OllamaLoopbackTransport(
+                base_url=str(settings.ollama_base_url),
+                timeout_seconds=settings.ollama_timeout_seconds,
+            ),
+        )
     path = settings.model_replay_fixture_path
     if path is None:
         raise ValueError("replay mode requires GAMECRAFTER_MODEL_REPLAY_FIXTURE_PATH")

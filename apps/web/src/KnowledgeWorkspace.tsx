@@ -52,7 +52,7 @@ type SourceVersion = {
 
 type Capability = {
   available: boolean;
-  mode: "disabled" | "offline_replay";
+  mode: "disabled" | "offline_replay" | "local_ollama";
   reason_code: string;
   reason: string;
 };
@@ -224,6 +224,7 @@ const text = {
     capability: "提取能力",
     checking: "正在校验离线能力…",
     available: "离线回放可用",
+    localAvailable: "零 API 费用的本地模型可用",
     unavailable: "当前不可提取",
     start: "开始提取",
     submitting: "正在加入本地队列…",
@@ -322,6 +323,7 @@ const text = {
       fixture_incomplete: "离线样例没有覆盖全部确定性文本分块。",
       target_invalid: "所选实体或证据版本不满足提取约束。",
       available: "该实体与证据版本拥有完整、精确、零 API 成本的本地回放。",
+      ollama_available: "已配置本地 Ollama 模型；候选仍须经过精确证据校验和人工审核。",
     },
   },
   en: {
@@ -348,6 +350,7 @@ const text = {
     capability: "Extraction capability",
     checking: "Checking offline capability…",
     available: "Offline replay available",
+    localAvailable: "Zero-API-cost local model available",
     unavailable: "Extraction unavailable",
     start: "Start extraction",
     submitting: "Adding to the local queue…",
@@ -446,6 +449,7 @@ const text = {
       fixture_incomplete: "The replay does not cover every deterministic text chunk.",
       target_invalid: "The selected entity or evidence version violates extraction constraints.",
       available: "This exact entity and evidence version has a complete zero-API-cost local replay.",
+      ollama_available: "A local Ollama model is configured; candidates still require exact evidence validation and human review.",
     },
   },
 } as const;
@@ -1071,7 +1075,7 @@ export function KnowledgeWorkspace({
           <div className="setup-label"><span>03</span><strong>{t.capability}</strong></div>
           {capabilityLoading ? <p>{t.checking}</p> : capability ? (
             <div className={capability.available ? "capability capability--available" : "capability capability--blocked"}>
-              <strong>{capability.available ? t.available : t.unavailable}</strong>
+              <strong>{capability.available ? (capability.mode === "local_ollama" ? t.localAvailable : t.available) : t.unavailable}</strong>
               <p>{capabilityReason}</p>
               <code>{capability.mode} · {capability.reason_code}</code>
             </div>

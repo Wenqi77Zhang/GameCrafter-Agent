@@ -15,6 +15,7 @@ from gamecrafter.infrastructure.models.gateways import (
     CLAIM_PROMPT_VERSION,
     CLAIM_SCHEMA_VERSION,
     DisabledModelGateway,
+    OllamaLocalGateway,
     OpenAIResponsesGateway,
     ReplayFixture,
     ReplayModelGateway,
@@ -116,6 +117,61 @@ def test_replay_gateway_rejects_missing_or_inexact_evidence() -> None:
     )
     with pytest.raises(InvalidModelOutputError, match="does not match"):
         gateway.extract_claims(request)
+
+
+def test_ollama_local_gateway_uses_loopback_schema_and_validates_evidence() -> None:
+    captured: dict[str, object] = {}
+
+    def request(payload: dict[str, object]) -> dict[str, object]:
+        captured.update(payload=payload)
+        return {
+            "model": "qwen3.5:4b",
+            "created_at": "2026-08-20T00:00:00Z",
+            "message": {"role": "assistant", "content": json.dumps(valid_payload())},
+            "done": True,
+            "prompt_eval_count": 40,
+            "eval_count": 20,
+        }
+
+    result = OllamaLocalGateway(requester=request).extract_claims(extraction_request())
+
+    assert result.provider == "ollama-local"
+    assert result.model == "qwen3.5:4b"
+    assert result.usage.total_tokens == 60
+    assert result.claims[0].evidence[0].start_offset == 100
+    payload = captured["payload"]
+    assert payload["stream"] is False
+    assert payload["think"] is False
+    assert payload["format"]["additionalProperties"] is False
+
+
+def test_ollama_gateway_corrects_offsets_only_for_a_unique_exact_quote() -> None:
+    payload = valid_payload()
+    payload["claims"][0]["evidence"][0]["start_offset"] = 999
+    payload["claims"][0]["evidence"][0]["end_offset"] = 1200
+
+    def request(body: dict[str, object]) -> dict[str, object]:
+        del body
+        return {
+            "created_at": "2026-08-20T00:00:00Z",
+            "message": {"content": json.dumps(payload)},
+            "done": True,
+        }
+
+    result = OllamaLocalGateway(requester=request).extract_claims(extraction_request())
+    assert result.claims[0].evidence[0].start_offset == 100
+    assert result.claims[0].evidence[0].end_offset == 121
+
+
+def test_ollama_gateway_redacts_transport_errors() -> None:
+    def failed_request(payload: dict[str, object]) -> dict[str, object]:
+        del payload
+        raise RuntimeError("private-source-text-must-not-leak")
+
+    with pytest.raises(ModelProviderError) as raised:
+        OllamaLocalGateway(requester=failed_request).extract_claims(extraction_request())
+    assert "private-source-text" not in str(raised.value)
+    assert "RuntimeError" in str(raised.value)
 
 
 def test_strict_schema_forbids_undeclared_object_properties() -> None:

@@ -62,9 +62,9 @@ Public sources must not be described as an internal GDD. For existing games, the
   effective time, and game version. A model confidence score cannot resolve a conflict.
 - Approved facts affect later workflows only after the user explicitly publishes an immutable
   knowledge snapshot. Open conflicts block publication.
-- C2 runs in strict zero-API-cost mode. Only disabled and exact offline-replay gateways may be
-  composed into the runnable application; automated tests must fail if they attempt a real model
-  network request.
+- C2 runs in strict zero-API-cost mode. Disabled, exact offline replay, and loopback-only local
+  Ollama may be composed into the runnable application. Cloud model execution remains prohibited;
+  local output must pass the same schema, exact-evidence, audit, and human-review gates.
 - C2.2 chunks normalized text without rewriting it, using the versioned 4,000-character maximum and
   400-character overlap. Offsets are Python Unicode code-point indices; delivery interfaces must
   render server-returned evidence rather than re-slicing text with JavaScript UTF-16 offsets.
