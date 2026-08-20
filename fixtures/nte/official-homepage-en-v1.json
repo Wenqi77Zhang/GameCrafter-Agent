@@ -1,6 +1,6 @@
 {
   "fixture_schema_version": "gamecrafter-replay-v1",
-  "fixture_id": "nte-official-homepage-en-20260801-v1",
+  "fixture_id": "nte-official-homepage-en-20260801-v2",
   "source": {
     "url": "https://nte.perfectworld.com/en/main.html",
     "captured_at": "2026-08-01T15:36:16Z",
@@ -14,9 +14,9 @@
     "text_start_offset": 0,
     "locale": "en",
     "region": "global",
-    "prompt_version": "knowledge-claim-v1",
+    "prompt_version": "knowledge-claim-v2",
     "schema_version": "knowledge-claim-v1",
-    "fingerprint_sha256": "9e92fa33724c2bddfd61d9111967674e8516ee43695b7e42aa148919b63872fc"
+    "fingerprint_sha256": "e858415035b81dee09ecc4c0661930ecaaa1b2675fb0d554f9539eafbd2988d1"
   },
   "response": {
     "claims": [

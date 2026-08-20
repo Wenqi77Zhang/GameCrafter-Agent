@@ -62,9 +62,9 @@ Public sources must not be described as an internal GDD. For existing games, the
   effective time, and game version. A model confidence score cannot resolve a conflict.
 - Approved facts affect later workflows only after the user explicitly publishes an immutable
   knowledge snapshot. Open conflicts block publication.
-- C2 runs in strict zero-API-cost mode. Only disabled and exact offline-replay gateways may be
-  composed into the runnable application; automated tests must fail if they attempt a real model
-  network request.
+- C2 runs in strict zero-API-cost mode. Disabled, exact offline replay, and loopback-only local
+  Ollama may be composed into the runnable application. Cloud model execution remains prohibited;
+  local output must pass the same schema, exact-evidence, audit, and human-review gates.
 - C2.2 chunks normalized text without rewriting it, using the versioned 4,000-character maximum and
   400-character overlap. Offsets are Python Unicode code-point indices; delivery interfaces must
   render server-returned evidence rather than re-slicing text with JavaScript UTF-16 offsets.
@@ -210,6 +210,30 @@ Public sources must not be described as an internal GDD. For existing games, the
 - versioned skills, prompts, rules, sources, and outputs;
 - provider adapters instead of vendor coupling;
 - no MCP service unless cross-application reuse or independent permissions justify it.
+
+## Confirmed multi-Agent operating policy (2026-08-21)
+
+- The first complete release has six versioned specialists: Knowledge Curator, Knowledge Reviewer,
+  Trend Analyst, Campaign Strategist, Script Writer, and Quality and Compliance Critic.
+- The PostgreSQL-backed Harness owns sequencing, parallel-safe job leasing, retry limits,
+  idempotency, checkpoints, and audit history. It is not counted as an Agent.
+- Agents exchange typed persisted artifacts; free-form Agent-to-Agent conversation, shared hidden
+  memory, unbounded ReAct loops, and runtime self-modification are prohibited.
+- Curator and Reviewer use only loopback Ollama under the strict zero-API-cost baseline. Trend,
+  strategy, writing, and quality roles are deterministic in this release and disclose that fact.
+- Repeating the same source version, entity, prompt, and schema reuses the completed extraction
+  rather than creating duplicate Claims. A new prompt or immutable evidence version creates a new
+  traceable batch.
+- The independent Reviewer can propose keep, remove, or human-attention outcomes. Exact duplicate
+  removal, taxonomy-correction routing, and the 15-fact pack limit are deterministic guardrails.
+- Agent decisions never satisfy the publication gate by themselves. A user may confirm clear
+  suggestions once as a batch; ambiguous entries still require individual review. Topic choice and
+  exact-version export approval remain mandatory human gates.
+- Review storage contains hashes, IDs, bounded rationales, risk codes, provider/model/version
+  metadata, and usage counts. It does not store hidden reasoning, request bodies, response bodies,
+  credentials, or unrelated source content.
+- The API exposes the six-role catalog and every automated marketing/script audit event includes
+  the responsible Agent version and whether its execution is local-model or deterministic.
 
 ## Change control
 

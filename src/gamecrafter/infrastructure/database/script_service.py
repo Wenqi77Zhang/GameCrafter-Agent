@@ -12,6 +12,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from gamecrafter.application.agent_catalog import QUALITY_CRITIC, SCRIPT_WRITER
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
     ClaimReviewRecord,
@@ -235,13 +236,19 @@ class DatabaseScriptService:
                     session,
                     project_id,
                     "script.version_created",
-                    actor,
+                    SCRIPT_WRITER.key if origin != "human_edit" else actor,
                     {
                         "script_run_id": str(run.id),
                         "script_version_id": str(version.id),
                         "version_number": version.version_number,
                         "origin": origin,
                         "content_sha256": version.content_sha256,
+                        "agent_version": (
+                            SCRIPT_WRITER.version if origin != "human_edit" else None
+                        ),
+                        "agent_mode": (
+                            SCRIPT_WRITER.mode.value if origin != "human_edit" else None
+                        ),
                     },
                 )
                 version_id, created = version.id, True
@@ -309,12 +316,14 @@ class DatabaseScriptService:
                     session,
                     project_id,
                     "script.evaluated",
-                    "local-system",
+                    QUALITY_CRITIC.key,
                     {
                         "script_run_id": str(run.id),
                         "script_version_id": str(version.id),
                         "score": evaluation.score,
                         "passed": evaluation.passed,
+                        "agent_version": QUALITY_CRITIC.version,
+                        "agent_mode": QUALITY_CRITIC.mode.value,
                     },
                 )
                 evaluation_id, created = evaluation.id, True
@@ -398,11 +407,13 @@ class DatabaseScriptService:
                     session,
                     project_id,
                     "script.auto_revised",
-                    actor,
+                    SCRIPT_WRITER.key,
                     {
                         "script_run_id": str(run.id),
                         "script_version_id": str(version.id),
                         "budget_used": used + 1,
+                        "agent_version": SCRIPT_WRITER.version,
+                        "agent_mode": SCRIPT_WRITER.mode.value,
                     },
                 )
                 version_id, created = version.id, True
@@ -992,7 +1003,11 @@ class DatabaseScriptService:
             AuditEventRecord(
                 project_id=project_id,
                 event_type=event_type,
-                actor_type="human" if actor_id != "local-system" else "system",
+                actor_type=(
+                    "system"
+                    if actor_id in {"local-system", SCRIPT_WRITER.key, QUALITY_CRITIC.key}
+                    else "human"
+                ),
                 actor_id=actor_id,
                 payload=payload,
             )

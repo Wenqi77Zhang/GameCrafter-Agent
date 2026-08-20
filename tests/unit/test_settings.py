@@ -21,6 +21,8 @@ def test_settings_use_safe_local_defaults() -> None:
     assert settings.worker_id == "local-worker"
     assert settings.model_provider == "disabled"
     assert settings.model_replay_fixture_path is None
+    assert str(settings.ollama_base_url) == "http://127.0.0.1:11434/"
+    assert settings.ollama_model == "qwen3.5:4b"
     assert settings.knowledge_document_max_bytes == 2 * 1024 * 1024
 
 

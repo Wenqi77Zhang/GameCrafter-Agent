@@ -61,7 +61,7 @@ class StructuredCandidateClaim(BaseModel):
         | list[StrictStr]
     )
     confidence: Annotated[float, Field(strict=True, ge=0, le=1)]
-    evidence: list[StructuredEvidenceSpan] = Field(min_length=1)
+    evidence: list[StructuredEvidenceSpan] = Field(min_length=1, max_length=2)
 
 
 class StructuredClaimEnvelope(BaseModel):
@@ -69,7 +69,7 @@ class StructuredClaimEnvelope(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    claims: list[StructuredCandidateClaim]
+    claims: list[StructuredCandidateClaim] = Field(max_length=8)
 
 
 def strict_claim_schema() -> dict[str, Any]:

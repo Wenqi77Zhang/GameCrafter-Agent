@@ -2,6 +2,45 @@
 
 GameCrafter v2 uses a modular monolith with explicit domain and adapter boundaries. The design prioritizes traceability, local development, testability, and a path to future multi-tenant operation without prematurely creating distributed services.
 
+## Implemented constrained multi-Agent topology
+
+```mermaid
+flowchart LR
+    HUMAN["Chinese studio user"]
+    HARNESS["Durable Harness: typed jobs, gates, retries, audit"]
+    CURATOR["Knowledge Curator v2: local Ollama"]
+    REVIEWER["Knowledge Reviewer v1: independent local Ollama"]
+    TREND["Trend Analyst v1: deterministic"]
+    STRATEGY["Campaign Strategist v1: deterministic"]
+    WRITER["Script Writer v1: deterministic"]
+    CRITIC["Quality and Compliance Critic v1: deterministic"]
+    PACK{"Human knowledge-pack confirmation"}
+    TOPIC{"Human topic choice"}
+    FINAL{"Human final export approval"}
+    STORE[("Typed immutable artifacts and audit events")]
+
+    HUMAN --> HARNESS --> CURATOR --> REVIEWER --> PACK --> STORE
+    STORE --> TREND --> STRATEGY --> TOPIC --> WRITER --> CRITIC --> FINAL
+    CURATOR --> STORE
+    REVIEWER --> STORE
+    TREND --> STORE
+    STRATEGY --> STORE
+    WRITER --> STORE
+    CRITIC --> STORE
+```
+
+The Harness is the orchestrator, not a seventh Agent. Specialists do not hold an unconstrained
+conversation: each receives a bounded, versioned input and emits a typed artifact. The two
+knowledge roles use the loopback-only local model; the four downstream roles expose their existing
+deterministic rules as versioned specialists and never pretend that a model was called. This is a
+workflow/DAG with independent evaluator stages, not ReAct, ReWOO, or a self-modifying swarm.
+
+The reviewer writes `agent_approved`, `agent_rejected`, or `needs_human` into a ledger separate
+from human reviews. Suggested predicate changes always route to a person. Deterministic governance
+removes exact duplicates and caps the proposed pack at 15 approved facts after all review batches.
+One explicit human command may confirm the clear keep/remove suggestions; ambiguous items, topic
+selection, and final export remain individual human gates.
+
 ## System context
 
 ```mermaid
@@ -269,8 +308,11 @@ stateDiagram-v2
     IngestionFailed --> Quarantined: cancel or retry budget exhausted
     ContentParsed --> ClaimsExtracted
     ClaimsExtracted --> EvidenceLinked
-    EvidenceLinked --> ConflictCheck
-    ConflictCheck --> HumanReview: new, uncertain, or conflicting claims
+    EvidenceLinked --> AgentReview
+    AgentReview --> HumanReview: needs human or taxonomy correction
+    AgentReview --> PackConfirmation: clear keep or remove suggestions
+    PackConfirmation --> ConflictCheck
+    ConflictCheck --> HumanReview: conflicting claims
     HumanReview --> ClaimsExtracted: edit and re-extract
     HumanReview --> Rejected: reject
     HumanReview --> SnapshotPublished: approve
@@ -328,6 +370,7 @@ flowchart LR
     PORT["Application ModelGateway port"]
     DISABLED["Disabled gateway"]
     REPLAY["Exact offline Replay gateway"]
+    OLLAMA["Loopback-only local Ollama gateway"]
     OPENAI["Dependency-injected OpenAI Responses adapter"]
     SCHEMA["Strict structured claim schema"]
     EVIDENCE["Exact quote and range validator"]
@@ -336,6 +379,7 @@ flowchart LR
     REQUEST --> PORT
     PORT --> DISABLED
     PORT --> REPLAY --> SCHEMA
+    PORT --> OLLAMA --> SCHEMA
     PORT -. "implemented but not composed or called" .-> OPENAI --> SCHEMA
     SCHEMA --> EVIDENCE --> CANDIDATE
 ```
@@ -343,7 +387,10 @@ flowchart LR
 The application port owns provider-neutral requests, fingerprints, validated results, token usage,
 and safe failure types. Infrastructure adapters depend inward on that port. The disabled adapter
 fails closed. Replay accepts a fixture only when its key matches the exact source version, text,
-offset, subject, locale, region, prompt version, and schema version.
+offset, subject, locale, region, prompt version, and schema version. The Ollama adapter accepts an
+injected transport that is restricted to a loopback HTTP endpoint. It requests JSON Schema output,
+records local token counts, and deterministically corrects offset arithmetic only when the returned
+exact quote occurs once in the supplied chunk; missing or ambiguous quotes still fail closed.
 
 The OpenAI adapter constructs a Responses request with strict JSON Schema, `store: false`, bounded
 output, low reasoning effort, and no source identifier, URL, path, secret, raw HTML, image, or log
@@ -364,13 +411,13 @@ flowchart LR
     CHUNKER["unicode-boundary-v1 chunker"]
     CHUNKS["Ordered exact 4,000/400 slices"]
     REQUESTS["Fingerprint-bound extraction requests"]
-    REPLAY["Exact offline replay gateway"]
+    GATEWAY["Exact replay or local Ollama gateway"]
     VALIDATE["Strict schema and evidence validation"]
     DEDUPE["Stable predicate/value/evidence deduplication"]
     MANIFEST["Document result and invocation manifest"]
     FAIL["Safe whole-document failure"]
 
-    DOCUMENT --> CHUNKER --> CHUNKS --> REQUESTS --> REPLAY --> VALIDATE --> DEDUPE --> MANIFEST
+    DOCUMENT --> CHUNKER --> CHUNKS --> REQUESTS --> GATEWAY --> VALIDATE --> DEDUPE --> MANIFEST
     REQUESTS -. "missing fixture, invalid output, or fingerprint mismatch" .-> FAIL
 ```
 

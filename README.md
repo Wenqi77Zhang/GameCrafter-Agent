@@ -11,11 +11,28 @@ GameCrafter is being rebuilt from an early architecture shell into a long-term p
 
 The first complete product slice focuses on marketing a real game to English-speaking TikTok audiences. The default validation case is **NTE: Neverness to Everness (《异环》)**.
 
+For the current click-by-click flow and Agent responsibility boundaries, see
+[`docs/product/multi-agent-v1.md`](docs/product/multi-agent-v1.md).
+
 ## Current status
 
-The repository has reached **M4: the first complete local product slice**.
+The repository has reached **M4 plus the constrained multi-Agent knowledge-review upgrade**.
 
 Implemented through M4:
+
+- a six-role, versioned specialist topology coordinated by the durable Harness: Knowledge Curator,
+  Knowledge Reviewer, Trend Analyst, Campaign Strategist, Script Writer, and Quality/Compliance
+  Critic;
+- typed artifact handoffs instead of free-form Agent chat, with local-model versus deterministic
+  execution disclosed per role through `GET /agents`;
+- an independent loopback-only Ollama knowledge Reviewer with strict structured decisions,
+  exact claim-ID coverage, redacted failures, risk codes, bounded rationales, and token accounting;
+- extraction reuse for the same evidence/entity/prompt/schema target, per-batch Claim display,
+  deterministic duplicate handling, taxonomy-risk routing, and a maximum 15-fact proposed pack;
+- separate immutable Agent-review and human-review ledgers, plus one-command human confirmation of
+  clear keep/remove suggestions while unresolved candidates retain individual controls;
+- a bilingual pre-review interface with keep/remove/needs-human counts, filtered low-value items,
+  evidence-linked rationale, durable run progress, and unchanged human publication gates;
 
 - a modular-monolith project layout;
 - a FastAPI health endpoint;
@@ -66,12 +83,14 @@ Implemented through M4:
 - deterministic conflict-group and immutable knowledge-snapshot contracts;
 - PostgreSQL guards for evidence-required approval, unresolved-conflict publication blocking, and
   immutable review/snapshot lineage.
-- a provider-neutral `ModelGateway` with disabled, exact offline-replay, and dependency-injected
-  OpenAI Responses adapters;
+- a provider-neutral `ModelGateway` with disabled, exact offline-replay, loopback-only local
+  Ollama, and dependency-injected OpenAI Responses adapters;
 - strict structured claim output, exact quote/range validation, request fingerprints, redacted
   provider errors, and token-usage contracts;
-- a zero-cost runtime boundary: no model SDK, API key, network client, or live model call is
-  constructed in C2.1.
+- bounded local-model output (up to eight high-value claims per chunk) with deterministic exact-quote
+  offset repair and per-candidate rejection when a small model returns unsupported evidence;
+- a zero-API-cost runtime boundary: cloud execution remains uncomposed, while optional local
+  Ollama traffic is restricted to loopback and uses an injected transport.
 - a paragraph/sentence-aware deterministic Unicode chunker with exact source offsets, stable chunk
   IDs, a 4,000-character limit, and 400-character overlap;
 - a sequential fail-closed extraction Harness with request/result fingerprint checks, exact
@@ -90,17 +109,20 @@ Implemented through M4:
 - durable redacted per-chunk invocation lifecycles and an immutable whole-document result marker;
 - atomic candidate-claim, exact-evidence, extraction-result, and audit persistence with idempotent
   retry behavior;
-- project-scoped extraction command/result/claim APIs with strict local replay preflight;
-- disabled-by-default execution where only an exact offline fixture can be enqueued at zero cost.
+- project-scoped extraction command/result/claim APIs with zero-cost provider preflight;
+- disabled-by-default execution with exact offline replay and loopback-only local Ollama as the
+  runnable zero-API-cost modes.
 - project-scoped game-entity create/list APIs with server-owned stable keys and duplicate-safe
   identity handling;
 - append-only entity correction and terminal archival history without rewriting claims or evidence;
 - latest-first immutable source-version read models with normalized-text availability;
-- a non-mutating extraction-capability preflight that distinguishes disabled, missing, invalid,
-  mismatched, incomplete, and exact offline replay states;
+- a non-mutating extraction-capability preflight that distinguishes disabled, local Ollama,
+  missing, invalid, mismatched, incomplete, and exact offline replay states;
 - filterable unreviewed-claim reads with server-returned evidence quotes and source/version metadata.
 - a responsive Knowledge workspace that keeps entity identity, immutable evidence-version choice,
   exact-replay capability, extraction progress, candidate claims, and exact evidence in one flow;
+- SSE progress updates with a two-second polling fallback while a run remains active, preventing a
+  completed or failed background job from appearing permanently stuck;
 - beginner-safe game-entity creation plus append-only correction and archival controls;
 - explicit zero-cost disabled/mismatch states, Knowledge-to-Runs trace navigation, and a Sources
   shortcut when no evidence exists;
@@ -170,7 +192,7 @@ Not implemented yet:
 - a live NTE acceptance capture committed as product evidence;
 - embeddings or retrieval over approved knowledge snapshots;
 - automated live trend connectors (the first release uses human-verified authorized-source input);
-- live LLM calls, RAG, or model-generated marketing copy;
+- cloud LLM calls, RAG, or model-generated marketing copy (local Ollama knowledge roles are live);
 - authentication, multi-tenancy, billing, or team collaboration.
 
 The earlier README described several of these as if they already existed. They did not. The original placeholder modules remain traceable in Git history and are documented under [`legacy/`](legacy/README.md).
@@ -333,6 +355,15 @@ From PowerShell:
 .\scripts\setup.ps1
 .\scripts\database.ps1 up
 .\scripts\start.ps1
+```
+
+`start.ps1` is the foreground development launcher: keep that terminal open and
+press Ctrl+C when you want to stop. On Windows, the services can instead be
+detached from the terminal and managed explicitly:
+
+```powershell
+.\scripts\start-background.ps1
+.\scripts\stop-background.ps1
 ```
 
 The local services will be available at:

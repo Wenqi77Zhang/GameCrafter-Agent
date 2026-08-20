@@ -52,7 +52,7 @@ type SourceVersion = {
 
 type Capability = {
   available: boolean;
-  mode: "disabled" | "offline_replay";
+  mode: "disabled" | "offline_replay" | "local_ollama";
   reason_code: string;
   reason: string;
 };
@@ -85,6 +85,24 @@ type ClaimReview = {
   created_at: string;
 };
 
+type AgentClaimReview = {
+  decision: "agent_approved" | "agent_rejected" | "needs_human";
+  suggested_predicate: string | null;
+  priority: number;
+  reason_code: string;
+  rationale: string;
+  risk_codes: string[];
+};
+
+type AgentReviewSummary = {
+  run_id: string;
+  extraction_run_id: string;
+  agent: { key: string; version: string; provider: string; model: string };
+  counts: { reviewed: number; agent_approved: number; agent_rejected: number; needs_human: number };
+  token_usage: { input: number; output: number; total: number };
+  decisions: Array<AgentClaimReview & { claim_id: string }>;
+};
+
 type Claim = {
   id: string;
   subject_entity_id: string;
@@ -105,6 +123,7 @@ type Claim = {
   evidence: Evidence[];
   reviews: ClaimReview[];
   latest_review: ClaimReview | null;
+  agent_review: AgentClaimReview | null;
 };
 
 type ConflictMember = {
@@ -224,11 +243,25 @@ const text = {
     capability: "提取能力",
     checking: "正在校验离线能力…",
     available: "离线回放可用",
+    localAvailable: "零 API 费用的本地模型可用",
     unavailable: "当前不可提取",
     start: "开始提取",
     submitting: "正在加入本地队列…",
     queued: "知识提取已进入本地队列。",
-    unreviewed: "AI 候选 · 每条显示独立人工状态",
+    unreviewed: "仅显示当前提取批次；审核 Agent 拒绝的低价值项默认折叠。",
+    agentReviewTitle: "AI 知识预审",
+    agentReviewHint: "独立审核 Agent 会核对证据、纠正错误分类并将知识包限制在 15 条以内；它不能替你做最终批准。",
+    startAgentReview: "让审核 Agent 检查",
+    reviewing: "审核 Agent 正在检查…",
+    confirmAgentPack: "批量确认审核建议",
+    confirmingAgentPack: "正在记录人工确认…",
+    reviewQueued: "知识审核已进入本地队列。",
+    packConfirmed: "已确认 Agent 明确建议；有疑问的条目仍保留给你单独判断。",
+    approvedByAgent: "建议保留",
+    rejectedByAgent: "建议移除",
+    needsHuman: "需要你判断",
+    showRejected: "显示被筛除项",
+    hideRejected: "隐藏被筛除项",
     progress: "实时进度",
     fullRun: "查看完整运行记录",
     stages: ["校验证据", "文本分块", "离线提取", "保存候选知识"],
@@ -322,6 +355,7 @@ const text = {
       fixture_incomplete: "离线样例没有覆盖全部确定性文本分块。",
       target_invalid: "所选实体或证据版本不满足提取约束。",
       available: "该实体与证据版本拥有完整、精确、零 API 成本的本地回放。",
+      ollama_available: "已配置本地 Ollama 模型；候选仍须经过精确证据校验和人工审核。",
     },
   },
   en: {
@@ -348,11 +382,25 @@ const text = {
     capability: "Extraction capability",
     checking: "Checking offline capability…",
     available: "Offline replay available",
+    localAvailable: "Zero-API-cost local model available",
     unavailable: "Extraction unavailable",
     start: "Start extraction",
     submitting: "Adding to the local queue…",
     queued: "Knowledge extraction was added to the local queue.",
-    unreviewed: "AI candidates · individual human state shown",
+    unreviewed: "Only the current extraction batch is shown; low-value agent rejections are collapsed.",
+    agentReviewTitle: "AI knowledge pre-review",
+    agentReviewHint: "An independent local reviewer verifies evidence, flags bad taxonomy, and limits the pack to 15 facts. It cannot grant final approval.",
+    startAgentReview: "Run reviewer Agent",
+    reviewing: "Reviewer Agent is checking…",
+    confirmAgentPack: "Confirm reviewer suggestions",
+    confirmingAgentPack: "Recording human confirmation…",
+    reviewQueued: "Knowledge review was added to the local queue.",
+    packConfirmed: "Clear Agent suggestions were confirmed; ambiguous items remain for individual review.",
+    approvedByAgent: "Keep",
+    rejectedByAgent: "Remove",
+    needsHuman: "Needs your decision",
+    showRejected: "Show filtered items",
+    hideRejected: "Hide filtered items",
     progress: "Live progress",
     fullRun: "View full run record",
     stages: ["Validate evidence", "Chunk text", "Offline extraction", "Save candidates"],
@@ -446,6 +494,7 @@ const text = {
       fixture_incomplete: "The replay does not cover every deterministic text chunk.",
       target_invalid: "The selected entity or evidence version violates extraction constraints.",
       available: "This exact entity and evidence version has a complete zero-API-cost local replay.",
+      ollama_available: "A local Ollama model is configured; candidates still require exact evidence validation and human review.",
     },
   },
 } as const;
@@ -563,6 +612,9 @@ export function KnowledgeWorkspace({
   const [correctionAliases, setCorrectionAliases] = useState("");
   const [correctionReason, setCorrectionReason] = useState("");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [extractionRunId, setExtractionRunId] = useState<string | null>(null);
+  const [agentReview, setAgentReview] = useState<AgentReviewSummary | null>(null);
+  const [showAgentRejected, setShowAgentRejected] = useState(false);
   const [reviewDecision, setReviewDecision] = useState<ReviewDecision>("approve");
   const [reviewReason, setReviewReason] = useState("");
   const [reviewEditedValue, setReviewEditedValue] = useState("");
@@ -619,8 +671,11 @@ export function KnowledgeWorkspace({
       return;
     }
     try {
+      const query = extractionRunId
+        ? `subject_entity_id=${selectedEntityId}&extraction_run_id=${extractionRunId}`
+        : `subject_entity_id=${selectedEntityId}`;
       const payload = await api<{ items: Claim[] }>(
-        `/api/projects/${projectId}/knowledge-claims?subject_entity_id=${selectedEntityId}`,
+        `/api/projects/${projectId}/knowledge-claims?${query}`,
       );
       setClaims(payload.items);
       setSelectedClaimId((current) =>
@@ -629,7 +684,21 @@ export function KnowledgeWorkspace({
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
     }
-  }, [projectId, selectedEntityId, t.failed]);
+  }, [extractionRunId, projectId, selectedEntityId, t.failed]);
+
+  const loadAgentReview = useCallback(async () => {
+    if (!projectId || !extractionRunId) {
+      setAgentReview(null);
+      return;
+    }
+    try {
+      setAgentReview(await api<AgentReviewSummary>(
+        `/api/projects/${projectId}/knowledge-agent-reviews?extraction_run_id=${extractionRunId}`,
+      ));
+    } catch {
+      setAgentReview(null);
+    }
+  }, [extractionRunId, projectId]);
 
   const loadConflicts = useCallback(async () => {
     if (!projectId || !selectedEntityId) {
@@ -669,6 +738,8 @@ export function KnowledgeWorkspace({
     setSelectedVersionId("");
     setSelectedClaimId("");
     setActiveRunId(null);
+    setExtractionRunId(null);
+    setAgentReview(null);
     setShowCreate(false);
     setShowCorrect(false);
     setEntityName(projectName);
@@ -677,10 +748,18 @@ export function KnowledgeWorkspace({
   }, [projectId, projectName, refreshToken, loadCatalog]);
 
   useEffect(() => {
+    const latest = [...runs].reverse().find(
+      (run) => run.task_type === "knowledge.extract" && run.status === "succeeded",
+    );
+    if (latest && !extractionRunId) setExtractionRunId(latest.id);
+  }, [extractionRunId, runs]);
+
+  useEffect(() => {
     void loadClaims();
+    void loadAgentReview();
     void loadConflicts();
     void loadPublication();
-  }, [loadClaims, loadConflicts, loadPublication]);
+  }, [loadAgentReview, loadClaims, loadConflicts, loadPublication]);
 
   useEffect(() => {
     if (!selectedEntity || !selectedVersionId) {
@@ -715,11 +794,13 @@ export function KnowledgeWorkspace({
 
   useEffect(() => {
     if (activeRun?.status === "succeeded") {
+      if (activeRun.task_type === "knowledge.extract") setExtractionRunId(activeRun.id);
       void loadClaims();
+      void loadAgentReview();
       void loadConflicts();
       void loadPublication();
     }
-  }, [activeRun?.status, loadClaims, loadConflicts, loadPublication]);
+  }, [activeRun, loadAgentReview, loadClaims, loadConflicts, loadPublication]);
 
   useEffect(() => {
     if (!selectedEntity || showCorrect) return;
@@ -737,10 +818,11 @@ export function KnowledgeWorkspace({
   const groupedClaims = useMemo(() => {
     const groups = new Map<string, Claim[]>();
     for (const claim of claims) {
+      if (!showAgentRejected && claim.agent_review?.decision === "agent_rejected") continue;
       groups.set(claim.predicate, [...(groups.get(claim.predicate) ?? []), claim]);
     }
     return [...groups.entries()];
-  }, [claims]);
+  }, [claims, showAgentRejected]);
 
   const conflictByClaim = useMemo(() => {
     const index = new Map<string, ConflictMember>();
@@ -843,8 +925,59 @@ export function KnowledgeWorkspace({
         }),
       });
       setActiveRunId(run.id);
+      setExtractionRunId(run.id);
+      setAgentReview(null);
       onRunQueued(run);
       setMessage({ kind: "ok", text: t.queued });
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const startAgentReview = async () => {
+    if (!extractionRunId || claims.length === 0) return;
+    setBusy("agent-review");
+    setMessage(null);
+    try {
+      const run = await api<WorkspaceRun>(
+        `/api/projects/${projectId}/knowledge-agent-reviews`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey("knowledge-agent-review"),
+          },
+          body: JSON.stringify({ extraction_run_id: extractionRunId }),
+        },
+      );
+      setActiveRunId(run.id);
+      onRunQueued(run);
+      setMessage({ kind: "ok", text: t.reviewQueued });
+      if (run.status === "succeeded") await loadAgentReview();
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const confirmAgentPack = async () => {
+    if (!extractionRunId || !agentReview) return;
+    setBusy("agent-confirm");
+    setMessage(null);
+    try {
+      await api(`/api/projects/${projectId}/knowledge-agent-reviews/confirm`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey("confirm-agent-pack"),
+        },
+        body: JSON.stringify({ extraction_run_id: extractionRunId }),
+      });
+      await Promise.all([loadClaims(), loadConflicts(), loadPublication()]);
+      setMessage({ kind: "ok", text: t.packConfirmed });
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
     } finally {
@@ -1071,7 +1204,7 @@ export function KnowledgeWorkspace({
           <div className="setup-label"><span>03</span><strong>{t.capability}</strong></div>
           {capabilityLoading ? <p>{t.checking}</p> : capability ? (
             <div className={capability.available ? "capability capability--available" : "capability capability--blocked"}>
-              <strong>{capability.available ? t.available : t.unavailable}</strong>
+              <strong>{capability.available ? (capability.mode === "local_ollama" ? t.localAvailable : t.available) : t.unavailable}</strong>
               <p>{capabilityReason}</p>
               <code>{capability.mode} · {capability.reason_code}</code>
             </div>
@@ -1094,6 +1227,45 @@ export function KnowledgeWorkspace({
             </ol>
             {activeRun?.last_error_detail && <div className="error-detail"><strong>{activeRun.last_error_code}</strong><p>{activeRun.last_error_detail}</p></div>}
             <button className="ghost-button" type="button" onClick={() => onOpenRun(activeRunId)}>{t.fullRun}</button>
+          </>
+        )}
+      </section>
+
+      <section className="panel agent-review-panel" aria-labelledby="agent-review-title">
+        <div className="conflict-heading">
+          <div>
+            <h2 id="agent-review-title">{t.agentReviewTitle}</h2>
+            <p>{t.agentReviewHint}</p>
+          </div>
+          {!agentReview ? (
+            <button
+              className="primary-button"
+              type="button"
+              disabled={busy !== null || claims.length === 0 || !extractionRunId}
+              onClick={() => void startAgentReview()}
+            >
+              {busy === "agent-review" ? t.reviewing : t.startAgentReview}
+            </button>
+          ) : (
+            <button
+              className="primary-button"
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void confirmAgentPack()}
+            >
+              {busy === "agent-confirm" ? t.confirmingAgentPack : t.confirmAgentPack}
+            </button>
+          )}
+        </div>
+        {agentReview && (
+          <>
+            <div className="snapshot-metrics">
+              <div><span>{t.approvedByAgent}</span><strong>{agentReview.counts.agent_approved}</strong></div>
+              <div><span>{t.rejectedByAgent}</span><strong>{agentReview.counts.agent_rejected}</strong></div>
+              <div><span>{t.needsHuman}</span><strong>{agentReview.counts.needs_human}</strong></div>
+              <div><span>Agent</span><strong>{agentReview.agent.version}</strong></div>
+            </div>
+            <code>{agentReview.agent.model} · {agentReview.token_usage.total} local tokens</code>
           </>
         )}
       </section>
@@ -1207,6 +1379,11 @@ export function KnowledgeWorkspace({
         <section className="panel claim-browser">
           <div className="list-heading"><h2>{t.candidates}</h2><span>{claims.length}</span></div>
           <div className="candidate-warning">{t.unreviewed}</div>
+          {agentReview && (
+            <button className="ghost-button" type="button" onClick={() => setShowAgentRejected((current) => !current)}>
+              {showAgentRejected ? t.hideRejected : t.showRejected} ({agentReview.counts.agent_rejected})
+            </button>
+          )}
           {claims.length === 0 ? <div className="empty-state">{t.noClaims}</div> : groupedClaims.map(([predicate, items]) => (
             <div className="claim-group" key={predicate}>
               <h3>{predicateNames[language][predicate] ?? predicate}</h3>
@@ -1214,6 +1391,16 @@ export function KnowledgeWorkspace({
                 <button className={selectedClaimId === claim.id ? "claim-card active" : "claim-card"} type="button" key={claim.id} aria-pressed={selectedClaimId === claim.id} onClick={() => setSelectedClaimId(claim.id)}>
                   <strong>{displayValue(claim.value)}</strong>
                   <span>{Math.round(claim.confidence * 100)}% · {claim.locale} · {claim.region}</span>
+                  {claim.agent_review && (
+                    <em className={`review-state review-state--${claim.agent_review.decision}`}>
+                      {claim.agent_review.decision === "agent_approved"
+                        ? t.approvedByAgent
+                        : claim.agent_review.decision === "agent_rejected"
+                          ? t.rejectedByAgent
+                          : t.needsHuman}
+                      {` · ${claim.agent_review.priority}`}
+                    </em>
+                  )}
                   {conflictByClaim.has(claim.id) && (
                     <em className={`claim-relation claim-relation--${conflictByClaim.get(claim.id)?.relation}`}>
                       {conflictByClaim.get(claim.id)?.relation === "conflicting" ? t.conflicting : t.possiblyCoexisting}
@@ -1233,6 +1420,13 @@ export function KnowledgeWorkspace({
           {!selectedClaim ? <div className="empty-state">{t.selectClaim}</div> : (
             <>
               <div className="selected-claim"><span>{predicateNames[language][selectedClaim.predicate] ?? selectedClaim.predicate}</span><strong>{displayValue(selectedClaim.value)}</strong><small>{t.confidence}: {Math.round(selectedClaim.confidence * 100)}%</small></div>
+              {selectedClaim.agent_review && (
+                <div className="candidate-warning">
+                  <strong>{selectedClaim.agent_review.decision === "agent_approved" ? t.approvedByAgent : selectedClaim.agent_review.decision === "agent_rejected" ? t.rejectedByAgent : t.needsHuman}</strong>
+                  <p>{selectedClaim.agent_review.rationale}</p>
+                  {selectedClaim.agent_review.suggested_predicate && <code>{selectedClaim.agent_review.suggested_predicate}</code>}
+                </div>
+              )}
               <div className="evidence-list">
                 {selectedClaim.evidence.map((evidence) => (
                   <article key={`${evidence.source_version_id}-${evidence.ordinal}`}>

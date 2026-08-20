@@ -10,7 +10,7 @@ from uuid import UUID
 
 from gamecrafter.domain.knowledge.claims import CandidateClaim
 
-CLAIM_PROMPT_VERSION = "knowledge-claim-v1"
+CLAIM_PROMPT_VERSION = "knowledge-claim-v2"
 CLAIM_SCHEMA_VERSION = "knowledge-claim-v1"
 
 

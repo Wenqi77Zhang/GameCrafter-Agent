@@ -1,4 +1,4 @@
-"""Run the local API and web development servers together."""
+"""Run the local API, background worker, and web development server together."""
 
 from __future__ import annotations
 
@@ -29,10 +29,10 @@ def main() -> int:
         for command in commands
     ]
 
-    print("GameCrafter development services started.")
+    print("GameCrafter API, worker, and web services started.")
     print("Web: http://localhost:5173")
     print(f"API: http://{settings.api_host}:{settings.api_port}/health")
-    print("Press Ctrl+C to stop both services.")
+    print("Press Ctrl+C to stop all services.")
 
     try:
         return_code = 0

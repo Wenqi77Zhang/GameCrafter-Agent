@@ -41,6 +41,10 @@ class FakeKnowledgeRepository:
     def extraction_result(self, **kwargs):
         return {"run_id": str(kwargs["run_id"]), "claim_count": 2, "invocations": []}
 
+    def completed_run_for_target(self, **kwargs):
+        del kwargs
+        return None
+
     def list_claims(self, project_id, **kwargs):
         assert project_id == PROJECT_ID
         assert kwargs in (

@@ -6,6 +6,10 @@ from collections.abc import Mapping
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from gamecrafter.application.agent_review_jobs import (
+    REVIEW_KNOWLEDGE_TASK,
+    KnowledgeReviewHandlers,
+)
 from gamecrafter.application.jobs import JobHandler
 from gamecrafter.application.knowledge_jobs import (
     EXTRACT_KNOWLEDGE_TASK,
@@ -13,14 +17,18 @@ from gamecrafter.application.knowledge_jobs import (
 )
 from gamecrafter.application.ports.model_gateway import ModelGateway
 from gamecrafter.config.settings import Settings
+from gamecrafter.infrastructure.database.agent_review_service import DatabaseAgentReviewService
 from gamecrafter.infrastructure.database.knowledge_repository import (
     DatabaseKnowledgeRepository,
 )
+from gamecrafter.infrastructure.local_ai.ollama import OllamaLoopbackTransport
 from gamecrafter.infrastructure.models.gateways import (
     DisabledModelGateway,
+    OllamaLocalGateway,
     ReplayModelGateway,
 )
 from gamecrafter.infrastructure.models.replay_fixtures import load_replay_fixture
+from gamecrafter.infrastructure.models.reviewer import OllamaKnowledgeReviewerGateway
 from gamecrafter.infrastructure.storage.local import LocalObjectStorage
 
 
@@ -43,12 +51,34 @@ def build_knowledge_handlers(
         gateway=gateway,
         document_max_bytes=settings.knowledge_document_max_bytes,
     )
-    return {EXTRACT_KNOWLEDGE_TASK: handlers.extract}
+    result: dict[str, JobHandler] = {EXTRACT_KNOWLEDGE_TASK: handlers.extract}
+    if settings.model_provider == "ollama":
+        transport = OllamaLoopbackTransport(
+            base_url=str(settings.ollama_base_url),
+            timeout_seconds=settings.ollama_timeout_seconds,
+        )
+        reviewer = KnowledgeReviewHandlers(
+            service=DatabaseAgentReviewService(session_factory),
+            gateway=OllamaKnowledgeReviewerGateway(
+                model=settings.ollama_model,
+                requester=transport,
+            ),
+        )
+        result[REVIEW_KNOWLEDGE_TASK] = reviewer.review
+    return result
 
 
 def _configured_gateway(settings: Settings) -> ModelGateway:
     if settings.model_provider == "disabled":
         return DisabledModelGateway()
+    if settings.model_provider == "ollama":
+        return OllamaLocalGateway(
+            model=settings.ollama_model,
+            requester=OllamaLoopbackTransport(
+                base_url=str(settings.ollama_base_url),
+                timeout_seconds=settings.ollama_timeout_seconds,
+            ),
+        )
     path = settings.model_replay_fixture_path
     if path is None:
         raise ValueError("replay mode requires GAMECRAFTER_MODEL_REPLAY_FIXTURE_PATH")

@@ -40,8 +40,11 @@ class Settings(BaseSettings):
     worker_id: str = "local-worker"
     worker_poll_seconds: float = 1.0
     job_lease_seconds: int = 60
-    model_provider: Literal["disabled", "replay"] = "disabled"
+    model_provider: Literal["disabled", "replay", "ollama"] = "disabled"
     model_replay_fixture_path: Path | None = None
+    ollama_base_url: HttpUrl = HttpUrl("http://127.0.0.1:11434")
+    ollama_model: str = Field(default="qwen3.5:4b", min_length=1, max_length=120)
+    ollama_timeout_seconds: float = Field(default=180.0, gt=0, le=600)
     knowledge_document_max_bytes: int = Field(default=2 * 1024 * 1024, gt=0)
 
 
