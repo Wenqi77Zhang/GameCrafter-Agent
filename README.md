@@ -370,6 +370,11 @@ The local services will be available at:
 
 - web: `http://localhost:5173`
 - API: `http://localhost:8000`
+
+If the computer has restarted, open Docker Desktop before using GameCrafter and then run
+`\.\scripts\database.ps1 up`. The web app now keeps source-discovery controls hidden until the
+project database is reachable, so a stopped database is reported as a connection problem instead
+of the misleading `Not Found` response.
 - API health: `http://localhost:8000/health`
 - database readiness: `http://localhost:8000/ready`
 

@@ -64,6 +64,7 @@ const copy = {
     selectRun: "选择一条运行记录查看可恢复的实时进度。",
     refresh: "刷新",
     language: "English",
+    loadingProject: "正在连接本地项目与数据库…",
     apiDown: "本地 API 暂不可用",
     retry: "重试连接",
     working: "正在提交…",
@@ -112,6 +113,7 @@ const copy = {
     selectRun: "Select a run to view its resumable live progress.",
     refresh: "Refresh",
     language: "简体中文",
+    loadingProject: "Connecting to the local project and database…",
     apiDown: "Local API is unavailable",
     retry: "Retry",
     working: "Submitting…",
@@ -313,6 +315,10 @@ export function App() {
   };
 
   const submitRun = async (path: string, body: object, key: string) => {
+    if (!projectId) {
+      setConnected(false);
+      return;
+    }
     setBusy(key);
     setMessage(null);
     try {
@@ -393,7 +399,12 @@ export function App() {
         </div>
       </header>
 
-      {connected === false ? (
+      {connected === null ? (
+        <section className="center-state" aria-live="polite">
+          <span className="status-dot" />
+          <h1>{t.loadingProject}</h1>
+        </section>
+      ) : connected === false ? (
         <section className="center-state" aria-live="polite">
           <span className="status-dot status-dot--error" />
           <h1>{t.apiDown}</h1>
