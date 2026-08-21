@@ -297,6 +297,18 @@ test("defaults to Simplified Chinese and loads the NTE source workspace", async 
   expect(screen.getByText("暂无待选候选。先运行一次来源发现。")).toBeInTheDocument();
 });
 
+test("keeps discovery controls unavailable while the project database is still loading", () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    if (String(input) === "/api/health") return Promise.resolve(json({ status: "ok" }));
+    return new Promise<Response>(() => undefined);
+  });
+
+  render(<App />);
+
+  expect(screen.getByRole("heading", { name: "正在连接本地项目与数据库…" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /开始发现/ })).not.toBeInTheDocument();
+});
+
 test("switches to English and remembers the preference", async () => {
   workspaceFetch();
   render(<App />);
