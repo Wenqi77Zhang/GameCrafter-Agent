@@ -8,18 +8,20 @@ GameCrafter v2 uses a modular monolith with explicit domain and adapter boundari
 flowchart LR
     HUMAN["Chinese studio user"]
     HARNESS["Durable Harness: typed jobs, gates, retries, audit"]
+    SOURCE["Source and Provenance Steward v1: deterministic"]
     CURATOR["Knowledge Curator v2: local Ollama"]
     REVIEWER["Knowledge Reviewer v1: independent local Ollama"]
     TREND["Trend Analyst v1: deterministic"]
     STRATEGY["Campaign Strategist v1: deterministic"]
     WRITER["Script Writer v1: deterministic"]
     CRITIC["Quality and Compliance Critic v1: deterministic"]
+    GDD["GDD Architect v1: deterministic"]
     PACK{"Human knowledge-pack confirmation"}
     TOPIC{"Human topic choice"}
     FINAL{"Human final export approval"}
     STORE[("Typed immutable artifacts and audit events")]
 
-    HUMAN --> HARNESS --> CURATOR --> REVIEWER --> PACK --> STORE
+    HUMAN --> HARNESS --> SOURCE --> CURATOR --> REVIEWER --> PACK --> STORE
     STORE --> TREND --> STRATEGY --> TOPIC --> WRITER --> CRITIC --> FINAL
     CURATOR --> STORE
     REVIEWER --> STORE
@@ -27,13 +29,20 @@ flowchart LR
     STRATEGY --> STORE
     WRITER --> STORE
     CRITIC --> STORE
+    SOURCE --> STORE
+    STORE --> GDD --> STORE
 ```
 
-The Harness is the orchestrator, not a seventh Agent. Specialists do not hold an unconstrained
+The Harness is the orchestrator, not another Agent. Eight specialists do not hold an unconstrained
 conversation: each receives a bounded, versioned input and emits a typed artifact. The two
 knowledge roles use the loopback-only local model; the four downstream roles expose their existing
 deterministic rules as versioned specialists and never pretend that a model was called. This is a
 workflow/DAG with independent evaluator stages, not ReAct, ReWOO, or a self-modifying swarm.
+
+The Source Steward owns bounded collection and provenance contracts; the GDD Architect performs
+exact-offset structural parsing and keeps design assumptions outside factual knowledge. Identity,
+RBAC, quotas, hashing, deletion, and integrity checks remain deterministic platform policy rather
+than being delegated to an Agent that could improvise a security decision.
 
 The reviewer writes `agent_approved`, `agent_rejected`, or `needs_human` into a ledger separate
 from human reviews. Suggested predicate changes always route to a person. Deterministic governance
@@ -66,12 +75,12 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M5 runtime
+## Implemented M1-A to M8-local runtime
 
 ```mermaid
 flowchart LR
     USER["Local user"]
-    WEB["React Sources, Knowledge, Marketing, Create, and Runs workspace"]
+    WEB["React Sources, Knowledge, GDD, Marketing, Create, Runs, and Account workspace"]
     API["FastAPI"]
     COMMAND["Validated workspace commands and queries"]
     RUNS[("workflow_runs")]
@@ -79,6 +88,7 @@ flowchart LR
     AUDIT[("audit_events")]
     WORKER["Python worker"]
     HANDLER["Registered source and knowledge handlers"]
+    IDENTITY["Opaque sessions and owner/editor/reviewer/viewer RBAC"]
 
     USER --> WEB --> API
     API -->|"sources, candidates, runs"| WEB
@@ -86,6 +96,7 @@ flowchart LR
     API -. "resumable SSE audit events" .-> WEB
     API -->|"database readiness"| RUNS
     API --> COMMAND
+    WEB --> IDENTITY --> API
     COMMAND -->|"atomic idempotent enqueue"| RUNS
     COMMAND --> JOBS
     JOBS -->|"lease with bounded retry"| WORKER
@@ -101,7 +112,7 @@ consistency. The worker never claims a website or model capability until its typ
 implemented and registered. C2.4a adds Knowledge delivery queries and correction commands; C2.4b
 connects them to a bilingual, responsive interface without weakening the human-review boundary.
 
-## Implemented M1-B B1 evidence contracts
+## Historical M1-B B1 evidence-contract stage
 
 ```mermaid
 flowchart LR
@@ -120,16 +131,16 @@ flowchart LR
     PROJECT --> FAMILY
     PROJECT --> SOURCE
     FAMILY -->|"optional grouping"| SOURCE
-    CANDIDATE -. "imported source; handler not implemented" .-> SOURCE
+    CANDIDATE -. "implemented later by B3/B4" .-> SOURCE
     SOURCE --> VERSION --> ASSET --> OBJECT
     PORT --> LOCAL
-    OBJECT -. "metadata only; capture not implemented" .-> PORT
+    OBJECT -. "physical capture implemented later by B3" .-> PORT
 ```
 
-B1 creates these domain, database, and storage contracts. It does not discover or capture a live
-website. PostgreSQL prevents updates to stored-object metadata, source versions, and evidence links;
-a meaningful change must create a new version. Physical object deletion remains a later,
-dependency-aware application command.
+This diagram records the original B1 contract-only stage; B3/B4 and M6 now implement the dotted
+capabilities. PostgreSQL prevents updates to stored-object metadata, source versions, and evidence
+links; a meaningful change must create a new version. Project deletion removes only unreferenced
+objects after dependency-aware database deletion.
 
 ## Implemented M1-B B2 controlled source boundary
 
@@ -240,6 +251,35 @@ persisted artifacts. Trend processing never rewrites the raw observation and dis
 version, fingerprint, duplicate lineage, cluster key/size, and current freshness label. Manual
 retry resets only failed jobs after a terminal state, is idempotent by command key, and appends
 `run.retried`; it cannot retry successful, running, or cancelled work.
+
+## Implemented M6-M8 local product layer
+
+```mermaid
+flowchart LR
+    ACCOUNT["Local account: scrypt password + opaque session"]
+    TEAM["Team RBAC and revocable invitations"]
+    PROJECT["Tenant-isolated project"]
+    EXPORT["Portable ZIP with records + verified objects"]
+    DELETE{"Typed irreversible confirmation"}
+    LOCAL["Private document, transcript, or owned GDD"]
+    VERSION["Immutable local evidence version"]
+    GDD["GDD Architect exact-offset chapters"]
+    ASSUME{"Explicit human assumption decision"}
+    REVISION["Immutable approved GDD revision"]
+
+    ACCOUNT --> TEAM --> PROJECT
+    PROJECT --> EXPORT
+    PROJECT --> DELETE
+    LOCAL --> VERSION --> GDD --> ASSUME --> REVISION
+    REVISION --> PROJECT
+```
+
+M6 is local-first rather than a hosted billing claim: it provides identity, isolation, resource
+quotas, private storage, full project export, project deletion, and guarded account deletion with
+no paid identity service. M7 provides immediate revocation and four roles; security and integrity
+rules are enforced by middleware and database services, not by an LLM. M8 binds every chapter to
+one immutable GDD source version and exact character offsets, stores assumptions in a separate
+ledger, blocks publication while assumptions are undecided, and versions a canonical manifest.
 
 ## Implemented M1-B B3 ingestion and persistence flow
 

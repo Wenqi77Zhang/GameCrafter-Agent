@@ -330,6 +330,11 @@ const text = {
     publishingSnapshot: "正在原子发布…",
     snapshotPublished: "知识快照已发布，后续流程将引用这个不可变版本。",
     snapshotHistory: "快照版本历史",
+    synthesis: "多来源联合视图",
+    synthesisHint: "只对已批准快照做确定性汇总，不生成新事实。",
+    distinctSources: "独立来源",
+    corroborated: "多来源相互印证",
+    singleSource: "仅单一来源",
     noSnapshots: "尚未发布知识快照。",
     latestSnapshot: "最新",
     snapshotFacts: "条事实",
@@ -469,6 +474,11 @@ const text = {
     publishingSnapshot: "Publishing atomically…",
     snapshotPublished: "The knowledge snapshot was published; downstream workflows will reference this immutable version.",
     snapshotHistory: "Snapshot version history",
+    synthesis: "Multi-source synthesis",
+    synthesisHint: "Deterministic summary of the approved snapshot only; it creates no new facts.",
+    distinctSources: "Distinct sources",
+    corroborated: "Multi-source corroborated",
+    singleSource: "Single-source only",
     noSnapshots: "No knowledge snapshot has been published yet.",
     latestSnapshot: "Latest",
     snapshotFacts: "facts",
@@ -550,6 +560,26 @@ function displayValue(value: unknown): string {
     return String((value as { entity_key: unknown }).entity_key);
   }
   return JSON.stringify(value);
+}
+
+function snapshotSynthesis(snapshot: KnowledgeSnapshot) {
+  const sources = new Set<string>();
+  const groups = new Map<string, Set<string>>();
+  for (const member of snapshot.members) {
+    const key = `${member.subject.entity_id}\u0000${member.predicate}\u0000${JSON.stringify(member.value)}`;
+    const group = groups.get(key) ?? new Set<string>();
+    for (const evidence of member.evidence) {
+      sources.add(evidence.source_id);
+      group.add(evidence.source_id);
+    }
+    groups.set(key, group);
+  }
+  return {
+    sourceCount: sources.size,
+    corroborated: [...groups.values()].filter((items) => items.size >= 2).length,
+    singleSource: [...groups.values()].filter((items) => items.size === 1).length,
+    ruleVersion: "multi-source-synthesis-v1",
+  };
 }
 
 function parseEditedValue(kind: string, input: string): unknown {
@@ -1567,6 +1597,15 @@ export function KnowledgeWorkspace({
                   <div className="snapshot-detail">
                     <code>{snapshot.schema_version} · {snapshot.content_sha256}</code>
                     {snapshot.notes && <p>{snapshot.notes}</p>}
+                    {(() => {
+                      const synthesis = snapshotSynthesis(snapshot);
+                      return <div className="snapshot-metrics" aria-label={t.synthesis}>
+                        <div><span>{t.distinctSources}</span><strong>{synthesis.sourceCount}</strong></div>
+                        <div><span>{t.corroborated}</span><strong>{synthesis.corroborated}</strong></div>
+                        <div><span>{t.singleSource}</span><strong>{synthesis.singleSource}</strong></div>
+                        <div><span>{t.synthesisHint}</span><code>{synthesis.ruleVersion}</code></div>
+                      </div>;
+                    })()}
                     <div className="snapshot-members">
                       {snapshot.members.map((member) => (
                         <article key={`${snapshot.id}-${member.review_id}`}>

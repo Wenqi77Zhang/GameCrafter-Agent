@@ -7,7 +7,9 @@
 [![Backend](https://img.shields.io/badge/FastAPI-Pydantic-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-GameCrafter is being rebuilt from an early architecture shell into a long-term product for independent game developers. It will organize game information into a traceable knowledge hub, connect that knowledge to real market signals, and help users create, evaluate, revise, and approve marketing scripts.
+GameCrafter is a complete local-first product for independent game developers. It organizes game
+information into a traceable knowledge hub, connects that knowledge to real public market signals,
+and helps users create, evaluate, revise, approve, and export marketing scripts.
 
 The first complete product slice focuses on marketing a real game to English-speaking TikTok audiences. The default validation case is **NTE: Neverness to Everness (《异环》)**.
 
@@ -16,7 +18,28 @@ For the current click-by-click flow and Agent responsibility boundaries, see
 
 ## Current status
 
-The repository has reached **M5 portfolio-ready local release**.
+The repository has reached **M8-local complete product release**. The original NTE-to-English-
+TikTok workflow remains the primary validation path; later capabilities extend it without
+weakening evidence, privacy, human control, or the strict zero-paid-API boundary.
+
+The completion release adds:
+
+- real public trend retrieval through no-key Google News RSS and GDELT DOC, with optional official
+  YouTube Data API free quota and a deliberately manual, verified TikTok path;
+- private TXT, Markdown, VTT transcript, JSON, and user-owned GDD evidence import, stored only in
+  content-addressed local object storage;
+- an eight-role constrained Agent topology, adding deterministic Source/Provenance Steward and GDD
+  Architect roles while keeping security policy outside model control;
+- optional local accounts with scrypt password hashing, opaque revocable sessions, project tenant
+  isolation, owner/editor/reviewer/viewer RBAC, expiring single-use invitations, revocation, and
+  local quotas;
+- complete project ZIP export, typed-confirmation project deletion with unreferenced-object cleanup,
+  and guarded account deletion;
+- GDD Studio with exact source offsets, chapter hierarchy, separately reviewed assumptions, and
+  immutable canonical revisions;
+- deterministic multi-source synthesis over approved snapshots, explicitly separating corroborated
+  values from single-source facts without generating new claims;
+- an updated requirements matrix and architecture DAGs covering M1.1 and M6–M8 local behavior.
 
 M5 adds:
 
@@ -35,9 +58,9 @@ M5 adds:
 
 Implemented through M4:
 
-- a six-role, versioned specialist topology coordinated by the durable Harness: Knowledge Curator,
-  Knowledge Reviewer, Trend Analyst, Campaign Strategist, Script Writer, and Quality/Compliance
-  Critic;
+- an eight-role, versioned specialist topology coordinated by the durable Harness: Source and
+  Provenance Steward, Knowledge Curator, Knowledge Reviewer, Trend Analyst, Campaign Strategist,
+  Script Writer, Quality/Compliance Critic, and GDD Architect;
 - typed artifact handoffs instead of free-form Agent chat, with local-model versus deterministic
   execution disclosed per role through `GET /agents`;
 - an independent loopback-only Ollama knowledge Reviewer with strict structured decisions,
@@ -201,25 +224,25 @@ Implemented through M4:
 - a bilingual responsive Create workspace for preview, structured editing, evaluation, revision,
   final review, and local file download.
 
-Not implemented yet:
+Deliberately not implemented:
 
-- document ingestion or an installed browser runtime by default;
+- binary office-document OCR/import (the private path accepts bounded UTF-8 text formats);
 - a live NTE acceptance capture committed as product evidence;
 - embeddings or retrieval over approved knowledge snapshots;
-- automated live trend connectors (the release deliberately uses human-verified authorized-source
-  input and now processes it deterministically without claiming a TikTok API connection);
+- TikTok scraping or an unverified TikTok API connection;
 - cloud LLM calls, RAG, or model-generated marketing copy (local Ollama knowledge roles are live);
-- authentication, multi-tenancy, billing, or team collaboration.
+- payment processing or a “free forever” public cloud-hosting claim. Local account isolation,
+  resource quotas, and team collaboration are implemented; monetary billing would contradict the
+  confirmed strict zero-cost boundary and requires a later commercial deployment decision.
 
 The earlier README described several of these as if they already existed. They did not. The original placeholder modules remain traceable in Git history and are documented under [`legacy/`](legacy/README.md).
 
-## Product workflow (M1–M5)
+## Product workflow (M1–M8 local)
 
-This is the planned workflow. M1-A implements the durable project, run, job, and audit foundation.
-M1-B B1 adds source-evidence and object-storage contracts. B2 adds controlled access primitives
-and NTE adapters. B3 registers durable discovery/capture handlers and immutable persistence. B4
-exposes them through human-controlled product APIs, resumable run events, and the Sources/Runs
-workspace.
+This workflow is implemented end to end. It combines official and private evidence, reviewed
+knowledge, authorized public trend inputs, explainable topic fit, script creation, guarded export,
+optional local accounts and teams, and a source-bound GDD workspace. Durable runs, typed artifacts,
+immutable versions, audit events, and explicit failure states connect every stage.
 
 The M5 production preview remains local and costs nothing to run beyond the user's own computer:
 
@@ -228,7 +251,8 @@ The M5 production preview remains local and costs nothing to run beyond the user
 ```
 
 Open `http://127.0.0.1:8080`. Use `.\scripts\production.ps1 down` to stop it. This packaging is a
-repeatable deployment artifact, not a claim that a public hosted service or account system exists.
+repeatable deployment artifact, not a claim that a public hosted service or payment system exists.
+Optional local accounts and teams can be enabled through the documented environment switch.
 
 ```mermaid
 flowchart LR
@@ -275,28 +299,18 @@ flowchart LR
 
 The graph is deliberately constrained. Specialized agent nodes operate inside a deterministic workflow; models do not form an unrestricted autonomous agent swarm. Human approval is required before topic selection and final export.
 
-For an existing game, approved public evidence becomes a sourced **Public Game Intelligence Profile**, not a claimed internal GDD. Future trend connectors must use authorized sources. TikTok Creative Center data is manually verified or imported in the first release rather than collected through unauthorized scraping.
+For an existing game, approved public evidence becomes a sourced **Public Game Intelligence
+Profile**, not a claimed internal GDD. The implemented live connectors use bounded public Google
+News RSS and GDELT endpoints; the official YouTube connector is optional. TikTok Creative Center
+data remains manually verified or imported rather than collected through unauthorized scraping.
 
-## Target software architecture
+## Implemented software architecture
 
-This is the target modular-monolith architecture. M1-A implements the API health/readiness
-boundary, PostgreSQL adapter, migration layer, durable job queue, worker shell, and audit
-foundation. M1-B B1 adds inward-facing source-evidence contracts and a local `ObjectStorage`
-adapter. B2 adds `PageFetcher` and `SiteAdapter` boundaries with HTTP, Playwright, and NTE
-implementations. B3 composes them into registered worker handlers and transactional source
-persistence. B4 adds validated delivery commands, project-scoped read models, SSE run events, and
-the bilingual human-control interface. M1-C C1 adds reviewable knowledge lineage and PostgreSQL
-guards. C2.1 adds the zero-cost model boundary; C2.2 adds deterministic chunking, sequential
-offline extraction orchestration, and the source-attributed NTE replay fixture. C2.3a generalizes
-the durable run/job substrate so later knowledge and marketing workflows reuse the same queue.
-C2.3b registers durable extraction, persists redacted invocation and exact-evidence lineage, and
-exposes project-scoped commands and read models under exact offline-replay preflight.
-C2.4a adds the stable delivery contracts required by the Knowledge interface: correctable entity
-labels with immutable history, source-version selection, honest replay capability, and enriched
-candidate/evidence reads. C2.4b composes those contracts into the bilingual, responsive Knowledge
-workspace while keeping human review and publication out of scope until their guarded commands
-exist. C2.5 proves the NTE fixture path against migrated PostgreSQL, the real leased queue, and the
-production persistence constraints; it is not represented as a current live-site capture.
+The modular monolith separates domain rules from FastAPI, model vendors, external source adapters,
+and PostgreSQL. The durable Harness coordinates eight bounded specialist roles through typed
+artifacts and checkpoints. Security, tenancy, quotas, destructive confirmations, and publication
+gates remain deterministic platform policy rather than model decisions. The detailed evolution is
+preserved in the migration notes; the diagram below reflects the active runtime.
 
 ```mermaid
 flowchart TB
@@ -362,8 +376,8 @@ scripts/                Setup, development, and verification helpers
 legacy/                 Notes about the original placeholder shell
 ```
 
-Future trend, campaign, script, and Agent-runtime packages are created only when their milestone
-adds executable behavior; the active tree does not keep empty capability placeholders.
+Trend, campaign, script, GDD, identity, and Agent-runtime packages are present only where they add
+executable behavior; the active tree does not keep empty capability placeholders.
 
 ## Quick start
 

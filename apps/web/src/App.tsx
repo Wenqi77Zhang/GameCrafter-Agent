@@ -1,14 +1,17 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { AccountWorkspace } from "./AccountWorkspace";
+import type { AuthStatus } from "./AccountWorkspace";
 import { api, formatDate, idempotencyKey } from "./client";
 import type { Language } from "./client";
 import { KnowledgeWorkspace } from "./KnowledgeWorkspace";
+import { GddWorkspace } from "./GddWorkspace";
 import { MarketingWorkspace } from "./MarketingWorkspace";
 import { ProjectJourney } from "./ProjectJourney";
 import { ScriptWorkspace } from "./ScriptWorkspace";
 import type { WorkspaceAuditEvent, WorkspaceRun } from "./KnowledgeWorkspace";
 
-type Tab = "sources" | "knowledge" | "marketing" | "scripts" | "runs";
+type Tab = "sources" | "knowledge" | "gdd" | "marketing" | "scripts" | "runs" | "account";
 type Project = { id: string; slug: string; name: string; default_locale: Language };
 type Candidate = {
   id: string;
@@ -42,16 +45,28 @@ const copy = {
   "zh-CN": {
     sources: "来源",
     knowledge: "知识",
+    gdd: "GDD",
     marketing: "营销",
     scripts: "创作",
     runs: "运行记录",
+    account: "账户与团队",
     createNte: "创建《异环》项目",
     emptyProject: "先创建本地《异环》验证项目，再开始采集官方公开资料。",
     evidenceNotice: "公开官网资料是可追溯证据，不等同于游戏公司的内部 GDD。",
     quick: "快速发现",
-    quickHint: "从一个明确的官方列表页提取候选，不会递归抓取整站。",
+    quickHint: "首次使用只需点击“异环国际服 · 英文（推荐）”。成功后在右侧确认候选，再导入来源。不会递归抓取整站。",
+    advanced: "高级方式",
     targeted: "定向发现",
     direct: "直接导入官方页面",
+    local: "导入本地资料",
+    localHint: "文本、Markdown、字幕转录稿或你拥有的 GDD 只保存在本机，不会发送到外部模型。",
+    localKind: "资料类型",
+    localTitle: "资料标题",
+    localKey: "稳定标识",
+    localFile: "选择文件",
+    localContent: "文本内容",
+    localPrivate: "本地私有资料",
+    localImported: "本地资料已保存为不可变证据版本。",
     import: "导入",
     extract: "知识提取",
     discover: "开始发现",
@@ -87,21 +102,33 @@ const copy = {
     status: "状态",
     checkpoint: "检查点",
     error: "需要人工关注",
-    privacy: "本地单用户 · 不上传私有文档",
+    privacy: "本地私有存储 · 零付费 API",
   },
   en: {
     sources: "Sources",
     knowledge: "Knowledge",
+    gdd: "GDD",
     marketing: "Marketing",
     scripts: "Create",
     runs: "Runs",
+    account: "Account & teams",
     createNte: "Create NTE project",
     emptyProject: "Create the local NTE validation project before collecting public official sources.",
     evidenceNotice: "Public official material is traceable evidence, not the studio's internal GDD.",
     quick: "Quick discovery",
-    quickHint: "Extract candidates from one explicit official listing page without crawling the site.",
+    quickHint: "For the first run, click “NTE Global · English (recommended)”. Review the candidates on the right, then import one. The site is never crawled recursively.",
+    advanced: "Advanced",
     targeted: "Targeted discovery",
     direct: "Import an official page",
+    local: "Import local material",
+    localHint: "Text, Markdown, transcript, or your own GDD stays on this machine and is never sent to an external model.",
+    localKind: "Material type",
+    localTitle: "Title",
+    localKey: "Stable key",
+    localFile: "Choose file",
+    localContent: "Text content",
+    localPrivate: "Private local material",
+    localImported: "Local material was saved as an immutable evidence version.",
     import: "Import",
     extract: "Knowledge extraction",
     discover: "Discover",
@@ -137,29 +164,33 @@ const copy = {
     status: "Status",
     checkpoint: "Checkpoint",
     error: "Needs attention",
-    privacy: "Local single-user · no private document upload",
+    privacy: "Private local storage · zero paid APIs",
   },
 } as const;
 
 const quickProfiles = [
   {
     id: "global-en",
-    label: "Global · EN",
+    labelZh: "异环国际服 · 英文（推荐）",
+    labelEn: "NTE Global · English (recommended)",
     url: "https://nte.perfectworld.com/en/article/news/index.html",
   },
   {
     id: "global-cn",
-    label: "Global · 中文",
+    labelZh: "异环国际服 · 中文",
+    labelEn: "NTE Global · Chinese",
     url: "https://nte.perfectworld.com/cn/article/news/index.html",
   },
   {
     id: "global-jp",
-    label: "Global · 日本語",
+    labelZh: "异环国际服 · 日文",
+    labelEn: "NTE Global · Japanese",
     url: "https://nte.perfectworld.com/jp/article/news/index.html",
   },
   {
     id: "mainland-cn",
-    label: "中国大陆 · 中文",
+    labelZh: "异环中国大陆服 · 中文",
+    labelEn: "NTE Mainland China · Chinese",
     url: "https://yh.wanmei.com/news/index.html",
   },
 ] as const;
@@ -191,6 +222,12 @@ export function App() {
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [directUrl, setDirectUrl] = useState("");
+  const [localKind, setLocalKind] = useState<"document" | "transcript" | "gdd">("document");
+  const [localTitle, setLocalTitle] = useState("");
+  const [localKey, setLocalKey] = useState("");
+  const [localFilename, setLocalFilename] = useState("notes.txt");
+  const [localContent, setLocalContent] = useState("");
+  const [localMediaType, setLocalMediaType] = useState<"text/plain" | "text/markdown" | "text/vtt" | "application/json">("text/plain");
   const [targetSite, setTargetSite] = useState("en");
   const [targetCategory, setTargetCategory] = useState("gamenews");
   const [targetPages, setTargetPages] = useState(1);
@@ -201,6 +238,7 @@ export function App() {
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [knowledgeRefreshToken, setKnowledgeRefreshToken] = useState(0);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const t = copy[language];
 
   const loadProjects = useCallback(async () => {
@@ -215,9 +253,21 @@ export function App() {
       );
       setConnected(true);
     } catch {
+      setAuthStatus({ enabled: false, bootstrap_required: false, user: null, zero_cost: true });
       setConnected(false);
     }
   }, []);
+
+  const refreshAuth = useCallback(async () => {
+    try {
+      const value = await api<AuthStatus>("/api/auth/status");
+      setAuthStatus(value);
+      if (!value.enabled || value.user) await loadProjects();
+    } catch {
+      setAuthStatus({ enabled: false, bootstrap_required: false, user: null, zero_cost: true });
+      setConnected(false);
+    }
+  }, [loadProjects]);
 
   const refreshWorkspace = useCallback(async () => {
     if (!projectId) return;
@@ -240,8 +290,8 @@ export function App() {
   }, [projectId, t.failed]);
 
   useEffect(() => {
-    void loadProjects();
-  }, [loadProjects]);
+    void refreshAuth();
+  }, [refreshAuth]);
 
   useEffect(() => {
     void refreshWorkspace();
@@ -369,6 +419,61 @@ export function App() {
     void submitRun(`/api/projects/${projectId}/source-imports`, { url: directUrl }, "direct");
   };
 
+  const chooseLocalFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const mediaType = extension === "md" ? "text/markdown" : extension === "vtt" ? "text/vtt" : extension === "json" ? "application/json" : "text/plain";
+    setLocalFilename(file.name);
+    setLocalTitle((current) => current || file.name.replace(/\.[^.]+$/, ""));
+    setLocalKey(
+      (current) =>
+        current ||
+        file.name
+          .toLowerCase()
+          .replace(/\.[^.]+$/, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "") ||
+        `local-${Date.now()}`,
+    );
+    setLocalMediaType(mediaType);
+    if (extension === "vtt") setLocalKind("transcript");
+    setLocalContent(await file.text());
+  };
+
+  const importLocal = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy("local");
+    setMessage(null);
+    try {
+      await api(`/api/projects/${projectId}/local-sources`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey("local-source"),
+        },
+        body: JSON.stringify({
+          document_key: localKey,
+          kind: localKind,
+          title: localTitle,
+          filename: localFilename,
+          content: localContent,
+          media_type: localMediaType,
+          locale: "en",
+          region: "private",
+        }),
+      });
+      setLocalContent("");
+      await refreshWorkspace();
+      setKnowledgeRefreshToken((current) => current + 1);
+      setMessage({ kind: "ok", text: t.localImported });
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const importCandidate = (candidate: Candidate) =>
     submitRun(
       `/api/projects/${projectId}/source-imports`,
@@ -392,7 +497,7 @@ export function App() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">G</span>
-          <div><strong>GameCrafter</strong><small>Marketing Studio · M5</small></div>
+          <div><strong>GameCrafter</strong><small>Knowledge + Marketing Studio</small></div>
         </div>
         <div className="top-actions">
           <span className="privacy-note">{t.privacy}</span>
@@ -402,7 +507,14 @@ export function App() {
         </div>
       </header>
 
-      {connected === null ? (
+      {authStatus === null ? (
+        <section className="center-state" aria-live="polite">
+          <span className="status-dot" />
+          <h1>{t.loadingProject}</h1>
+        </section>
+      ) : authStatus.enabled && !authStatus.user ? (
+        <AccountWorkspace status={authStatus} language={language} gate onChanged={refreshAuth} />
+      ) : connected === null ? (
         <section className="center-state" aria-live="polite">
           <span className="status-dot" />
           <h1>{t.loadingProject}</h1>
@@ -455,6 +567,9 @@ export function App() {
                 <button className={tab === "knowledge" ? "active" : ""} type="button" onClick={() => setTab("knowledge")}>
                   {t.knowledge}
                 </button>
+                <button className={tab === "gdd" ? "active" : ""} type="button" onClick={() => setTab("gdd")}>
+                  {t.gdd}
+                </button>
                 <button className={tab === "marketing" ? "active" : ""} type="button" onClick={() => setTab("marketing")}>
                   {t.marketing}
                 </button>
@@ -463,6 +578,9 @@ export function App() {
                 </button>
                 <button className={tab === "runs" ? "active" : ""} type="button" onClick={() => setTab("runs")}>
                   {t.runs}<span>{runs.length}</span>
+                </button>
+                <button className={tab === "account" ? "active" : ""} type="button" onClick={() => setTab("account")}>
+                  {t.account}
                 </button>
                 <button className="refresh-button" type="button" onClick={refreshAll}>{t.refresh}</button>
               </nav>
@@ -477,15 +595,16 @@ export function App() {
                       <div className="profile-grid">
                         {quickProfiles.map((profile) => (
                           <button key={profile.id} type="button" disabled={busy !== null} onClick={() => void quickDiscover(profile)}>
-                            <span>{profile.label}</span><small>{busy === `quick-${profile.id}` ? t.working : t.discover}</small>
+                            <span>{language === "zh-CN" ? profile.labelZh : profile.labelEn}</span><small>{busy === `quick-${profile.id}` ? t.working : t.discover}</small>
                           </button>
                         ))}
                       </div>
                     </section>
 
-                    <form className="panel" onSubmit={targetedDiscover}>
-                      <div className="panel-heading"><span>02</span><div><h2>{t.targeted}</h2></div></div>
-                      <div className="form-grid">
+                    <details className="panel advanced-panel">
+                      <summary><span>02</span><strong>{t.targeted}</strong><small>{t.advanced}</small></summary>
+                      <form className="advanced-form" onSubmit={targetedDiscover}>
+                        <div className="form-grid">
                         <label><span>{t.profile}</span><select value={targetSite} onChange={(e) => setTargetSite(e.target.value)}>
                           <option value="en">Global · EN</option><option value="cn">Global · 中文</option>
                           <option value="jp">Global · 日本語</option><option value="mainland-cn">中国大陆 · 中文</option>
@@ -497,15 +616,32 @@ export function App() {
                         <label><span>{t.limit}</span><input type="number" min="1" max="100" value={targetLimit} onChange={(e) => setTargetLimit(Number(e.target.value))} /></label>
                         <label><span>{t.dateFrom}</span><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
                         <label><span>{t.dateTo}</span><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
-                      </div>
-                      <button className="primary-button" type="submit" disabled={busy !== null}>{busy === "targeted" ? t.working : t.discover}</button>
-                    </form>
+                        </div>
+                        <button className="primary-button" type="submit" disabled={busy !== null}>{busy === "targeted" ? t.working : t.discover}</button>
+                      </form>
+                    </details>
 
-                    <form className="panel" onSubmit={importDirect}>
-                      <div className="panel-heading"><span>03</span><div><h2>{t.direct}</h2></div></div>
-                      <label className="url-field"><span>{t.url}</span><input required type="url" placeholder="https://nte.perfectworld.com/…" value={directUrl} onChange={(e) => setDirectUrl(e.target.value)} /></label>
-                      <button className="primary-button" type="submit" disabled={busy !== null}>{busy === "direct" ? t.working : t.import}</button>
-                    </form>
+                    <details className="panel advanced-panel">
+                      <summary><span>03</span><strong>{t.direct}</strong><small>{t.advanced}</small></summary>
+                      <form className="advanced-form" onSubmit={importDirect}>
+                        <label className="url-field"><span>{t.url}</span><input required type="url" placeholder="https://nte.perfectworld.com/…" value={directUrl} onChange={(e) => setDirectUrl(e.target.value)} /></label>
+                        <button className="primary-button" type="submit" disabled={busy !== null}>{busy === "direct" ? t.working : t.import}</button>
+                      </form>
+                    </details>
+                    <details className="panel advanced-panel">
+                      <summary><span>04</span><strong>{t.local}</strong><small>{t.advanced}</small></summary>
+                      <form className="advanced-form" onSubmit={importLocal}>
+                        <p>{t.localHint}</p>
+                        <div className="form-grid">
+                          <label><span>{t.localKind}</span><select value={localKind} onChange={(event) => setLocalKind(event.target.value as typeof localKind)}><option value="document">Document</option><option value="transcript">Transcript</option><option value="gdd">GDD</option></select></label>
+                          <label><span>{t.localFile}</span><input type="file" accept=".txt,.md,.vtt,.json,text/plain,text/markdown,text/vtt,application/json" onChange={(event) => void chooseLocalFile(event)} /></label>
+                          <label><span>{t.localTitle}</span><input required maxLength={500} value={localTitle} onChange={(event) => setLocalTitle(event.target.value)} /></label>
+                          <label><span>{t.localKey}</span><input required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxLength={100} value={localKey} onChange={(event) => setLocalKey(event.target.value.toLowerCase())} /></label>
+                          <label className="span-two"><span>{t.localContent}</span><textarea required maxLength={2000000} value={localContent} onChange={(event) => setLocalContent(event.target.value)} /></label>
+                        </div>
+                        <button className="primary-button" type="submit" disabled={busy !== null}>{busy === "local" ? t.working : t.import}</button>
+                      </form>
+                    </details>
                   </aside>
 
                   <div className="evidence-stack">
@@ -526,7 +662,7 @@ export function App() {
                       <div className="list-heading"><h2>{t.captured}</h2><span>{sources.length}</span></div>
                       {sources.length === 0 ? <div className="empty-state">{t.noSources}</div> : sources.map((source) => (
                         <article className="source-card" key={source.id}>
-                          <div><div className="card-meta"><span>{source.site}</span><span>{source.locale}</span><span>{source.source_type}</span></div><a href={source.url} target="_blank" rel="noreferrer">{source.url}</a></div>
+                          <div><div className="card-meta"><span>{source.site === "local-private" ? t.localPrivate : source.site}</span><span>{source.locale}</span><span>{source.source_type}</span></div>{source.url.startsWith("local://") ? <span>{t.localPrivate}</span> : <a href={source.url} target="_blank" rel="noreferrer">{source.url}</a>}</div>
                           <dl><div><dt>{t.versions}</dt><dd>{source.version_count}</dd></div><div><dt>{t.assets}</dt><dd>{source.asset_count}</dd></div><div><dt>{t.latest}</dt><dd>{source.latest_version ?? "—"}</dd></div></dl>
                         </article>
                       ))}
@@ -549,10 +685,19 @@ export function App() {
                   }}
                   onGoSources={() => setTab("sources")}
                 />
+              ) : tab === "gdd" && selectedProject ? (
+                <GddWorkspace projectId={projectId} language={language} />
               ) : tab === "marketing" && selectedProject ? (
                 <MarketingWorkspace projectId={projectId} language={language} />
               ) : tab === "scripts" && selectedProject ? (
                 <ScriptWorkspace projectId={projectId} language={language} />
+              ) : tab === "account" ? (
+                <AccountWorkspace
+                  status={authStatus}
+                  language={language}
+                  onChanged={refreshAuth}
+                  project={selectedProject}
+                />
               ) : (
                 <div className="runs-layout">
                   <section className="run-list">

@@ -18,6 +18,9 @@ class SourceType(StrEnum):
     UPDATE = "update"
     EVENT = "event"
     GUIDE_FAQ = "guide_faq"
+    DOCUMENT = "document"
+    TRANSCRIPT = "transcript"
+    GDD = "gdd"
     OTHER = "other"
 
 
@@ -42,6 +45,7 @@ class CaptureMethod(StrEnum):
 
     HTTP = "http"
     PLAYWRIGHT = "playwright"
+    LOCAL_UPLOAD = "local_upload"
 
 
 class ChangeKind(StrEnum):
@@ -55,6 +59,7 @@ class AssetRole(StrEnum):
     """Purpose of a stored object inside an immutable source version."""
 
     RAW_HTML = "raw_html"
+    RAW_DOCUMENT = "raw_document"
     NORMALIZED_TEXT = "normalized_text"
     IMAGE = "image"
 

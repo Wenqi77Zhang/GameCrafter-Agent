@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     ollama_model: str = Field(default="qwen3.5:4b", min_length=1, max_length=120)
     ollama_timeout_seconds: float = Field(default=180.0, gt=0, le=600)
     knowledge_document_max_bytes: int = Field(default=2 * 1024 * 1024, gt=0)
+    trend_connector_timeout_seconds: float = Field(default=45.0, gt=0, le=60)
+    trend_connector_max_bytes: int = Field(default=2 * 1024 * 1024, gt=0, le=10 * 1024 * 1024)
+    youtube_api_key: SecretStr | None = None
+    auth_enabled: bool = False
+    auth_cookie_secure: bool = False
+    auth_session_hours: int = Field(default=168, ge=1, le=24 * 30)
+    quota_projects_per_user: int = Field(default=10, ge=1, le=1000)
+    quota_team_members: int = Field(default=20, ge=1, le=1000)
 
 
 @lru_cache

@@ -10,16 +10,28 @@ from functools import lru_cache
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException, Response, status
+from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
+from gamecrafter.api.routes.identity import identity_service, request_actor_id
+from gamecrafter.config.settings import get_settings
+from gamecrafter.infrastructure.database.identity_service import IdentityError
+from gamecrafter.infrastructure.database.local_source_service import (
+    DatabaseLocalSourceService,
+    LocalSourceError,
+)
+from gamecrafter.infrastructure.database.project_portability import (
+    DatabaseProjectPortabilityService,
+    ProjectPortabilityError,
+)
 from gamecrafter.infrastructure.database.session import get_session_factory
 from gamecrafter.infrastructure.database.workspace_service import (
     DatabaseWorkspaceService,
     WorkspaceConflictError,
     WorkspaceNotFoundError,
 )
+from gamecrafter.infrastructure.storage.local import LocalObjectStorage
 
 router = APIRouter(prefix="/api", tags=["workspace"])
 
@@ -32,6 +44,23 @@ IdempotencyKey = Annotated[
 @lru_cache
 def _service() -> DatabaseWorkspaceService:
     return DatabaseWorkspaceService(get_session_factory())
+
+
+@lru_cache
+def _local_source_service() -> DatabaseLocalSourceService:
+    settings = get_settings()
+    return DatabaseLocalSourceService(
+        get_session_factory(),
+        LocalObjectStorage(settings.object_storage_path),
+        max_bytes=settings.knowledge_document_max_bytes,
+    )
+
+
+@lru_cache
+def _portability_service() -> DatabaseProjectPortabilityService:
+    return DatabaseProjectPortabilityService(
+        get_session_factory(), LocalObjectStorage(get_settings().object_storage_path)
+    )
 
 
 class ProjectCreate(BaseModel):
@@ -84,6 +113,25 @@ class SourceImportCreate(BaseModel):
         return self
 
 
+class LocalSourceCreate(BaseModel):
+    document_key: str = Field(
+        min_length=2,
+        max_length=100,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
+    kind: Literal["document", "transcript", "gdd"]
+    title: str = Field(min_length=1, max_length=500)
+    filename: str = Field(min_length=1, max_length=240)
+    content: str = Field(min_length=1, max_length=2_000_000)
+    media_type: Literal["text/plain", "text/markdown", "text/vtt", "application/json"]
+    locale: str = Field(default="en", min_length=2, max_length=16)
+    region: str = Field(default="private", min_length=2, max_length=32)
+
+
+class ProjectDelete(BaseModel):
+    confirmation: str = Field(min_length=8, max_length=100)
+
+
 def _translate_error(error: Exception) -> HTTPException:
     if isinstance(error, WorkspaceNotFoundError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error))
@@ -96,18 +144,45 @@ def _translate_error(error: Exception) -> HTTPException:
 
 
 @router.get("/projects")
-def list_projects() -> dict[str, object]:
-    return {"items": _service().list_projects()}
+def list_projects(request: Request) -> dict[str, object]:
+    items = _service().list_projects()
+    if not get_settings().auth_enabled:
+        return {"items": items}
+    user = getattr(request.state, "user", None)
+    if not user:
+        return {"items": []}
+    allowed = identity_service().accessible_project_ids(UUID(str(user["id"])))
+    return {"items": [item for item in items if str(item["id"]) in allowed]}
 
 
 @router.post("/projects", status_code=status.HTTP_201_CREATED)
-def create_project(command: ProjectCreate, response: Response) -> dict[str, object]:
+def create_project(
+    command: ProjectCreate, response: Response, request: Request
+) -> dict[str, object]:
+    user_id: UUID | None = None
+    team_id: UUID | None = None
+    if get_settings().auth_enabled:
+        user = getattr(request.state, "user", None)
+        if not user:
+            raise HTTPException(status_code=401, detail="authentication required")
+        user_id = UUID(str(user["id"]))
+        try:
+            identity_service().enforce_project_quota(
+                user_id, get_settings().quota_projects_per_user
+            )
+            team_id = identity_service().default_team_id(user_id)
+        except IdentityError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
     project, created = _service().create_project(
         slug=command.slug,
         name=command.name,
         default_locale=command.default_locale,
-        actor_id="local-user",
+        actor_id=request_actor_id(request),
     )
+    if created and user_id is not None and team_id is not None:
+        identity_service().assign_project(
+            project_id=UUID(str(project["id"])), user_id=user_id, team_id=team_id
+        )
     if not created:
         response.status_code = status.HTTP_200_OK
     return project
@@ -145,12 +220,38 @@ def project_overview(project_id: UUID) -> dict[str, object]:
         raise _translate_error(error) from error
 
 
+@router.get("/projects/{project_id}/portable-export")
+def portable_project_export(project_id: UUID) -> StreamingResponse:
+    try:
+        filename, payload = _portability_service().export_zip(project_id)
+    except ProjectPortabilityError as error:
+        code = 404 if "not found" in str(error) else 409
+        raise HTTPException(status_code=code, detail=str(error)) from error
+    return StreamingResponse(
+        iter([payload]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.delete("/projects/{project_id}")
+def delete_project(project_id: UUID, command: ProjectDelete) -> dict[str, object]:
+    try:
+        return _portability_service().delete_project(
+            project_id=project_id, confirmation=command.confirmation
+        )
+    except ProjectPortabilityError as error:
+        code = 404 if "not found" in str(error) else 409
+        raise HTTPException(status_code=code, detail=str(error)) from error
+
+
 @router.post("/projects/{project_id}/source-discoveries", status_code=202)
 def create_discovery(
     project_id: UUID,
     command: DiscoveryCreate,
     idempotency_key: IdempotencyKey,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     payload = command.model_dump(mode="json", exclude_none=True)
     payload["listing_urls"] = [str(url) for url in command.listing_urls]
@@ -160,7 +261,7 @@ def create_discovery(
             idempotency_key=idempotency_key,
             task_type="source.discover",
             payload=payload,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
         )
     except (WorkspaceNotFoundError, WorkspaceConflictError) as error:
         raise _translate_error(error) from error
@@ -175,6 +276,7 @@ def create_source_import(
     command: SourceImportCreate,
     idempotency_key: IdempotencyKey,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     payload = (
         {"url": str(command.url)}
@@ -187,7 +289,7 @@ def create_source_import(
             idempotency_key=idempotency_key,
             task_type="source.capture",
             payload=payload,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
             candidate_id=command.candidate_id,
         )
     except (WorkspaceNotFoundError, WorkspaceConflictError) as error:
@@ -195,6 +297,33 @@ def create_source_import(
     if not created:
         response.status_code = status.HTTP_200_OK
     return run
+
+
+@router.post("/projects/{project_id}/local-sources", status_code=status.HTTP_201_CREATED)
+def create_local_source(
+    project_id: UUID,
+    command: LocalSourceCreate,
+    idempotency_key: IdempotencyKey,
+    response: Response,
+    request: Request,
+) -> dict[str, object]:
+    try:
+        item, created = _local_source_service().import_text(
+            project_id=project_id,
+            **command.model_dump(),
+            actor_id=request_actor_id(request),
+            command_key=idempotency_key,
+        )
+    except LocalSourceError as error:
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if "project not found" in str(error)
+            else status.HTTP_409_CONFLICT
+        )
+        raise HTTPException(status_code=code, detail=str(error)) from error
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return item
 
 
 @router.get("/runs/{run_id}")
@@ -210,12 +339,13 @@ def retry_run(
     run_id: UUID,
     idempotency_key: IdempotencyKey,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     try:
         run, created = _service().retry_run(
             run_id=run_id,
             command_key=idempotency_key,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
         )
     except (WorkspaceNotFoundError, WorkspaceConflictError) as error:
         raise _translate_error(error) from error

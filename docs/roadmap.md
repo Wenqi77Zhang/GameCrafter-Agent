@@ -12,7 +12,7 @@ Each milestone must produce a runnable slice, tests, a failure case, evidence, a
 | M4 | Script, evaluation, revision, versions, export | bounded revisions and mandatory final approval |
 | M5 | Public product and portfolio case | deployment, usability, responsive UI, observability |
 | M6 | Accounts and individual commercialization | isolation, deletion/export, private storage, quotas |
-| M7 | Small-team collaboration | RBAC, approval, audit, revocation, team billing |
+| M7 | Small-team collaboration | RBAC, approval, audit, revocation, team isolation |
 | M8 | Structured GDD Studio | chapter-level evidence, assumptions, revisions, shared knowledge |
 
 The course game-marketing requirements remain the minimum acceptance line for M2–M5, but the product is no longer constrained to a four-day team submission.
@@ -81,6 +81,10 @@ The course game-marketing requirements remain the minimum acceptance line for M2
   production-preview containers, and desktop/mobile Chromium acceptance. This is the portfolio-ready
   local release.
 
-M6–M8 remain deliberate future product expansions. They are not part of the local first-release
-boundary and are not represented as implemented: accounts require identity and isolation policy,
-teams require RBAC and revocation, and GDD Studio requires a separately approved private-data model.
+M1.1 and M6–M8 are complete for the local-product boundary. M1.1 adds bounded private text,
+transcript, and owned-GDD evidence plus real public trend connectors. M6 adds optional local
+identity, isolation, quotas, portable export, project deletion, and guarded account deletion. M7
+adds four-role RBAC, expiring hashed invitations, and immediate revocation. M8 adds source-bound GDD
+chapters, exact offsets, separately reviewed assumptions, and immutable revisions. Payment
+processing and anonymous public hosting remain outside scope because they contradict the confirmed
+zero-cost local boundary and would require a separate commercial/privacy decision.

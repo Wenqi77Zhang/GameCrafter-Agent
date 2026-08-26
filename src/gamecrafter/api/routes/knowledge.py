@@ -7,9 +7,10 @@ from hashlib import sha256
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
 
+from gamecrafter.api.routes.identity import request_actor_id
 from gamecrafter.api.routes.workspace import IdempotencyKey
 from gamecrafter.application.agent_review_jobs import REVIEW_KNOWLEDGE_TASK
 from gamecrafter.application.knowledge_jobs import EXTRACT_KNOWLEDGE_TASK
@@ -236,13 +237,14 @@ def create_knowledge_entity(
     project_id: UUID,
     command: KnowledgeEntityCreate,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     try:
         entity, created = _knowledge_workspace().create_entity(
             project_id=project_id,
             display_name=command.display_name,
             aliases=command.aliases,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
         )
     except (KnowledgeWorkspaceNotFoundError, KnowledgeWorkspaceConflictError) as error:
         raise _delivery_error(error) from error
@@ -256,6 +258,7 @@ def correct_knowledge_entity(
     project_id: UUID,
     entity_id: UUID,
     command: KnowledgeEntityCorrection,
+    request: Request,
 ) -> dict[str, object]:
     try:
         entity, _ = _knowledge_workspace().correct_entity(
@@ -264,7 +267,7 @@ def correct_knowledge_entity(
             display_name=command.display_name,
             aliases=command.aliases,
             change_reason=command.change_reason,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
         )
         return entity
     except (KnowledgeWorkspaceNotFoundError, KnowledgeWorkspaceConflictError) as error:
@@ -276,13 +279,14 @@ def archive_knowledge_entity(
     project_id: UUID,
     entity_id: UUID,
     command: KnowledgeEntityArchive,
+    request: Request,
 ) -> dict[str, object]:
     try:
         entity, _ = _knowledge_workspace().archive_entity(
             project_id=project_id,
             entity_id=entity_id,
             change_reason=command.change_reason,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
         )
         return entity
     except (KnowledgeWorkspaceNotFoundError, KnowledgeWorkspaceConflictError) as error:
@@ -336,6 +340,7 @@ def create_knowledge_extraction(
     command: KnowledgeExtractionCreate,
     idempotency_key: IdempotencyKey,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     """Queue extraction only when an exact, local, zero-cost replay can run."""
 
@@ -364,7 +369,7 @@ def create_knowledge_extraction(
                 "source_version_id": str(command.source_version_id),
                 "subject_entity_id": str(command.subject_entity_id),
             },
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
         )
     except KnowledgeStateError as error:
         raise _state_error(error) from error
@@ -424,6 +429,7 @@ def create_agent_review(
     command: KnowledgeAgentReviewCreate,
     idempotency_key: IdempotencyKey,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     extraction_run_id = command.extraction_run_id
     if get_settings().model_provider != "ollama":
@@ -441,7 +447,7 @@ def create_agent_review(
             idempotency_key=idempotency_key,
             task_type=REVIEW_KNOWLEDGE_TASK,
             payload={"extraction_run_id": str(extraction_run_id)},
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
         )
     except (AgentReviewNotFoundError, AgentReviewConflictError) as error:
         code = 404 if isinstance(error, AgentReviewNotFoundError) else 409
@@ -468,6 +474,7 @@ def confirm_agent_review_pack(
     project_id: UUID,
     command: KnowledgeAgentReviewCreate,
     idempotency_key: IdempotencyKey,
+    request: Request,
 ) -> dict[str, object]:
     extraction_run_id = command.extraction_run_id
     try:
@@ -475,7 +482,7 @@ def confirm_agent_review_pack(
             project_id=project_id,
             extraction_run_id=extraction_run_id,
             command_key=idempotency_key,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
         )
     except (AgentReviewNotFoundError, AgentReviewConflictError) as error:
         code = 404 if isinstance(error, AgentReviewNotFoundError) else 409
@@ -492,6 +499,7 @@ def review_knowledge_claim(
     command: ClaimReviewCreate,
     idempotency_key: IdempotencyKey,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     try:
         review, created = _reviews().review_claim(
@@ -500,7 +508,7 @@ def review_knowledge_claim(
             decision=command.decision,
             approved_value=command.approved_value,
             reason=command.reason,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
             command_key=idempotency_key,
         )
     except (ReviewServiceNotFoundError, ReviewServiceConflictError) as error:
@@ -529,11 +537,11 @@ def list_knowledge_reviews(
 
 
 @router.post("/projects/{project_id}/knowledge-conflicts/reconcile")
-def reconcile_knowledge_conflicts(project_id: UUID) -> dict[str, object]:
+def reconcile_knowledge_conflicts(project_id: UUID, request: Request) -> dict[str, object]:
     """Run deterministic comparison without a model call or automatic resolution."""
 
     try:
-        return _conflicts().reconcile(project_id=project_id, actor_id="local-user")
+        return _conflicts().reconcile(project_id=project_id, actor_id=request_actor_id(request))
     except ConflictServiceNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -569,6 +577,7 @@ def close_knowledge_conflict(
     command: ConflictClosureCreate,
     idempotency_key: IdempotencyKey,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     try:
         closure, created = _reviews().close_conflict(
@@ -576,7 +585,7 @@ def close_knowledge_conflict(
             conflict_group_id=conflict_group_id,
             outcome=command.outcome,
             reason=command.reason,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
             command_key=idempotency_key,
         )
     except (ReviewServiceNotFoundError, ReviewServiceConflictError) as error:
@@ -603,12 +612,13 @@ def publish_knowledge_snapshot(
     command: KnowledgeSnapshotCreate,
     idempotency_key: IdempotencyKey,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     try:
         snapshot, created = _snapshots().publish(
             project_id=project_id,
             notes=command.notes,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
             command_key=idempotency_key,
         )
     except (SnapshotServiceNotFoundError, SnapshotServiceConflictError) as error:

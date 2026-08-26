@@ -68,7 +68,9 @@ function workspaceFetch(options?: {
   trendSignals?: Array<Record<string, unknown>>;
   topicCandidates?: Array<Record<string, unknown>>;
   scriptRuns?: Array<Record<string, unknown>>;
+  gddDocuments?: Array<Record<string, unknown>>;
   runs?: Array<Record<string, unknown>>;
+  auth?: { enabled: boolean; bootstrap_required: boolean; user: Record<string, unknown> | null };
 }) {
   const projects = options?.projects ?? [project];
   const candidates = options?.candidates ?? [];
@@ -81,17 +83,27 @@ function workspaceFetch(options?: {
   const trendSignals = [...(options?.trendSignals ?? [])];
   const topicCandidates = [...(options?.topicCandidates ?? [])];
   const scriptRuns = [...(options?.scriptRuns ?? [])];
+  const gddDocuments = [...(options?.gddDocuments ?? [])];
   const runs: Array<Record<string, unknown>> = [...(options?.runs ?? [])];
+  const auth = options?.auth ?? { enabled: false, bootstrap_required: false, user: null };
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const path = String(input);
     if (path === "/api/health") return json({ status: "ok" });
+    if (path === "/api/auth/status") return json({ ...auth, zero_cost: true });
+    if (path === "/api/auth/bootstrap" && init?.method === "POST") {
+      auth.user = { id: "owner-1", email: "owner@example.com", display_name: "Owner", status: "active" };
+      auth.bootstrap_required = false;
+      return json(auth.user, 201);
+    }
+    if (path === "/api/auth/me") return json({ user: auth.user, teams: [] });
+    if (path === "/api/trend-connectors") return json({ items: [{ key: "gdelt-doc", name: "GDELT DOC 2.0", mode: "live_public_api", available: true, requires_secret: false, cost: "zero_paid_api" }, { key: "google-news-rss", name: "Google News RSS", mode: "live_public_rss", available: true, requires_secret: false, cost: "zero_paid_api" }, { key: "youtube-data", name: "YouTube Data API", mode: "official_api_free_quota", available: false, requires_secret: true, cost: "zero_paid_api_quota_limited" }, { key: "tiktok-manual", name: "TikTok Creative Center", mode: "manual_verified_import", available: true, requires_secret: false, cost: "zero_paid_api" }] });
     if (path === "/api/projects" && init?.method === "POST") return json(project, 201);
     if (path === "/api/projects") return json({ items: projects });
     if (path.endsWith("/candidates")) return json({ items: candidates });
     if (path.endsWith("/overview")) {
       return json({
         project_id: project.id,
-        release: "M5",
+        release: "M8-local",
         next_action: "sources",
         stages: [
           { key: "sources", status: "not_started" },
@@ -115,6 +127,15 @@ function workspaceFetch(options?: {
         },
       });
     }
+    if (path.endsWith("/local-sources") && init?.method === "POST") {
+      return json({
+        source_id: "local-source-1",
+        source_version_id: "local-version-1",
+        source_version_number: 1,
+        created: true,
+        site: "local-private",
+      }, 201);
+    }
     if (path.endsWith("/sources")) return json({ items: [] });
     if (path.endsWith("/runs") && !path.endsWith("/script-runs")) return json({ items: runs });
     if (path.endsWith("/knowledge-entities") && init?.method === "POST") {
@@ -136,6 +157,23 @@ function workspaceFetch(options?: {
       return json(corrected);
     }
     if (path.endsWith("/source-versions")) return json({ items: versions });
+    if (path.endsWith("/gdd/documents") && init?.method === "POST") {
+      const payload = JSON.parse(String(init.body)) as { source_version_id: string };
+      const document = {
+        id: "gdd-1", source_version_id: payload.source_version_id, title: "NTE design",
+        status: "draft", parser_version: "markdown-heading-offsets-v1", chapter_count: 1,
+        assumption_count: 0, revision_count: 0, updated_at: "2026-08-26T00:00:00Z",
+        chapters: [{ id: "chapter-1", parent_chapter_id: null, ordinal: 0, heading_level: 1, title: "Vision", start_offset: 0, end_offset: 25, content: "# Vision\nUrban exploration", content_sha256: "a".repeat(64) }],
+        assumptions: [], revisions: [],
+      };
+      gddDocuments.splice(0, gddDocuments.length, document);
+      return json(document, 201);
+    }
+    if (path.endsWith("/gdd/documents")) return json({ items: gddDocuments });
+    if (path.includes("/gdd/documents/")) {
+      const document = gddDocuments[0];
+      return document ? json(document) : json({ detail: "not found" }, 404);
+    }
     if (path.includes("/knowledge-extraction-capability")) {
       return json(
         options?.capability ?? {
@@ -248,6 +286,9 @@ function workspaceFetch(options?: {
     if (path.endsWith("/knowledge-snapshots")) return json({ items: snapshots });
     if (path.endsWith("/marketing-tasks")) return json({ items: marketingTasks });
     if (path.endsWith("/trend-signals")) return json({ items: trendSignals });
+    if (path.includes("/trend-connectors/") && path.endsWith("/sync") && init?.method === "POST") {
+      return json({ connector: "google-news-rss", fetched: 1, inserted: 1, reused: 0, items: [] });
+    }
     if (path.endsWith("/topic-candidates") && init?.method !== "POST") {
       return json({ items: topicCandidates });
     }
@@ -375,6 +416,22 @@ test("can create the local NTE validation project", async () => {
   );
 });
 
+test("bootstraps the first local owner before exposing tenant projects", async () => {
+  const fetchMock = workspaceFetch({
+    auth: { enabled: true, bootstrap_required: true, user: null },
+  });
+  render(<App />);
+  fireEvent.change(await screen.findByLabelText("显示名称"), { target: { value: "Owner" } });
+  fireEvent.change(screen.getByLabelText("邮箱"), { target: { value: "owner@example.com" } });
+  fireEvent.change(screen.getByLabelText("密码（至少 12 位）"), { target: { value: "local-password-123" } });
+  fireEvent.click(screen.getByRole("button", { name: "继续" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+    "/api/auth/bootstrap",
+    expect.objectContaining({ method: "POST" }),
+  ));
+  expect(await screen.findByRole("heading", { name: "把公开资料变成可复核的游戏知识。" })).toBeInTheDocument();
+});
+
 test("requires a human click before importing a discovered candidate", async () => {
   const candidate = {
     id: "candidate-1",
@@ -406,6 +463,61 @@ test("requires a human click before importing a discovered candidate", async () 
   await waitFor(() =>
     expect(FakeEventSource.instances[0]?.url).toBe("/api/runs/run-1/events"),
   );
+});
+
+test("imports user-owned text as private local evidence", async () => {
+  const fetchMock = workspaceFetch();
+  render(<App />);
+
+  fireEvent.click(await screen.findByText("导入本地资料"));
+  fireEvent.change(await screen.findByLabelText("资料标题"), { target: { value: "异环设计摘要" } });
+  fireEvent.change(screen.getByLabelText("稳定标识"), { target: { value: "nte-design-notes" } });
+  fireEvent.change(screen.getByLabelText("文本内容"), {
+    target: { value: "城市探索以超自然事件为核心。" },
+  });
+  fireEvent.click(screen.getAllByRole("button", { name: "导入" }).at(-1)!);
+
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+    "/api/projects/project-1/local-sources",
+    expect.objectContaining({
+      method: "POST",
+      body: expect.stringContaining('"document_key":"nte-design-notes"'),
+    }),
+  ));
+  expect(await screen.findByText("本地资料已保存为不可变证据版本。")).toBeInTheDocument();
+});
+
+test("structures a private GDD into exact source chapters", async () => {
+  const fetchMock = workspaceFetch({
+    versions: [{ ...sourceVersion, id: "gdd-version-1", title: "NTE design", source_type: "gdd" }],
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "GDD" }));
+  fireEvent.click(await screen.findByRole("button", { name: "建立章节结构" }));
+
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+    "/api/projects/project-1/gdd/documents",
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ source_version_id: "gdd-version-1" }),
+    }),
+  ));
+  expect(await screen.findByRole("heading", { name: "Vision" })).toBeInTheDocument();
+  expect(screen.getByText(/原文位置: 0–25/)).toBeInTheDocument();
+  expect(screen.getByText(/设计假设不会进入事实知识库/)).toBeInTheDocument();
+});
+
+test("syncs a real public trend connector from the Marketing workspace", async () => {
+  const fetchMock = workspaceFetch();
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "营销" }));
+  fireEvent.click(await screen.findByRole("button", { name: "获取近期热点" }));
+
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+    "/api/projects/project-1/trend-connectors/google-news-rss/sync",
+    expect.objectContaining({ method: "POST" }),
+  ));
+  expect(await screen.findByText("热点同步完成: 1/1")).toBeInTheDocument();
 });
 
 test("shows a visible API failure instead of a fake healthy state", async () => {
@@ -774,6 +886,9 @@ test("publishes and renders an immutable approved knowledge snapshot", async () 
   expect(await screen.findByText(/知识快照已发布/)).toBeInTheDocument();
   expect(screen.getByText("《异环》官网英文资料首轮人工确认")).toBeInTheDocument();
   expect(screen.getByText("1 条事实")).toBeInTheDocument();
+  expect(screen.getByLabelText("多来源联合视图")).toHaveTextContent("独立来源1");
+  expect(screen.getByLabelText("多来源联合视图")).toHaveTextContent("仅单一来源1");
+  expect(screen.getByText("multi-source-synthesis-v1")).toBeInTheDocument();
 });
 
 test("shows traceable deterministic topic fit and records the human gate", async () => {

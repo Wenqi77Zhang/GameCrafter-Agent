@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from gamecrafter.api.app import create_app
 from gamecrafter.api.routes import marketing
+from gamecrafter.infrastructure.trends.connectors import TrendObservation
 
 PROJECT_ID = UUID("10000000-0000-0000-0000-000000000001")
 SNAPSHOT_ID = UUID("20000000-0000-0000-0000-000000000001")
@@ -43,6 +44,24 @@ class FakeMarketingService:
     def review_topic(self, **kwargs):
         self.calls.append(("review", kwargs))
         return {"id": "review-1", "decision": kwargs["decision"]}, True
+
+
+class FakeTrendConnector:
+    def gdelt(self, **kwargs):
+        assert kwargs["query"] == "open world games"
+        return [
+            TrendObservation(
+                source_name="GDELT · example.com",
+                source_url="https://example.com/trend",
+                observed_at=datetime(2026, 8, 26, tzinfo=UTC),
+                region="US",
+                signal_type="topic",
+                title="Open-world games",
+                keywords=("open", "world", "games"),
+                notes="Public index observation.",
+                external_id="https://example.com/trend",
+            )
+        ]
 
 
 def test_marketing_api_exposes_traceable_trend_to_topic_commands(monkeypatch) -> None:
@@ -106,3 +125,26 @@ def test_marketing_api_requires_idempotency_header() -> None:
         },
     )
     assert response.status_code == 422
+
+
+def test_live_connector_sync_creates_attributed_system_signal(monkeypatch) -> None:
+    fake = FakeMarketingService()
+    monkeypatch.setattr(marketing, "_service", lambda: fake)
+    monkeypatch.setattr(marketing, "_connector", lambda: FakeTrendConnector())
+    client = TestClient(create_app())
+
+    catalog = client.get("/api/trend-connectors")
+    assert catalog.status_code == 200
+    assert catalog.json()["items"][0]["key"] == "gdelt-doc"
+    response = client.post(
+        f"/api/projects/{PROJECT_ID}/trend-connectors/gdelt-doc/sync",
+        headers={"Idempotency-Key": "live-connector-sync"},
+        json={"query": "open world games", "region": "US", "max_results": 5},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["inserted"] == 1
+    call = fake.calls[-1]
+    assert call[0] == "signal"
+    assert call[1]["actor_type"] == "system"
+    assert call[1]["actor_id"] == "marketing.trend_analyst"

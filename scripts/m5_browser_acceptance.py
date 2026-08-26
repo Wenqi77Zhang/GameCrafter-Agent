@@ -1,4 +1,4 @@
-"""Desktop and mobile browser acceptance for the guided M5 product shell."""
+"""Desktop and mobile browser acceptance for the complete local product shell."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def main() -> int:
     output = (
         Path(args.output)
         if args.output
-        else Path(tempfile.gettempdir()) / "gamecrafter-m5-browser"
+        else Path(tempfile.gettempdir()) / "gamecrafter-complete-local-browser"
     )
     output.mkdir(parents=True, exist_ok=True)
 
@@ -54,7 +54,7 @@ def main() -> int:
         )
         assert_page(mobile, args.url, output / "mobile.png")
         browser.close()
-    print("M5 desktop and mobile browser acceptance passed.")
+    print("Complete local desktop and mobile browser acceptance passed.")
     return 0
 
 

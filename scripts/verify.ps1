@@ -39,7 +39,7 @@ try {
 
     if ($env:GAMECRAFTER_BROWSER_ACCEPTANCE_URL) {
         & $python scripts/m5_browser_acceptance.py --url $env:GAMECRAFTER_BROWSER_ACCEPTANCE_URL
-        if ($LASTEXITCODE -ne 0) { throw "M5 browser acceptance failed." }
+        if ($LASTEXITCODE -ne 0) { throw "Complete local browser acceptance failed." }
     }
 
     Write-Host "All locally available GameCrafter checks passed."

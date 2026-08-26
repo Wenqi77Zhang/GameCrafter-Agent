@@ -4,7 +4,9 @@ x-app-environment: &app-environment
   GAMECRAFTER_ENVIRONMENT: production
   GAMECRAFTER_DATABASE_URL: postgresql+psycopg://gamecrafter:${GAMECRAFTER_POSTGRES_PASSWORD:-gamecrafter_local_only_change_me}@postgres:5432/gamecrafter
   GAMECRAFTER_OBJECT_STORAGE_PATH: /app/data/objects
-  GAMECRAFTER_WEB_ORIGIN: http://localhost:8080
+  GAMECRAFTER_WEB_ORIGIN: http://127.0.0.1:8080
+  GAMECRAFTER_AUTH_ENABLED: ${GAMECRAFTER_AUTH_ENABLED:-false}
+  GAMECRAFTER_AUTH_COOKIE_SECURE: ${GAMECRAFTER_AUTH_COOKIE_SECURE:-false}
   GAMECRAFTER_MODEL_PROVIDER: replay
   GAMECRAFTER_MODEL_REPLAY_FIXTURE_PATH: /app/fixtures/nte/official-homepage-en-v1.json
 
@@ -81,4 +83,3 @@ services:
 volumes:
   gamecrafter-postgres-production:
   gamecrafter-objects:
-

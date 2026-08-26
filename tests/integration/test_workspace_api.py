@@ -93,6 +93,21 @@ class FakeWorkspace:
         ], True
 
 
+class FakeLocalSourceService:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def import_text(self, **kwargs):
+        self.calls.append(kwargs)
+        return {
+            "source_id": "local-source-1",
+            "source_version_id": "local-version-1",
+            "version_number": 1,
+            "private": True,
+            "document_kind": kwargs["kind"],
+        }, True
+
+
 def test_workspace_commands_require_explicit_idempotency_and_human_candidate() -> None:
     fake = FakeWorkspace()
     original = workspace._service
@@ -129,6 +144,32 @@ def test_project_overview_exposes_guided_progress_without_mutation() -> None:
         assert response.json()["metrics"]["api_cost_usd"] == 0
     finally:
         workspace._service = original
+
+
+def test_private_local_source_import_is_explicit_and_idempotent() -> None:
+    fake = FakeLocalSourceService()
+    original = workspace._local_source_service
+    workspace._local_source_service = lambda: fake
+    try:
+        response = TestClient(create_app()).post(
+            f"/api/projects/{PROJECT_ID}/local-sources",
+            headers={"Idempotency-Key": "local-source-command"},
+            json={
+                "document_key": "nte-transcript",
+                "kind": "transcript",
+                "title": "NTE interview",
+                "filename": "nte.vtt",
+                "content": "WEBVTT\n\nWelcome to Hethereau.",
+                "media_type": "text/vtt",
+                "locale": "en",
+                "region": "private",
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["private"] is True
+        assert fake.calls[0]["command_key"] == "local-source-command"
+    finally:
+        workspace._local_source_service = original
 
 
 def test_failed_run_retry_requires_an_explicit_idempotency_key() -> None:

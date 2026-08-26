@@ -181,11 +181,14 @@ class DatabaseMarketingService:
         notes: str | None,
         actor_id: str,
         command_key: str,
+        actor_type: str = "human",
     ) -> tuple[dict[str, object], bool]:
         clean_url = self._https_url(source_url)
         clean_observed = self._aware_utc(observed_at)
         if signal_type not in {"hashtag", "sound", "topic", "search"}:
             raise MarketingServiceConflictError("unsupported trend signal type")
+        if actor_type not in {"human", "system", "model"}:
+            raise MarketingServiceConflictError("unsupported trend signal actor type")
         if metric_value is not None and (metric_value < 0 or metric_value > 10**15):
             raise MarketingServiceConflictError("trend metric must be between 0 and 10^15")
         clean_keywords = self._keywords(keywords)
@@ -268,7 +271,7 @@ class DatabaseMarketingService:
                     AuditEventRecord(
                         project_id=project_id,
                         event_type="trend.signal_recorded",
-                        actor_type="human",
+                        actor_type=actor_type,
                         actor_id=str(values["actor_id"]),
                         payload={
                             "trend_signal_id": str(signal.id),

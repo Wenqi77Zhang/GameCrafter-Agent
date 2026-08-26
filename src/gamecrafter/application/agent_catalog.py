@@ -21,6 +21,16 @@ class AgentSpec:
     human_gate_after: bool
 
 
+SOURCE_STEWARD = AgentSpec(
+    "knowledge.source_steward",
+    "Source and Provenance Steward",
+    "1.0.0",
+    AgentMode.DETERMINISTIC,
+    "bounded source validation and provenance capture",
+    True,
+)
+
+
 KNOWLEDGE_CURATOR = AgentSpec(
     "knowledge.curator",
     "Knowledge Curator",
@@ -69,14 +79,24 @@ QUALITY_CRITIC = AgentSpec(
     "bounded evaluator optimizer",
     True,
 )
+GDD_ARCHITECT = AgentSpec(
+    "design.gdd_architect",
+    "GDD Architect",
+    "1.0.0",
+    AgentMode.DETERMINISTIC,
+    "exact-offset chapter structuring and assumption separation",
+    True,
+)
 
 AGENT_CATALOG = (
+    SOURCE_STEWARD,
     KNOWLEDGE_CURATOR,
     KNOWLEDGE_REVIEWER,
     TREND_ANALYST,
     CAMPAIGN_STRATEGIST,
     SCRIPT_WRITER,
     QUALITY_CRITIC,
+    GDD_ARCHITECT,
 )
 
 
