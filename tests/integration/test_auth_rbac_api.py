@@ -52,8 +52,8 @@ def test_invited_reviewer_can_read_then_immediately_loses_access_after_revocatio
     _clear_runtime_caches()
     Base.metadata.create_all(get_engine())
     app = create_app()
-    owner = TestClient(app)
-    member = TestClient(app)
+    owner = TestClient(app, headers={"Origin": "http://localhost:5173"})
+    member = TestClient(app, headers={"Origin": "http://localhost:5173"})
     anonymous = TestClient(app)
     try:
         assert owner.get("/api/auth/status").json()["bootstrap_required"] is True
@@ -133,6 +133,30 @@ def test_invited_reviewer_can_read_then_immediately_loses_access_after_revocatio
         )
         assert member.get(f"/api/projects/{project['id']}/sources").status_code == 403
         assert member.get(f"/api/runs/{run['id']}").status_code == 403
+        archive = owner.get(f"/api/projects/{project['id']}/portable-export")
+        assert archive.status_code == 200
+        assert (
+            owner.request(
+                "DELETE",
+                f"/api/projects/{project['id']}",
+                json={"confirmation": "DELETE isolated"},
+            ).status_code
+            == 200
+        )
+        restored = owner.post(
+            "/api/project-restores",
+            content=archive.content,
+            headers={"Content-Type": "application/zip"},
+        )
+        assert restored.status_code == 201
+        assert restored.json()["project_id"] == project["id"]
+        assert owner.get(f"/api/projects/{project['id']}/overview").status_code == 200
+        assert owner.get("/api/auth/status").headers["x-frame-options"] == "DENY"
+        assert (
+            "default-src 'self'" in owner.get("/api/auth/status").headers["content-security-policy"]
+        )
+        owner.headers.pop("Origin")
+        assert owner.post("/api/auth/logout").status_code == 403
     finally:
         owner.close()
         member.close()

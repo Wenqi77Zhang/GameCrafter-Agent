@@ -561,25 +561,25 @@ export function App() {
                 onNavigate={setTab}
               />
               <nav className="tabs" aria-label="Workspace">
-                <button className={tab === "sources" ? "active" : ""} type="button" onClick={() => setTab("sources")}>
+                <button aria-current={tab === "sources" ? "page" : undefined} className={tab === "sources" ? "active" : ""} type="button" onClick={() => setTab("sources")}>
                   {t.sources}<span>{sources.length}</span>
                 </button>
-                <button className={tab === "knowledge" ? "active" : ""} type="button" onClick={() => setTab("knowledge")}>
+                <button aria-current={tab === "knowledge" ? "page" : undefined} className={tab === "knowledge" ? "active" : ""} type="button" onClick={() => setTab("knowledge")}>
                   {t.knowledge}
                 </button>
-                <button className={tab === "gdd" ? "active" : ""} type="button" onClick={() => setTab("gdd")}>
+                <button aria-current={tab === "gdd" ? "page" : undefined} className={tab === "gdd" ? "active" : ""} type="button" onClick={() => setTab("gdd")}>
                   {t.gdd}
                 </button>
-                <button className={tab === "marketing" ? "active" : ""} type="button" onClick={() => setTab("marketing")}>
+                <button aria-current={tab === "marketing" ? "page" : undefined} className={tab === "marketing" ? "active" : ""} type="button" onClick={() => setTab("marketing")}>
                   {t.marketing}
                 </button>
-                <button className={tab === "scripts" ? "active" : ""} type="button" onClick={() => setTab("scripts")}>
+                <button aria-current={tab === "scripts" ? "page" : undefined} className={tab === "scripts" ? "active" : ""} type="button" onClick={() => setTab("scripts")}>
                   {t.scripts}
                 </button>
-                <button className={tab === "runs" ? "active" : ""} type="button" onClick={() => setTab("runs")}>
+                <button aria-current={tab === "runs" ? "page" : undefined} className={tab === "runs" ? "active" : ""} type="button" onClick={() => setTab("runs")}>
                   {t.runs}<span>{runs.length}</span>
                 </button>
-                <button className={tab === "account" ? "active" : ""} type="button" onClick={() => setTab("account")}>
+                <button aria-current={tab === "account" ? "page" : undefined} className={tab === "account" ? "active" : ""} type="button" onClick={() => setTab("account")}>
                   {t.account}
                 </button>
                 <button className="refresh-button" type="button" onClick={refreshAll}>{t.refresh}</button>

@@ -18,11 +18,25 @@ For the current click-by-click flow and Agent responsibility boundaries, see
 
 ## Current status
 
-The repository has reached **M8-local complete product release**. The original NTE-to-English-
+The repository has reached the **M12 mature local product release**. The original NTE-to-English-
 TikTok workflow remains the primary validation path; later capabilities extend it without
 weakening evidence, privacy, human control, or the strict zero-paid-API boundary.
 
-The completion release adds:
+The M9–M12 maturity pass adds:
+
+- versioned, restorable project backups with database-record and SHA-256 object verification,
+  bounded ZIP expansion, traversal/link/undeclared-object rejection and rollback on failure;
+- an Account recovery interface that works even when no project remains, assigns restored data to
+  the authenticated local owner, and applies the existing project quota;
+- owner-controlled team role changes and atomic team/project ownership transfer, with immediate
+  permission changes and durable security events;
+- persistent privacy-preserving login throttling, exact-Origin protection for authenticated
+  browser writes, CSP, framing/MIME/referrer/device-permission security headers and visible keyboard
+  focus;
+- a mature local-product acceptance matrix defining what is verified and what deliberately remains
+  outside the zero-cost local boundary.
+
+The M6–M8 completion release adds:
 
 - real public trend retrieval through no-key Google News RSS and GDELT DOC, with optional official
   YouTube Data API free quota and a deliberately manual, verified TikTok path;
@@ -33,7 +47,7 @@ The completion release adds:
 - optional local accounts with scrypt password hashing, opaque revocable sessions, project tenant
   isolation, owner/editor/reviewer/viewer RBAC, expiring single-use invitations, revocation, and
   local quotas;
-- complete project ZIP export, typed-confirmation project deletion with unreferenced-object cleanup,
+- complete project ZIP export/restore, typed-confirmation project deletion with unreferenced-object cleanup,
   and guarded account deletion;
 - GDD Studio with exact source offsets, chapter hierarchy, separately reviewed assumptions, and
   immutable canonical revisions;

@@ -8,7 +8,9 @@ WORKDIR /app
 COPY pyproject.toml README.md LICENSE alembic.ini ./
 COPY src ./src
 COPY migrations ./migrations
-COPY apps ./apps
+COPY apps/__init__.py ./apps/__init__.py
+COPY apps/api ./apps/api
+COPY apps/worker ./apps/worker
 COPY fixtures ./fixtures
 
 RUN python -m pip install --no-cache-dir .

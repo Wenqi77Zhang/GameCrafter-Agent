@@ -58,14 +58,14 @@ def create_app() -> FastAPI:
     async def local_identity_boundary(request: Request, call_next):
         if not settings.auth_enabled:
             return await call_next(request)
+        token = request.cookies.get(SESSION_COOKIE)
         origin = request.headers.get("origin")
         if (
             request.method not in {"GET", "HEAD", "OPTIONS"}
-            and origin
-            and origin.rstrip("/") != str(settings.web_origin).rstrip("/")
+            and token
+            and (not origin or origin.rstrip("/") != str(settings.web_origin).rstrip("/"))
         ):
             return JSONResponse({"detail": "request origin denied"}, status_code=403)
-        token = request.cookies.get(SESSION_COOKIE)
         user = identity_service().authenticate(token)
         request.state.user = user
         public = request.url.path in {
@@ -96,6 +96,20 @@ def create_app() -> FastAPI:
                 return JSONResponse({"detail": "project permission denied"}, status_code=403)
             request.state.project_role = role
         return await call_next(request)
+
+    @application.middleware("http")
+    async def browser_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; "
+            "form-action 'self'; object-src 'none'; img-src 'self' data: https:; "
+            "style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
+        )
+        return response
 
     application.include_router(health_router)
     application.include_router(readiness_router)

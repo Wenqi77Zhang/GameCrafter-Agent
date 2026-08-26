@@ -53,6 +53,10 @@ class InviteAccept(BaseModel):
     token: str = Field(min_length=32, max_length=200)
 
 
+class MemberRoleChange(BaseModel):
+    role: Literal["editor", "reviewer", "viewer"]
+
+
 class AccountDelete(BaseModel):
     confirmation: str = Field(min_length=8, max_length=340)
 
@@ -216,6 +220,33 @@ def revoke_member(request: Request, team_id: UUID, member_user_id: UUID) -> None
             team_id=team_id,
             actor_id=_user_id(request),
             member_user_id=member_user_id,
+        )
+    except IdentityError as error:
+        raise _fail(error) from error
+
+
+@router.put("/teams/{team_id}/members/{member_user_id}/role")
+def change_member_role(
+    request: Request, team_id: UUID, member_user_id: UUID, command: MemberRoleChange
+) -> dict[str, object]:
+    try:
+        return identity_service().change_member_role(
+            team_id=team_id,
+            actor_id=_user_id(request),
+            member_user_id=member_user_id,
+            role=command.role,
+        )
+    except IdentityError as error:
+        raise _fail(error) from error
+
+
+@router.post("/teams/{team_id}/ownership/{target_user_id}")
+def transfer_team_ownership(
+    request: Request, team_id: UUID, target_user_id: UUID
+) -> dict[str, object]:
+    try:
+        return identity_service().transfer_ownership(
+            team_id=team_id, actor_id=_user_id(request), target_user_id=target_user_id
         )
     except IdentityError as error:
         raise _fail(error) from error

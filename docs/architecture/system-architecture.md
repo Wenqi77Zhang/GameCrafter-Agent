@@ -848,6 +848,49 @@ the signal's immutable record time, market alignment uses the frozen task market
 completeness reports whether a metric was recorded, and relevance preserves exact matching snapshot
 member IDs. Scores rank candidates but cannot pass the human approval gate.
 
+## Verified recovery and ownership DAG
+
+```mermaid
+flowchart LR
+    OWNER["Local owner"] --> EXPORT["Versioned portable export"]
+    EXPORT --> RECORDS["Typed project-descendant records"]
+    EXPORT --> OBJECTS["Content-addressed private objects"]
+    RECORDS --> ARCHIVE["M9 ZIP manifest"]
+    OBJECTS --> ARCHIVE
+    ARCHIVE --> LIMITS{"Entry, path, expansion and version checks"}
+    LIMITS -->|fail| REJECT["Reject without database writes"]
+    LIMITS -->|pass| DIGESTS{"Counts and every SHA-256 match"}
+    DIGESTS -->|fail| REJECT
+    DIGESTS -->|pass| COLLISIONS{"Project, slug and object collision checks"}
+    COLLISIONS -->|fail| REJECT
+    COLLISIONS -->|pass| RESTORE["Single database transaction"]
+    RESTORE --> TENANT["Assign current owner and default team"]
+    RESTORE --> DEDUPE["Remap already stored immutable objects"]
+    RESTORE --> PROJECT["Recovered project and full lineage"]
+```
+
+Archived `owner_user_id` and `team_id` values are never trusted during restore. In account mode the
+API applies the current authenticated owner, their default local team and the existing project
+quota. Stored objects can be reused only when digest, key, size and media type all agree. Any
+transaction failure removes newly written unreferenced objects.
+
+```mermaid
+flowchart LR
+    CURRENT["Current team owner"] --> ROLE["Change non-owner role"]
+    CURRENT --> TRANSFER{"Explicit ownership transfer"}
+    ROLE --> RBAC["Permission change effective immediately"]
+    TRANSFER --> TARGET["Active target member becomes owner"]
+    TRANSFER --> PRIOR["Prior owner becomes editor"]
+    TRANSFER --> PROJECTS["All team projects change owner atomically"]
+    TARGET --> AUDIT["Append-only security audit"]
+    PRIOR --> AUDIT
+    PROJECTS --> AUDIT
+```
+
+The ownership operation is a database transaction, not an Agent decision. No specialist Agent can
+grant itself access, weaken a role, change a team owner, bypass the exact-Origin boundary, or alter
+the recovery verifier.
+
 ## Component relationships
 
 ```mermaid
@@ -922,7 +965,7 @@ The Agent Harness is the controlled execution shell around graphs and specialist
 
 The initial ToolProvider implementations stay in-process. MCP is an optional adapter behind that boundary only when cross-application reuse or independently managed permissions justify it; MCP is not the core orchestration mechanism.
 
-## Planned specialist nodes
+## Implemented specialist roles
 
 - Knowledge Curator: structures evidence-backed game claims.
 - Trend Analyst: clusters trends and explains task fit.

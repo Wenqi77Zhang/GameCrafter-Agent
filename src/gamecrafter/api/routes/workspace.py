@@ -22,6 +22,7 @@ from gamecrafter.infrastructure.database.local_source_service import (
     LocalSourceError,
 )
 from gamecrafter.infrastructure.database.project_portability import (
+    DEFAULT_PORTABLE_ARCHIVE_MAX_BYTES,
     DatabaseProjectPortabilityService,
     ProjectPortabilityError,
 )
@@ -232,6 +233,39 @@ def portable_project_export(project_id: UUID) -> StreamingResponse:
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/project-restores", status_code=status.HTTP_201_CREATED)
+async def restore_portable_project(request: Request) -> dict[str, object]:
+    if request.headers.get("content-type", "").split(";", 1)[0].strip() != "application/zip":
+        raise HTTPException(
+            status_code=415, detail="a portable application/zip archive is required"
+        )
+    owner_user_id: UUID | None = None
+    team_id: UUID | None = None
+    if get_settings().auth_enabled:
+        user = getattr(request.state, "user", None)
+        if not user:
+            raise HTTPException(status_code=401, detail="authentication required")
+        owner_user_id = UUID(str(user["id"]))
+        try:
+            identity_service().enforce_project_quota(
+                owner_user_id, get_settings().quota_projects_per_user
+            )
+            team_id = identity_service().default_team_id(owner_user_id)
+        except IdentityError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+    archive = bytearray()
+    async for chunk in request.stream():
+        archive.extend(chunk)
+        if len(archive) > DEFAULT_PORTABLE_ARCHIVE_MAX_BYTES:
+            raise HTTPException(status_code=413, detail="project archive exceeds the size limit")
+    try:
+        return _portability_service().restore_zip(
+            bytes(archive), owner_user_id=owner_user_id, team_id=team_id
+        )
+    except ProjectPortabilityError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @router.delete("/projects/{project_id}")

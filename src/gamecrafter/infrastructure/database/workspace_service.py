@@ -189,7 +189,7 @@ class DatabaseWorkspaceService:
             )
             return {
                 "project_id": str(project_id),
-                "release": "M8-local",
+                "release": "M12-local",
                 "next_action": next_action,
                 "stages": stages,
                 "metrics": {

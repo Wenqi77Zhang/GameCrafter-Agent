@@ -29,6 +29,14 @@ def assert_page(page: Page, url: str, screenshot: Path) -> None:
     if errors:
         raise AssertionError(f"browser console errors: {errors}")
     page.screenshot(path=str(screenshot), full_page=True)
+    page.get_by_role("button", name="账户与团队").click()
+    page.get_by_label("恢复项目备份").wait_for(timeout=10_000)
+    if page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 2"):
+        raise AssertionError("account recovery page has horizontal overflow")
+    page.screenshot(
+        path=str(screenshot.with_name(f"{screenshot.stem}-recovery{screenshot.suffix}")),
+        full_page=True,
+    )
 
 
 def main() -> int:

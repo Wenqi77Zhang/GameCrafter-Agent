@@ -109,3 +109,80 @@ def test_account_deletion_requires_exact_confirmation_and_removes_sessions() -> 
         identity.delete_account(user_id=user_id, confirmation="DELETE")
     identity.delete_account(user_id=user_id, confirmation="DELETE departing@example.com")
     assert identity.authenticate(token) is None
+
+
+def test_owner_can_change_roles_and_atomically_transfer_team_and_projects() -> None:
+    sessions, identity = _service()
+    owner, _ = identity.bootstrap(
+        email="owner@example.com", display_name="Owner", password="owner-password-123"
+    )
+    owner_id = UUID(str(owner["id"]))
+    from gamecrafter.infrastructure.database.models import (
+        ProjectRecord,
+        TeamMembershipRecord,
+        UserRecord,
+    )
+
+    with sessions.begin() as session:
+        member = UserRecord(
+            email_normalized="next@example.com",
+            display_name="Next owner",
+            password_hash=identity._hash_password("member-password-123"),  # noqa: SLF001
+        )
+        session.add(member)
+        session.flush()
+        member_id = member.id
+    team = identity.create_team(user_id=owner_id, name="Transfer studio")
+    team_id = UUID(str(team["id"]))
+    with sessions.begin() as session:
+        session.add(
+            TeamMembershipRecord(team_id=team_id, user_id=member_id, role="viewer", status="active")
+        )
+        project = ProjectRecord(
+            slug="transfer-game",
+            name="Transfer game",
+            owner_user_id=owner_id,
+            team_id=team_id,
+        )
+        session.add(project)
+        session.flush()
+        project_id = project.id
+
+    changed = identity.change_member_role(
+        team_id=team_id, actor_id=owner_id, member_user_id=member_id, role="reviewer"
+    )
+    assert changed["role"] == "reviewer"
+    assert identity.project_role(project_id=project_id, user_id=member_id) == "reviewer"
+    identity.transfer_ownership(team_id=team_id, actor_id=owner_id, target_user_id=member_id)
+    assert identity.project_role(project_id=project_id, user_id=member_id) == "owner"
+    assert identity.project_role(project_id=project_id, user_id=owner_id) == "editor"
+    with sessions() as session:
+        assert session.get(ProjectRecord, project_id).owner_user_id == member_id
+    with pytest.raises(IdentityError, match="permission denied"):
+        identity.change_member_role(
+            team_id=team_id,
+            actor_id=owner_id,
+            member_user_id=member_id,
+            role="viewer",
+        )
+    events = {item["event_type"] for item in identity.list_security_events(member_id)}
+    assert {"team.member_role_changed", "team.ownership_transferred"} <= events
+
+
+def test_login_throttle_persists_without_storing_raw_email() -> None:
+    sessions, identity = _service()
+    identity.bootstrap(
+        email="owner@example.com", display_name="Owner", password="owner-password-123"
+    )
+    for _ in range(5):
+        with pytest.raises(IdentityError, match="invalid email or password"):
+            identity.login(email="Owner@Example.com", password="wrong-password")
+    with pytest.raises(IdentityError, match="invalid email or password"):
+        identity.login(email="owner@example.com", password="owner-password-123")
+    from gamecrafter.infrastructure.database.models import AuthLoginThrottleRecord
+
+    with sessions() as session:
+        record = session.query(AuthLoginThrottleRecord).one()
+        assert record.failure_count == 5
+        assert record.blocked_until is not None
+        assert record.email_sha256 != "owner@example.com"

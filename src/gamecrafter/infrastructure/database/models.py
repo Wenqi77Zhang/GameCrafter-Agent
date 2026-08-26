@@ -1659,6 +1659,24 @@ class UserSessionRecord(Base):
     )
 
 
+class AuthLoginThrottleRecord(Base):
+    """Privacy-preserving persistent login throttle keyed only by normalized-email hash."""
+
+    __tablename__ = "auth_login_throttles"
+    __table_args__ = (
+        CheckConstraint("length(email_sha256) = 64", name="ck_auth_login_throttles_digest"),
+        CheckConstraint("failure_count >= 0", name="ck_auth_login_throttles_count"),
+    )
+
+    email_sha256: Mapped[str] = mapped_column(String(64), primary_key=True)
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    blocked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
 class TeamRecord(Base):
     """Small-team tenant boundary."""
 

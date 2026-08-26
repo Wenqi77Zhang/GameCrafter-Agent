@@ -96,6 +96,10 @@ function workspaceFetch(options?: {
       return json(auth.user, 201);
     }
     if (path === "/api/auth/me") return json({ user: auth.user, teams: [] });
+    if (path === "/api/auth/security-events") return json({ items: [] });
+    if (path === "/api/project-restores" && init?.method === "POST") {
+      return json({ restored: true, project_id: project.id, project_slug: project.slug }, 201);
+    }
     if (path === "/api/trend-connectors") return json({ items: [{ key: "gdelt-doc", name: "GDELT DOC 2.0", mode: "live_public_api", available: true, requires_secret: false, cost: "zero_paid_api" }, { key: "google-news-rss", name: "Google News RSS", mode: "live_public_rss", available: true, requires_secret: false, cost: "zero_paid_api" }, { key: "youtube-data", name: "YouTube Data API", mode: "official_api_free_quota", available: false, requires_secret: true, cost: "zero_paid_api_quota_limited" }, { key: "tiktok-manual", name: "TikTok Creative Center", mode: "manual_verified_import", available: true, requires_secret: false, cost: "zero_paid_api" }] });
     if (path === "/api/projects" && init?.method === "POST") return json(project, 201);
     if (path === "/api/projects") return json({ items: projects });
@@ -103,7 +107,7 @@ function workspaceFetch(options?: {
     if (path.endsWith("/overview")) {
       return json({
         project_id: project.id,
-        release: "M8-local",
+        release: "M12-local",
         next_action: "sources",
         stages: [
           { key: "sources", status: "not_started" },
@@ -414,6 +418,30 @@ test("can create the local NTE validation project", async () => {
       expect.objectContaining({ method: "POST" }),
     ),
   );
+});
+
+test("restores a verified project backup from the account workspace", async () => {
+  const fetchMock = workspaceFetch();
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "账户与团队" }));
+  const file = new File(["portable archive"], "gamecrafter-nte.zip", {
+    type: "application/zip",
+  });
+  fireEvent.change(await screen.findByLabelText("恢复项目备份"), {
+    target: { files: [file] },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "恢复项目备份" }));
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/project-restores",
+      expect.objectContaining({
+        method: "POST",
+        body: file,
+        headers: { "Content-Type": "application/zip" },
+      }),
+    ),
+  );
+  expect(await screen.findByText("备份已验证并恢复。")).toBeInTheDocument();
 });
 
 test("bootstraps the first local owner before exposing tenant projects", async () => {

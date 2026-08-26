@@ -10,11 +10,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
+    AuthLoginThrottleRecord,
     ProjectRecord,
     SecurityAuditRecord,
     TeamInvitationRecord,
@@ -39,6 +40,7 @@ class DatabaseIdentityService:
     def __init__(self, session_factory: sessionmaker[Session], *, session_hours: int = 168) -> None:
         self._sessions = session_factory
         self._session_hours = session_hours
+        self._dummy_password_hash = self._hash_password(secrets.token_urlsafe(24))
 
     def status(self) -> dict[str, object]:
         with self._sessions() as session:
@@ -83,20 +85,69 @@ class DatabaseIdentityService:
 
     def login(self, *, email: str, password: str) -> tuple[dict[str, object], str]:
         clean_email = self._email(email)
+        if self._login_blocked(clean_email):
+            raise IdentityError("invalid email or password")
         with self._sessions.begin() as session:
             user = session.scalar(
                 select(UserRecord).where(UserRecord.email_normalized == clean_email)
             )
-            if (
-                user is None
-                or user.status != "active"
-                or not self._verify_password(password, user.password_hash)
-            ):
-                raise IdentityError("invalid email or password")
-            token = self._new_session(session, user.id)
-            self._audit(session, "account.login_succeeded", user.id, None)
-            result = self._user(user)
+            valid_password = self._verify_password(
+                password, user.password_hash if user is not None else self._dummy_password_hash
+            )
+            if user is None or user.status != "active" or not valid_password:
+                invalid = True
+            else:
+                invalid = False
+                digest = hashlib.sha256(clean_email.encode()).hexdigest()
+                session.execute(
+                    delete(AuthLoginThrottleRecord).where(
+                        AuthLoginThrottleRecord.email_sha256 == digest
+                    )
+                )
+                token = self._new_session(session, user.id)
+                self._audit(session, "account.login_succeeded", user.id, None)
+                result = self._user(user)
+        if invalid:
+            self._record_login_failure(clean_email)
+            raise IdentityError("invalid email or password")
         return result, token
+
+    def _login_blocked(self, clean_email: str) -> bool:
+        digest = hashlib.sha256(clean_email.encode()).hexdigest()
+        now = utc_now()
+        with self._sessions() as session:
+            record = session.get(AuthLoginThrottleRecord, digest)
+            if record is None or record.blocked_until is None:
+                return False
+            blocked_until = record.blocked_until
+            if blocked_until.tzinfo is None:
+                blocked_until = blocked_until.replace(tzinfo=UTC)
+            return blocked_until > now
+
+    def _record_login_failure(self, clean_email: str) -> None:
+        digest = hashlib.sha256(clean_email.encode()).hexdigest()
+        now = utc_now()
+        window = timedelta(minutes=15)
+        with self._sessions.begin() as session:
+            record = session.get(AuthLoginThrottleRecord, digest)
+            if record is None:
+                record = AuthLoginThrottleRecord(
+                    email_sha256=digest, failure_count=1, window_started_at=now
+                )
+                session.add(record)
+                return
+            started = record.window_started_at
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=UTC)
+            if started + window <= now:
+                record.failure_count = 1
+                record.window_started_at = now
+                record.blocked_until = None
+            else:
+                record.failure_count += 1
+                if record.failure_count >= 5:
+                    record.blocked_until = now + window
+            record.updated_at = now
 
     def register_with_invitation(
         self,
@@ -375,6 +426,95 @@ class DatabaseIdentityService:
                 team_id,
                 {"member_user_id": str(member_user_id), "prior_role": membership.role},
             )
+
+    def change_member_role(
+        self,
+        *,
+        team_id: UUID,
+        actor_id: UUID,
+        member_user_id: UUID,
+        role: Literal["editor", "reviewer", "viewer"],
+    ) -> dict[str, object]:
+        """Change a non-owner role immediately and preserve the prior role in the audit trail."""
+
+        with self._sessions.begin() as session:
+            self._require_role(session, team_id, actor_id, "owner")
+            membership = session.scalar(
+                select(TeamMembershipRecord).where(
+                    TeamMembershipRecord.team_id == team_id,
+                    TeamMembershipRecord.user_id == member_user_id,
+                    TeamMembershipRecord.status == "active",
+                )
+            )
+            if membership is None:
+                raise IdentityError("active team member not found")
+            if membership.role == "owner":
+                raise IdentityError("transfer ownership before changing the owner role")
+            prior_role = membership.role
+            membership.role = role
+            self._audit(
+                session,
+                "team.member_role_changed",
+                actor_id,
+                team_id,
+                {
+                    "member_user_id": str(member_user_id),
+                    "prior_role": prior_role,
+                    "new_role": role,
+                },
+            )
+            user = session.get(UserRecord, member_user_id)
+            return {
+                "user_id": str(member_user_id),
+                "display_name": user.display_name,
+                "email": user.email_normalized,
+                "role": role,
+            }
+
+    def transfer_ownership(
+        self, *, team_id: UUID, actor_id: UUID, target_user_id: UUID
+    ) -> dict[str, object]:
+        """Atomically transfer a team and every team project to an active member."""
+
+        if actor_id == target_user_id:
+            raise IdentityError("target user is already the owner")
+        with self._sessions.begin() as session:
+            owner = self._require_role(session, team_id, actor_id, "owner")
+            target = session.scalar(
+                select(TeamMembershipRecord).where(
+                    TeamMembershipRecord.team_id == team_id,
+                    TeamMembershipRecord.user_id == target_user_id,
+                    TeamMembershipRecord.status == "active",
+                )
+            )
+            if target is None:
+                raise IdentityError("active target team member not found")
+            if target.role == "owner":
+                raise IdentityError("target user is already the owner")
+            prior_target_role = target.role
+            owner.role = "editor"
+            target.role = "owner"
+            team = session.get(TeamRecord, team_id)
+            if team is None:
+                raise IdentityError("team not found")
+            team.created_by = target_user_id
+            session.execute(
+                update(ProjectRecord)
+                .where(ProjectRecord.team_id == team_id)
+                .values(owner_user_id=target_user_id)
+            )
+            self._audit(
+                session,
+                "team.ownership_transferred",
+                actor_id,
+                team_id,
+                {
+                    "prior_owner_user_id": str(actor_id),
+                    "new_owner_user_id": str(target_user_id),
+                    "prior_target_role": prior_target_role,
+                },
+            )
+            return self._team(session, team, "editor")
 
     def delete_account(self, *, user_id: UUID, confirmation: str) -> None:
         with self._sessions.begin() as session:

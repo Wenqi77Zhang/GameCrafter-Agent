@@ -11,7 +11,7 @@ The first release is local and single-user. That reduces but does not remove dat
 - validate URL schemes, hosts, redirects, response size, and file types before ingestion;
 - redact secrets and unnecessary private content from logs;
 - preserve source and human-review metadata;
-- support deletion of sources, snapshots, runs, and local uploads;
+- support owner-confirmed whole-project deletion of sources, snapshots, runs, and local uploads;
 - do not scrape authenticated or disallowed sources.
 - bind the development database port to `127.0.0.1`, not all network interfaces;
 - keep the Docker volume, database URL, local snapshots, and raw data outside Git;
@@ -54,5 +54,22 @@ garbage-collection command must delete only objects proven unreferenced by `sour
 The M1-A database password is a local-only development placeholder. It must be replaced before any
 shared or remote deployment.
 
-Authentication, tenant isolation, private object storage, account export/deletion, rate limiting,
-and privacy terms are release gates for M6, not current M1-B features.
+## Mature local identity, recovery, and deletion
+
+- Passwords use scrypt with per-password salt; opaque session and invitation tokens are persisted
+  only as SHA-256 digests. Five failures within 15 minutes persistently throttle the normalized
+  email digest without storing another copy of the address.
+- Cookie-authenticated write requests require the exact configured browser Origin. `SameSite=Strict`,
+  HTTP-only cookies, CSP, frame denial, MIME sniff prevention and a minimal Permissions Policy add
+  independent browser defenses. Remote TLS deployment must set secure cookies and a new threat
+  model; the current product remains loopback-only.
+- Portable restore accepts only the current versioned schema, canonical content-addressed object
+  paths, declared entries and exact record/file counts and hashes. Tenant identifiers from an
+  archive are discarded in account mode.
+- PostgreSQL immutability triggers reject normal updates/deletes. The owner-only, typed-confirmed
+  whole-project purge first resolves exact descendant IDs with constraints active, then uses
+  transaction-local replica mode solely while deleting those IDs. The setting ends at transaction
+  completion; partial failure rolls back the database and object deletion begins only after commit.
+- The bundled local PostgreSQL application role owns its local database and can use that transaction-
+  local purge. A future hosted deployment must replace this with a narrowly privileged server-side
+  purge procedure and a non-owner runtime role before accepting untrusted tenants.
