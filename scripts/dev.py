@@ -9,12 +9,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-from gamecrafter.config.development import development_commands
-from gamecrafter.config.settings import get_settings
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 
 
 def main() -> int:
-    repo_root = Path(__file__).resolve().parents[1]
+    from gamecrafter.config.development import development_commands
+    from gamecrafter.config.settings import get_settings
+
     settings = get_settings()
     pnpm = shutil.which("pnpm") or shutil.which("pnpm.cmd")
     if pnpm is None:
@@ -22,10 +24,20 @@ def main() -> int:
         return 2
 
     commands = development_commands(settings, pnpm=pnpm, python=sys.executable)
+    child_environment = os.environ.copy()
+    existing_python_path = child_environment.get("PYTHONPATH")
+    child_environment["PYTHONPATH"] = str(REPO_ROOT / "src")
+    if existing_python_path:
+        child_environment["PYTHONPATH"] += os.pathsep + existing_python_path
 
     creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
     processes = [
-        subprocess.Popen(command, cwd=repo_root, creationflags=creation_flags)
+        subprocess.Popen(
+            command,
+            cwd=REPO_ROOT,
+            creationflags=creation_flags,
+            env=child_environment,
+        )
         for command in commands
     ]
 

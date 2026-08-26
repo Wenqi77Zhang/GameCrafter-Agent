@@ -37,24 +37,35 @@ if ((Test-Endpoint "http://127.0.0.1:5173") -and (Test-Endpoint "http://127.0.0.
 }
 
 New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
+$existingPythonPath = $env:PYTHONPATH
+$env:PYTHONPATH = Join-Path $repoRoot "src"
+if ($existingPythonPath) {
+    $env:PYTHONPATH += [System.IO.Path]::PathSeparator + $existingPythonPath
+}
 
-$api = Start-Process -FilePath $python `
-    -ArgumentList @("-m", "uvicorn", "apps.api.main:app", "--host", "127.0.0.1", "--port", "8000", "--log-level", "info") `
-    -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
-    -RedirectStandardOutput (Join-Path $runtimeDir "api.stdout.log") `
-    -RedirectStandardError (Join-Path $runtimeDir "api.stderr.log")
+try {
+    $api = Start-Process -FilePath $python `
+        -ArgumentList @("-m", "uvicorn", "apps.api.main:app", "--host", "127.0.0.1", "--port", "8000", "--log-level", "info") `
+        -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput (Join-Path $runtimeDir "api.stdout.log") `
+        -RedirectStandardError (Join-Path $runtimeDir "api.stderr.log")
 
-$worker = Start-Process -FilePath $python `
-    -ArgumentList @("-m", "apps.worker.main") `
-    -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
-    -RedirectStandardOutput (Join-Path $runtimeDir "worker.stdout.log") `
-    -RedirectStandardError (Join-Path $runtimeDir "worker.stderr.log")
+    $worker = Start-Process -FilePath $python `
+        -ArgumentList @("-m", "apps.worker.main") `
+        -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput (Join-Path $runtimeDir "worker.stdout.log") `
+        -RedirectStandardError (Join-Path $runtimeDir "worker.stderr.log")
 
-$web = Start-Process -FilePath $pnpm `
-    -ArgumentList @("--dir", "apps/web", "dev", "--", "--host", "127.0.0.1", "--port", "5173", "--strictPort") `
-    -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
-    -RedirectStandardOutput (Join-Path $runtimeDir "web.stdout.log") `
-    -RedirectStandardError (Join-Path $runtimeDir "web.stderr.log")
+    $web = Start-Process -FilePath $pnpm `
+        -ArgumentList @("--dir", "apps/web", "dev", "--", "--host", "127.0.0.1", "--port", "5173", "--strictPort") `
+        -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput (Join-Path $runtimeDir "web.stdout.log") `
+        -RedirectStandardError (Join-Path $runtimeDir "web.stderr.log")
+}
+finally {
+    if ($null -eq $existingPythonPath) { Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue }
+    else { $env:PYTHONPATH = $existingPythonPath }
+}
 
 @{
     api = $api.Id

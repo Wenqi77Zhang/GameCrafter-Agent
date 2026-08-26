@@ -19,10 +19,10 @@ if (-not $pnpm) {
 
 Push-Location $repoRoot
 try {
-    & $python -m ruff format --check src tests apps/api apps/worker migrations
+    & $python -m ruff format --check src tests apps/api apps/worker migrations scripts
     if ($LASTEXITCODE -ne 0) { throw "Python formatting check failed." }
 
-    & $python -m ruff check src tests apps/api apps/worker migrations
+    & $python -m ruff check src tests apps/api apps/worker migrations scripts
     if ($LASTEXITCODE -ne 0) { throw "Python lint check failed." }
 
     & $python -m pytest --basetemp $pytestTemp

@@ -1,4 +1,4 @@
-# Mature local-product acceptance matrix (M9–M13)
+# Mature local-product acceptance matrix (M9–M14)
 
 This matrix closes the gap between “feature complete” and a product that can safely keep a small
 studio's evidence and decisions for long-term local use. It extends, rather than replaces,
@@ -15,6 +15,7 @@ studio's evidence and decisions for long-term local use. It extends, rather than
 | Accessible operation | active workspace is programmatically exposed, keyboard focus is visible, status messages are announced, destructive controls are disabled until confirmed | mouse-only use is not required for core journeys | Vitest, Chromium desktop/mobile and manual keyboard check |
 | Self-diagnosing runtime | worker persists its latest heartbeat; Account shows worker freshness and aggregate queued, leased, failed and expired work | stopped/missing worker becomes visible without taking down the recovery UI; no task payload or private data is exposed | service/API/UI tests, migration 0018 and production worker acceptance |
 | Request correlation | every response has a bounded request ID and completion log with method, path, status and duration | malformed IDs are replaced; query strings, bodies, credentials and private content are not logged | middleware regression test and production response inspection |
+| Reproducible release | Python runtime/dev artifacts are version-and-hash locked; container bases, PostgreSQL image and CI actions use immutable identifiers; all product versions agree; startup waits for readiness and runs a read-only Chinese doctor | dependency drift, unhashed lock entries, floating build images and mismatched versions fail the release contract; local faults produce concrete recovery guidance | release contract test, frozen installs, clean container rebuild, production self-check and CI |
 | Honest product boundary | strict zero-paid-API local product is explicit; public hosting, payment, auto-posting, video rendering, OCR and TikTok scraping are not claimed | unavailable capabilities are documented as exclusions, never simulated | README, roadmap, architecture and redundancy audit |
 
 ## Release definition

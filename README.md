@@ -18,9 +18,15 @@ For the current click-by-click flow and Agent responsibility boundaries, see
 
 ## Current status
 
-The repository has reached the **M13 self-diagnosing mature local product release**. The original NTE-to-English-
+The repository has reached **GameCrafter 1.0.0 / M14**, a reproducible, self-diagnosing mature local product release. The original NTE-to-English-
 TikTok workflow remains the primary validation path; later capabilities extend it without
 weakening evidence, privacy, human control, or the strict zero-paid-API boundary.
+
+M14 turns the verified product into a reproducible release: Python production/development
+dependency graphs and artifact hashes are committed, Docker base images and GitHub Actions are
+pinned to immutable digests/commits, CI installs only the locked graph, and backend/frontend/API
+versions agree on `1.0.0`. See [`docs/security/reproducible-releases.md`](docs/security/reproducible-releases.md)
+for the controlled update procedure.
 
 M13 closes the operational blind spot that previously let a healthy page hide a stopped worker:
 
@@ -404,6 +410,24 @@ executable behavior; the active tree does not keep empty capability placeholders
 
 ## Quick start
 
+For ordinary use, start Docker Desktop and run this single command from PowerShell:
+
+```powershell
+.\scripts\production.ps1 up
+```
+
+When it reports that self-check passed, open `http://127.0.0.1:8080`. After a computer restart,
+run the same command again. To inspect the four required services without changing data, run:
+
+```powershell
+.\scripts\doctor.ps1
+```
+
+The doctor explains Docker, database, API, worker, web, version and queue problems in Simplified
+Chinese and exits without modifying project or user data.
+
+### Development setup
+
 Prerequisites:
 
 - Python 3.12 or newer;
@@ -433,10 +457,10 @@ The local services will be available at:
 - web: `http://localhost:5173`
 - API: `http://localhost:8000`
 
-If the computer has restarted, open Docker Desktop before using GameCrafter and then run
-`\.\scripts\database.ps1 up`. The web app now keeps source-discovery controls hidden until the
-project database is reachable, so a stopped database is reported as a connection problem instead
-of the misleading `Not Found` response.
+For development mode after a computer restart, open Docker Desktop and run
+`.\scripts\database.ps1 up` before starting the application. The web app keeps source-discovery
+controls hidden until the project database is reachable, so a stopped database is reported as a
+connection problem instead of the misleading `Not Found` response.
 - API health: `http://localhost:8000/health`
 - database readiness: `http://localhost:8000/ready`
 

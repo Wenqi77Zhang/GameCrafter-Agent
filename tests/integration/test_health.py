@@ -12,8 +12,8 @@ def test_health_endpoint_reports_current_foundation_status() -> None:
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["service"] == "gamecrafter-api"
-    assert payload["phase"] == "M13-local"
-    assert payload["version"] == "0.1.0"
+    assert payload["phase"] == "M14-local"
+    assert payload["version"] == "1.0.0"
 
 
 def test_request_id_is_echoed_only_when_safely_bounded() -> None:

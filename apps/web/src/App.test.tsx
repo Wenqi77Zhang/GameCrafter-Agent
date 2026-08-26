@@ -115,7 +115,7 @@ function workspaceFetch(options?: {
     if (path.endsWith("/overview")) {
       return json({
         project_id: project.id,
-        release: "M13-local",
+        release: "M14-local",
         next_action: "sources",
         stages: [
           { key: "sources", status: "not_started" },

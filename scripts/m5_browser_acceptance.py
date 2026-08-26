@@ -20,9 +20,7 @@ def assert_page(page: Page, url: str, screenshot: Path) -> None:
     if create.count():
         create.click()
     page.get_by_role("heading", name="从资料到可交付脚本").wait_for(timeout=10_000)
-    page.get_by_role(
-        "button", name=re.compile(r"继续下一步|首条营销链路已完成")
-    ).wait_for()
+    page.get_by_role("button", name=re.compile(r"继续下一步|首条营销链路已完成")).wait_for()
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 2")
     if overflow:
         raise AssertionError("page has horizontal overflow")
