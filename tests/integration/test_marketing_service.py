@@ -162,6 +162,9 @@ def test_manual_trend_to_explainable_human_approved_topic() -> None:
         command_key="trend-signal-nte-hashtag",
     )
     assert signal_created is True and signal["metric_value"] == 1250
+    assert signal["processing"]["version"] == "trend-processing-v1"
+    assert signal["processing"]["normalized_title"] == "nte"
+    assert signal["processing"]["freshness"] == "fresh"
 
     candidates = service.analyze(
         project_id=project_id,
@@ -186,6 +189,33 @@ def test_manual_trend_to_explainable_human_approved_topic() -> None:
     assert review_created is True and review["decision"] == "approve"
     updated = service.get_task(project_id=project_id, task_id=UUID(str(task["id"])))
     assert updated["approved_candidate_id"] == candidates[0]["id"]
+
+
+def test_trend_read_model_normalizes_deduplicates_and_clusters_without_mutating_raw_rows() -> None:
+    sessions, project_id, _ = _seed()
+    service = DatabaseMarketingService(sessions)
+    for index, title in enumerate(("#Cozy Gaming", "cozy-gaming")):
+        service.add_signal(
+            project_id=project_id,
+            source_name=f"Verified source {index}",
+            source_url=f"https://example.com/trends/{index}",
+            observed_at=datetime.now(UTC) - timedelta(days=index),
+            region="US",
+            signal_type="topic",
+            title=title,
+            keywords=["cozy", "gaming"],
+            metric_name=None,
+            metric_value=None,
+            notes="Manual public observation.",
+            actor_id="local-user",
+            command_key=f"trend-processing-{index}",
+        )
+
+    signals = service.list_signals(project_id)
+    assert len(signals) == 2
+    assert {item["processing"]["normalized_title"] for item in signals} == {"cozy gaming"}
+    assert {item["processing"]["cluster_size"] for item in signals} == {2}
+    assert sum(item["processing"]["duplicate_of_signal_id"] is not None for item in signals) == 1
 
 
 def test_trend_validation_and_single_approved_topic_gate() -> None:

@@ -16,7 +16,22 @@ For the current click-by-click flow and Agent responsibility boundaries, see
 
 ## Current status
 
-The repository has reached **M4 plus the constrained multi-Agent knowledge-review upgrade**.
+The repository has reached **M5 portfolio-ready local release**.
+
+M5 adds:
+
+- a beginner-oriented five-step journey from Sources to an approved export, with one visible next
+  action instead of requiring users to infer the tab order;
+- a project overview API and UI metrics for evidence, Claims, verified trends, script versions,
+  successful/active/attention runs, and the truthful zero-dollar API cost;
+- deterministic trend normalization, exact-duplicate detection, related-event clustering,
+  freshness labels, fingerprints, and disclosed processing-rule versions over immutable raw
+  observations;
+- an explicit human retry command for terminal workflow failures, preserving the original run and
+  adding an audit event instead of silently restarting work;
+- a production-preview Docker stack with migration, API, worker, PostgreSQL, object storage, Nginx,
+  dependency health checks, and a single local URL;
+- real Chromium desktop/mobile acceptance with horizontal-overflow and console-error checks.
 
 Implemented through M4:
 
@@ -191,19 +206,29 @@ Not implemented yet:
 - document ingestion or an installed browser runtime by default;
 - a live NTE acceptance capture committed as product evidence;
 - embeddings or retrieval over approved knowledge snapshots;
-- automated live trend connectors (the first release uses human-verified authorized-source input);
+- automated live trend connectors (the release deliberately uses human-verified authorized-source
+  input and now processes it deterministically without claiming a TikTok API connection);
 - cloud LLM calls, RAG, or model-generated marketing copy (local Ollama knowledge roles are live);
 - authentication, multi-tenancy, billing, or team collaboration.
 
 The earlier README described several of these as if they already existed. They did not. The original placeholder modules remain traceable in Git history and are documented under [`legacy/`](legacy/README.md).
 
-## Target product workflow (M1–M4)
+## Product workflow (M1–M5)
 
 This is the planned workflow. M1-A implements the durable project, run, job, and audit foundation.
 M1-B B1 adds source-evidence and object-storage contracts. B2 adds controlled access primitives
 and NTE adapters. B3 registers durable discovery/capture handlers and immutable persistence. B4
 exposes them through human-controlled product APIs, resumable run events, and the Sources/Runs
 workspace.
+
+The M5 production preview remains local and costs nothing to run beyond the user's own computer:
+
+```powershell
+.\scripts\production.ps1 up
+```
+
+Open `http://127.0.0.1:8080`. Use `.\scripts\production.ps1 down` to stop it. This packaging is a
+repeatable deployment artifact, not a claim that a public hosted service or account system exists.
 
 ```mermaid
 flowchart LR

@@ -137,6 +137,14 @@ def list_runs(project_id: UUID) -> dict[str, object]:
         raise _translate_error(error) from error
 
 
+@router.get("/projects/{project_id}/overview")
+def project_overview(project_id: UUID) -> dict[str, object]:
+    try:
+        return _service().project_overview(project_id)
+    except (WorkspaceNotFoundError, WorkspaceConflictError) as error:
+        raise _translate_error(error) from error
+
+
 @router.post("/projects/{project_id}/source-discoveries", status_code=202)
 def create_discovery(
     project_id: UUID,
@@ -195,6 +203,25 @@ def get_run(run_id: UUID) -> dict[str, object]:
         return _service().get_run(run_id)
     except (WorkspaceNotFoundError, WorkspaceConflictError) as error:
         raise _translate_error(error) from error
+
+
+@router.post("/runs/{run_id}/retry")
+def retry_run(
+    run_id: UUID,
+    idempotency_key: IdempotencyKey,
+    response: Response,
+) -> dict[str, object]:
+    try:
+        run, created = _service().retry_run(
+            run_id=run_id,
+            command_key=idempotency_key,
+            actor_id="local-user",
+        )
+    except (WorkspaceNotFoundError, WorkspaceConflictError) as error:
+        raise _translate_error(error) from error
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return run
 
 
 def _encode_event(event: dict[str, object]) -> str:

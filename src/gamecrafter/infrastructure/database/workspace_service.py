@@ -12,10 +12,19 @@ from sqlalchemy.orm import Session, sessionmaker
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
     DiscoveryCandidateRecord,
+    KnowledgeClaimRecord,
+    KnowledgeSnapshotRecord,
+    MarketingTaskRecord,
     ProjectRecord,
+    ScriptExportRecord,
+    ScriptFinalReviewRecord,
+    ScriptRunRecord,
+    ScriptVersionRecord,
     SourceAssetRecord,
     SourceRecord,
     SourceVersionRecord,
+    TopicReviewRecord,
+    TrendSignalRecord,
     WorkflowJobRecord,
     WorkflowRunRecord,
 )
@@ -73,6 +82,134 @@ class DatabaseWorkspaceService:
                 )
             )
             return self._project(project), True
+
+    def project_overview(self, project_id: UUID) -> dict[str, Any]:
+        """Return a compact, truthful progress and operations read model for M5."""
+
+        with self._session_factory() as session:
+            self._require_project(session, project_id)
+
+            def count(statement: Select[tuple[Any]]) -> int:
+                return int(session.scalar(statement) or 0)
+
+            source_count = count(
+                select(func.count(SourceRecord.id)).where(SourceRecord.project_id == project_id)
+            )
+            version_count = count(
+                select(func.count(SourceVersionRecord.id))
+                .select_from(SourceVersionRecord)
+                .join(SourceRecord, SourceRecord.id == SourceVersionRecord.source_id)
+                .where(SourceRecord.project_id == project_id)
+            )
+            claim_count = count(
+                select(func.count(KnowledgeClaimRecord.id)).where(
+                    KnowledgeClaimRecord.project_id == project_id
+                )
+            )
+            snapshot_count = count(
+                select(func.count(KnowledgeSnapshotRecord.id)).where(
+                    KnowledgeSnapshotRecord.project_id == project_id
+                )
+            )
+            signal_count = count(
+                select(func.count(TrendSignalRecord.id)).where(
+                    TrendSignalRecord.project_id == project_id
+                )
+            )
+            task_count = count(
+                select(func.count(MarketingTaskRecord.id)).where(
+                    MarketingTaskRecord.project_id == project_id
+                )
+            )
+            approved_topic_count = count(
+                select(func.count(TopicReviewRecord.id))
+                .select_from(TopicReviewRecord)
+                .join(MarketingTaskRecord, MarketingTaskRecord.id == TopicReviewRecord.task_id)
+                .where(
+                    MarketingTaskRecord.project_id == project_id,
+                    TopicReviewRecord.decision == "approve",
+                )
+            )
+            script_run_count = count(
+                select(func.count(ScriptRunRecord.id)).where(
+                    ScriptRunRecord.project_id == project_id
+                )
+            )
+            script_version_count = count(
+                select(func.count(ScriptVersionRecord.id))
+                .select_from(ScriptVersionRecord)
+                .join(ScriptRunRecord, ScriptRunRecord.id == ScriptVersionRecord.run_id)
+                .where(ScriptRunRecord.project_id == project_id)
+            )
+            final_approval_count = count(
+                select(func.count(ScriptFinalReviewRecord.id))
+                .select_from(ScriptFinalReviewRecord)
+                .join(ScriptRunRecord, ScriptRunRecord.id == ScriptFinalReviewRecord.run_id)
+                .where(
+                    ScriptRunRecord.project_id == project_id,
+                    ScriptFinalReviewRecord.decision == "approve",
+                )
+            )
+            export_count = count(
+                select(func.count(ScriptExportRecord.id))
+                .select_from(ScriptExportRecord)
+                .join(ScriptRunRecord, ScriptRunRecord.id == ScriptExportRecord.run_id)
+                .where(ScriptRunRecord.project_id == project_id)
+            )
+            succeeded_runs = count(
+                select(func.count(WorkflowRunRecord.id)).where(
+                    WorkflowRunRecord.project_id == project_id,
+                    WorkflowRunRecord.status == "succeeded",
+                )
+            )
+            attention_runs = count(
+                select(func.count(WorkflowRunRecord.id)).where(
+                    WorkflowRunRecord.project_id == project_id,
+                    WorkflowRunRecord.status == "needs_attention",
+                )
+            )
+            active_runs = count(
+                select(func.count(WorkflowRunRecord.id)).where(
+                    WorkflowRunRecord.project_id == project_id,
+                    WorkflowRunRecord.status.in_(("queued", "running", "retry_wait")),
+                )
+            )
+
+            stages = [
+                self._stage("sources", version_count > 0, source_count > 0),
+                self._stage("knowledge", snapshot_count > 0, claim_count > 0),
+                self._stage(
+                    "marketing", approved_topic_count > 0, task_count > 0 or signal_count > 0
+                ),
+                self._stage("creation", final_approval_count > 0, script_run_count > 0),
+                self._stage("delivery", export_count > 0, final_approval_count > 0),
+            ]
+            next_action = next(
+                (stage["key"] for stage in stages if stage["status"] != "complete"), "complete"
+            )
+            return {
+                "project_id": str(project_id),
+                "release": "M5",
+                "next_action": next_action,
+                "stages": stages,
+                "metrics": {
+                    "sources": source_count,
+                    "evidence_versions": version_count,
+                    "candidate_claims": claim_count,
+                    "published_snapshots": snapshot_count,
+                    "verified_trend_signals": signal_count,
+                    "marketing_tasks": task_count,
+                    "approved_topics": approved_topic_count,
+                    "script_runs": script_run_count,
+                    "script_versions": script_version_count,
+                    "final_approvals": final_approval_count,
+                    "exports": export_count,
+                    "successful_runs": succeeded_runs,
+                    "attention_runs": attention_runs,
+                    "active_runs": active_runs,
+                    "api_cost_usd": 0,
+                },
+            }
 
     def enqueue(
         self,
@@ -265,6 +402,72 @@ class DatabaseWorkspaceService:
                 raise WorkspaceNotFoundError("run not found")
             return self._run(row[0], row[1])
 
+    def retry_run(
+        self, *, run_id: UUID, command_key: str, actor_id: str
+    ) -> tuple[dict[str, Any], bool]:
+        """Explicitly requeue failed jobs after a human has addressed the visible cause."""
+
+        now = datetime.now(UTC)
+        with self._session_factory.begin() as session:
+            run = session.get(WorkflowRunRecord, run_id, with_for_update=True)
+            if run is None:
+                raise WorkspaceNotFoundError("run not found")
+            retry_events = session.scalars(
+                select(AuditEventRecord).where(
+                    AuditEventRecord.run_id == run_id,
+                    AuditEventRecord.event_type == "run.retried",
+                )
+            ).all()
+            if any(event.payload.get("command_key") == command_key for event in retry_events):
+                task_type = session.scalar(
+                    select(WorkflowJobRecord.task_type)
+                    .where(WorkflowJobRecord.run_id == run_id)
+                    .order_by(WorkflowJobRecord.created_at, WorkflowJobRecord.id)
+                    .limit(1)
+                )
+                return self._run(run, task_type), False
+            if run.status != "needs_attention":
+                raise WorkspaceConflictError("only a run needing attention can be retried")
+            failed_jobs = session.scalars(
+                select(WorkflowJobRecord)
+                .where(
+                    WorkflowJobRecord.run_id == run_id,
+                    WorkflowJobRecord.status == "failed",
+                )
+                .with_for_update()
+            ).all()
+            if not failed_jobs:
+                raise WorkspaceConflictError("run has no failed job to retry")
+            for job in failed_jobs:
+                job.status = "queued"
+                job.attempts = 0
+                job.available_at = now
+                job.lease_owner = None
+                job.lease_expires_at = None
+                job.last_error_code = None
+                job.last_error_detail = None
+                job.updated_at = now
+            run.status = "queued"
+            run.version += 1
+            run.finished_at = None
+            run.last_error_code = None
+            run.last_error_detail = None
+            run.updated_at = now
+            session.add(
+                AuditEventRecord(
+                    project_id=run.project_id,
+                    run_id=run.id,
+                    event_type="run.retried",
+                    actor_type="human",
+                    actor_id=actor_id,
+                    payload={
+                        "command_key": command_key,
+                        "requeued_jobs": len(failed_jobs),
+                    },
+                )
+            )
+            return self._run(run, failed_jobs[0].task_type), True
+
     def events_after(self, run_id: UUID, cursor: UUID | None) -> tuple[list[dict[str, Any]], bool]:
         with self._session_factory() as session:
             run = session.get(WorkflowRunRecord, run_id)
@@ -306,6 +509,11 @@ class DatabaseWorkspaceService:
             "default_locale": row.default_locale,
             "created_at": _iso(row.created_at),
         }
+
+    @staticmethod
+    def _stage(key: str, complete: bool, started: bool) -> dict[str, str]:
+        status = "complete" if complete else "in_progress" if started else "not_started"
+        return {"key": key, "status": status}
 
     @staticmethod
     def _run(row: WorkflowRunRecord, task_type: str | None) -> dict[str, Any]:

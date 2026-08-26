@@ -20,7 +20,7 @@ class HealthResponse(BaseModel):
     service: Literal["gamecrafter-api"]
     version: str
     environment: str
-    phase: Literal["M4"]
+    phase: Literal["M5"]
     timestamp: datetime
 
 
@@ -34,7 +34,7 @@ async def health() -> HealthResponse:
         service="gamecrafter-api",
         version=__version__,
         environment=settings.environment,
-        phase="M4",
+        phase="M5",
         timestamp=datetime.now(UTC),
     )
 

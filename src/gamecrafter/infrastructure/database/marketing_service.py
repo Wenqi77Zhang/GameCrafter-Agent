@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
+import unicodedata
 from datetime import UTC, datetime
 from decimal import Decimal
 from urllib.parse import urlsplit
@@ -26,6 +28,7 @@ from gamecrafter.infrastructure.database.models import (
 )
 
 FIT_RULE_VERSION = "trend-fit-v1"
+TREND_PROCESSING_VERSION = "trend-processing-v1"
 _TOKEN_PATTERN = re.compile(r"[\w#]+", re.UNICODE)
 
 
@@ -290,7 +293,7 @@ class DatabaseMarketingService:
                     .order_by(TrendSignalRecord.observed_at.desc(), TrendSignalRecord.id.desc())
                 )
             )
-            return [self._signal(item) for item in signals]
+            return self._processed_signals(signals)
 
     def get_signal(self, *, project_id: UUID, signal_id: UUID) -> dict[str, object]:
         with self._session_factory() as session:
@@ -302,7 +305,7 @@ class DatabaseMarketingService:
             )
             if signal is None:
                 raise MarketingServiceNotFoundError("trend signal not found")
-            return self._signal(signal)
+            return self._processed_signals([signal])[0]
 
     def analyze(self, *, project_id: UUID, task_id: UUID, actor_id: str) -> list[dict[str, object]]:
         self._text(actor_id, "actor", 120)
@@ -638,9 +641,11 @@ class DatabaseMarketingService:
             "created_at": self._stored_utc(item.created_at).isoformat(),
         }
 
-    @staticmethod
-    def _signal(item: TrendSignalRecord) -> dict[str, object]:
-        return {
+    @classmethod
+    def _signal(
+        cls, item: TrendSignalRecord, processing: dict[str, object] | None = None
+    ) -> dict[str, object]:
+        result: dict[str, object] = {
             "id": str(item.id),
             "project_id": str(item.project_id),
             "source_name": item.source_name,
@@ -656,6 +661,97 @@ class DatabaseMarketingService:
             "created_by": item.created_by,
             "created_at": DatabaseMarketingService._stored_utc(item.created_at).isoformat(),
         }
+        result["processing"] = processing or cls._processing(item)
+        return result
+
+    @classmethod
+    def _processed_signals(cls, signals: list[TrendSignalRecord]) -> list[dict[str, object]]:
+        ordered = sorted(signals, key=lambda item: (cls._stored_utc(item.observed_at), item.id))
+        fingerprints: dict[str, UUID] = {}
+        clusters: list[dict[str, object]] = []
+        processing_by_id: dict[UUID, dict[str, object]] = {}
+        for item in ordered:
+            normalized = cls._normalize_trend_title(item.title)
+            fingerprint = hashlib.sha256(
+                f"{item.region}|{item.signal_type}|{normalized}".encode()
+            ).hexdigest()
+            duplicate_of = fingerprints.get(fingerprint)
+            if duplicate_of is None:
+                fingerprints[fingerprint] = item.id
+            tokens = cls._tokens(normalized)
+            cluster = next(
+                (
+                    candidate
+                    for candidate in clusters
+                    if candidate["region"] == item.region
+                    and candidate["signal_type"] == item.signal_type
+                    and cls._jaccard(tokens, candidate["tokens"]) >= 0.5
+                ),
+                None,
+            )
+            if cluster is None:
+                cluster = {
+                    "key": hashlib.sha256(
+                        f"{item.region}|{item.signal_type}|{normalized}".encode()
+                    ).hexdigest()[:16],
+                    "region": item.region,
+                    "signal_type": item.signal_type,
+                    "tokens": tokens,
+                    "members": [],
+                }
+                clusters.append(cluster)
+            cluster["members"].append(item.id)
+            processing_by_id[item.id] = {
+                "version": TREND_PROCESSING_VERSION,
+                "normalized_title": normalized,
+                "content_fingerprint_sha256": fingerprint,
+                "duplicate_of_signal_id": str(duplicate_of) if duplicate_of else None,
+                "cluster_key": cluster["key"],
+                "cluster_size": 0,
+                "freshness": cls._freshness(item.observed_at),
+            }
+        for cluster in clusters:
+            size = len(cluster["members"])
+            for signal_id in cluster["members"]:
+                processing_by_id[signal_id]["cluster_size"] = size
+        return [cls._signal(item, processing_by_id[item.id]) for item in signals]
+
+    @classmethod
+    def _processing(cls, item: TrendSignalRecord) -> dict[str, object]:
+        normalized = cls._normalize_trend_title(item.title)
+        fingerprint = hashlib.sha256(
+            f"{item.region}|{item.signal_type}|{normalized}".encode()
+        ).hexdigest()
+        return {
+            "version": TREND_PROCESSING_VERSION,
+            "normalized_title": normalized,
+            "content_fingerprint_sha256": fingerprint,
+            "duplicate_of_signal_id": None,
+            "cluster_key": fingerprint[:16],
+            "cluster_size": 1,
+            "freshness": cls._freshness(item.observed_at),
+        }
+
+    @staticmethod
+    def _normalize_trend_title(value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).casefold().replace("#", " ")
+        return " ".join(_TOKEN_PATTERN.findall(normalized))
+
+    @staticmethod
+    def _jaccard(left: set[str], right: object) -> float:
+        right_tokens = right if isinstance(right, set) else set()
+        if not left or not right_tokens:
+            return 0.0
+        return len(left & right_tokens) / len(left | right_tokens)
+
+    @classmethod
+    def _freshness(cls, observed_at: datetime) -> str:
+        age_days = max(0, (datetime.now(UTC) - cls._stored_utc(observed_at)).days)
+        if age_days <= 7:
+            return "fresh"
+        if age_days <= 30:
+            return "aging"
+        return "stale"
 
     @staticmethod
     def _review(item: TopicReviewRecord) -> dict[str, object]:

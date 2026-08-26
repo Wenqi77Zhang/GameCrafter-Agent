@@ -68,6 +68,7 @@ function workspaceFetch(options?: {
   trendSignals?: Array<Record<string, unknown>>;
   topicCandidates?: Array<Record<string, unknown>>;
   scriptRuns?: Array<Record<string, unknown>>;
+  runs?: Array<Record<string, unknown>>;
 }) {
   const projects = options?.projects ?? [project];
   const candidates = options?.candidates ?? [];
@@ -80,13 +81,40 @@ function workspaceFetch(options?: {
   const trendSignals = [...(options?.trendSignals ?? [])];
   const topicCandidates = [...(options?.topicCandidates ?? [])];
   const scriptRuns = [...(options?.scriptRuns ?? [])];
-  const runs: Array<Record<string, unknown>> = [];
+  const runs: Array<Record<string, unknown>> = [...(options?.runs ?? [])];
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const path = String(input);
     if (path === "/api/health") return json({ status: "ok" });
     if (path === "/api/projects" && init?.method === "POST") return json(project, 201);
     if (path === "/api/projects") return json({ items: projects });
     if (path.endsWith("/candidates")) return json({ items: candidates });
+    if (path.endsWith("/overview")) {
+      return json({
+        project_id: project.id,
+        release: "M5",
+        next_action: "sources",
+        stages: [
+          { key: "sources", status: "not_started" },
+          { key: "knowledge", status: "not_started" },
+          { key: "marketing", status: "not_started" },
+          { key: "creation", status: "not_started" },
+          { key: "delivery", status: "not_started" },
+        ],
+        metrics: {
+          evidence_versions: versions.length,
+          candidate_claims: claims.length,
+          published_snapshots: snapshots.length,
+          verified_trend_signals: trendSignals.length,
+          approved_topics: 0,
+          script_versions: 0,
+          exports: 0,
+          successful_runs: 0,
+          attention_runs: 0,
+          active_runs: 0,
+          api_cost_usd: 0,
+        },
+      });
+    }
     if (path.endsWith("/sources")) return json({ items: [] });
     if (path.endsWith("/runs") && !path.endsWith("/script-runs")) return json({ items: runs });
     if (path.endsWith("/knowledge-entities") && init?.method === "POST") {
@@ -269,6 +297,15 @@ function workspaceFetch(options?: {
         202,
       );
     }
+    if (path.includes("/api/runs/") && path.endsWith("/retry") && init?.method === "POST") {
+      const run = runs.find((item) => path.includes(String(item.id)));
+      if (run) {
+        run.status = "queued";
+        run.last_error_code = null;
+        run.last_error_detail = null;
+      }
+      return json(run ?? {}, 200);
+    }
     throw new Error(`Unexpected request: ${path}`);
   });
 }
@@ -294,6 +331,8 @@ test("defaults to Simplified Chinese and loads the NTE source workspace", async 
   expect(screen.getByText("公开官网资料是可追溯证据，不等同于游戏公司的内部 GDD。")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "English" })).toBeInTheDocument();
   expect(screen.getByText("异环")).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "从资料到可交付脚本" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /继续下一步 · 添加来源/ })).toBeInTheDocument();
   expect(screen.getByText("暂无待选候选。先运行一次来源发现。")).toBeInTheDocument();
 });
 
@@ -375,6 +414,30 @@ test("shows a visible API failure instead of a fake healthy state", async () => 
 
   expect(await screen.findByRole("heading", { name: "本地 API 暂不可用" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "重试连接" })).toBeInTheDocument();
+});
+
+test("lets the user retry a run only after it reaches needs-attention", async () => {
+  const fetchMock = workspaceFetch({
+    runs: [{
+      id: "failed-run-1",
+      workflow_kind: "source.discover",
+      task_type: "source.discover",
+      status: "needs_attention",
+      checkpoint: "source.discover",
+      last_error_code: "network",
+      last_error_detail: "Docker or network was unavailable",
+      created_at: "2026-08-26T00:00:00Z",
+      finished_at: null,
+    }],
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: /运行记录/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /快速发现.*needs_attention/i }));
+  fireEvent.click(screen.getByRole("button", { name: "问题修复后重新运行" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+    "/api/runs/failed-run-1/retry",
+    expect.objectContaining({ method: "POST" }),
+  ));
 });
 
 test("runs exact zero-cost extraction without leaving the Knowledge workspace", async () => {

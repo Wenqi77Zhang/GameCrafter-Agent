@@ -1,0 +1,62 @@
+"""Desktop and mobile browser acceptance for the guided M5 product shell."""
+
+from __future__ import annotations
+
+import argparse
+import re
+import tempfile
+from pathlib import Path
+
+from playwright.sync_api import Page, sync_playwright
+
+
+def assert_page(page: Page, url: str, screenshot: Path) -> None:
+    errors: list[str] = []
+    page.on(
+        "console", lambda message: errors.append(message.text) if message.type == "error" else None
+    )
+    page.goto(url, wait_until="networkidle", timeout=30_000)
+    create = page.get_by_role("button", name="创建《异环》项目")
+    if create.count():
+        create.click()
+    page.get_by_role("heading", name="从资料到可交付脚本").wait_for(timeout=10_000)
+    page.get_by_role(
+        "button", name=re.compile(r"继续下一步|首条营销链路已完成")
+    ).wait_for()
+    overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 2")
+    if overflow:
+        raise AssertionError("page has horizontal overflow")
+    if errors:
+        raise AssertionError(f"browser console errors: {errors}")
+    page.screenshot(path=str(screenshot), full_page=True)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--url", default="http://127.0.0.1:5173")
+    parser.add_argument("--output")
+    args = parser.parse_args()
+    output = (
+        Path(args.output)
+        if args.output
+        else Path(tempfile.gettempdir()) / "gamecrafter-m5-browser"
+    )
+    output.mkdir(parents=True, exist_ok=True)
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        desktop = browser.new_page(viewport={"width": 1440, "height": 1000})
+        assert_page(desktop, args.url, output / "desktop.png")
+        mobile = browser.new_page(
+            viewport={"width": 390, "height": 844},
+            device_scale_factor=1,
+            is_mobile=True,
+        )
+        assert_page(mobile, args.url, output / "mobile.png")
+        browser.close()
+    print("M5 desktop and mobile browser acceptance passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

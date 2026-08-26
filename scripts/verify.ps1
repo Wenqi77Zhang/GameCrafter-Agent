@@ -37,6 +37,11 @@ try {
     & $pnpm.Source build:web
     if ($LASTEXITCODE -ne 0) { throw "Frontend production build failed." }
 
+    if ($env:GAMECRAFTER_BROWSER_ACCEPTANCE_URL) {
+        & $python scripts/m5_browser_acceptance.py --url $env:GAMECRAFTER_BROWSER_ACCEPTANCE_URL
+        if ($LASTEXITCODE -ne 0) { throw "M5 browser acceptance failed." }
+    }
+
     Write-Host "All locally available GameCrafter checks passed."
     Write-Host "PostgreSQL tests run when GAMECRAFTER_TEST_DATABASE_URL is configured."
 }

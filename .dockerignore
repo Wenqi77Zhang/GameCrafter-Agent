@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+node_modules
+apps/web/dist
+data
+uploads
+.pytest-*
+.ruff_cache
+*.log
+.env
+.env.*
+!.env.example
+

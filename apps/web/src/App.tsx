@@ -4,6 +4,7 @@ import { api, formatDate, idempotencyKey } from "./client";
 import type { Language } from "./client";
 import { KnowledgeWorkspace } from "./KnowledgeWorkspace";
 import { MarketingWorkspace } from "./MarketingWorkspace";
+import { ProjectJourney } from "./ProjectJourney";
 import { ScriptWorkspace } from "./ScriptWorkspace";
 import type { WorkspaceAuditEvent, WorkspaceRun } from "./KnowledgeWorkspace";
 
@@ -67,6 +68,7 @@ const copy = {
     loadingProject: "正在连接本地项目与数据库…",
     apiDown: "本地 API 暂不可用",
     retry: "重试连接",
+    retryRun: "问题修复后重新运行",
     working: "正在提交…",
     queued: "任务已进入本地队列",
     failed: "操作失败",
@@ -116,6 +118,7 @@ const copy = {
     loadingProject: "Connecting to the local project and database…",
     apiDown: "Local API is unavailable",
     retry: "Retry",
+    retryRun: "Run again after fixing",
     working: "Submitting…",
     queued: "Task added to the local queue",
     failed: "Action failed",
@@ -389,7 +392,7 @@ export function App() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">G</span>
-          <div><strong>GameCrafter</strong><small>Marketing Studio · M4</small></div>
+          <div><strong>GameCrafter</strong><small>Marketing Studio · M5</small></div>
         </div>
         <div className="top-actions">
           <span className="privacy-note">{t.privacy}</span>
@@ -439,6 +442,12 @@ export function App() {
             </section>
           ) : (
             <>
+              <ProjectJourney
+                projectId={projectId}
+                language={language}
+                refreshToken={knowledgeRefreshToken}
+                onNavigate={setTab}
+              />
               <nav className="tabs" aria-label="Workspace">
                 <button className={tab === "sources" ? "active" : ""} type="button" onClick={() => setTab("sources")}>
                   {t.sources}<span>{sources.length}</span>
@@ -561,6 +570,16 @@ export function App() {
                     {!selectedRun ? <div className="empty-state">{t.selectRun}</div> : (
                       <>
                         {selectedRunRecord?.last_error_detail && <div className="error-detail"><strong>{selectedRunRecord.last_error_code}</strong><p>{selectedRunRecord.last_error_detail}</p></div>}
+                        {selectedRunRecord?.status === "needs_attention" && (
+                          <button
+                            className="primary-button run-retry"
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => void submitRun(`/api/runs/${selectedRunRecord.id}/retry`, {}, `retry-${selectedRunRecord.id}`)}
+                          >
+                            {busy === `retry-${selectedRunRecord.id}` ? t.working : t.retryRun}
+                          </button>
+                        )}
                         <ol className="timeline">
                           {events.map((event) => <li key={event.id}><span /><div><strong>{event.event_type}</strong><small>{event.actor_type} · {formatDate(event.occurred_at, language)}</small></div></li>)}
                         </ol>

@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from gamecrafter.infrastructure.database.models import (
+    AuditEventRecord,
     Base,
     DiscoveryCandidateRecord,
     WorkflowJobRecord,
+    WorkflowRunRecord,
 )
 from gamecrafter.infrastructure.database.workspace_service import (
     DatabaseWorkspaceService,
@@ -45,6 +47,11 @@ def test_project_and_discovery_run_are_idempotent_but_not_ambiguous() -> None:
     )
     assert created is False
     assert repeated["id"] == project["id"]
+
+    overview = workspace.project_overview(UUID(project["id"]))
+    assert overview["next_action"] == "sources"
+    assert overview["stages"][0] == {"key": "sources", "status": "not_started"}
+    assert overview["metrics"]["api_cost_usd"] == 0
 
     payload = {
         "mode": "quick",
@@ -196,3 +203,45 @@ def test_run_events_reject_foreign_cursor() -> None:
             UUID(first["id"]),
             UUID(second_events[0]["id"]),
         )
+
+
+def test_human_can_idempotently_retry_a_run_after_fixing_its_visible_failure() -> None:
+    sessions = make_session_factory()
+    workspace = DatabaseWorkspaceService(sessions)
+    project, _ = workspace.create_project(
+        slug="nte", name="异环", default_locale="zh-CN", actor_id="test-user"
+    )
+    run, _ = workspace.enqueue(
+        project_id=UUID(project["id"]),
+        idempotency_key="failed-run-0001",
+        task_type="source.discover",
+        payload={"listing_urls": ["https://nte.perfectworld.com/en/"]},
+        actor_id="test-user",
+    )
+    with sessions.begin() as session:
+        record = session.get(WorkflowRunRecord, UUID(run["id"]))
+        job = session.scalar(
+            select(WorkflowJobRecord).where(WorkflowJobRecord.run_id == UUID(run["id"]))
+        )
+        assert record is not None and job is not None
+        record.status = "needs_attention"
+        record.last_error_code = "network"
+        job.status = "failed"
+        job.attempts = job.max_attempts
+
+    retried, created = workspace.retry_run(
+        run_id=UUID(run["id"]), command_key="retry-command-0001", actor_id="test-user"
+    )
+    assert created is True
+    assert retried["status"] == "queued"
+    repeated, created = workspace.retry_run(
+        run_id=UUID(run["id"]), command_key="retry-command-0001", actor_id="test-user"
+    )
+    assert created is False
+    assert repeated["id"] == run["id"]
+    with sessions() as session:
+        event = session.scalar(
+            select(AuditEventRecord).where(AuditEventRecord.event_type == "run.retried")
+        )
+        assert event is not None
+        assert event.payload["requeued_jobs"] == 1

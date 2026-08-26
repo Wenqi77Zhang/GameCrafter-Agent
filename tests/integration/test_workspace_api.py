@@ -36,6 +36,15 @@ class FakeWorkspace:
     def list_runs(self, project_id):
         return []
 
+    def project_overview(self, project_id):
+        return {
+            "project_id": str(project_id),
+            "release": "M5",
+            "next_action": "sources",
+            "stages": [{"key": "sources", "status": "not_started"}],
+            "metrics": {"api_cost_usd": 0},
+        }
+
     def enqueue(self, **kwargs):
         self.enqueued.append(kwargs)
         return {
@@ -54,6 +63,21 @@ class FakeWorkspace:
 
     def get_run(self, run_id):
         return {}
+
+    def retry_run(self, **kwargs):
+        return {
+            "id": str(kwargs["run_id"]),
+            "project_id": str(PROJECT_ID),
+            "workflow_kind": "source.discover",
+            "task_type": "source.discover",
+            "status": "queued",
+            "checkpoint": "source.discover",
+            "last_error_code": None,
+            "last_error_detail": None,
+            "created_at": "2026-07-29T00:00:00+00:00",
+            "updated_at": "2026-07-29T00:01:00+00:00",
+            "finished_at": None,
+        }, True
 
     def events_after(self, run_id, cursor):
         if cursor is not None and cursor != EVENT_ID:
@@ -90,6 +114,36 @@ def test_workspace_commands_require_explicit_idempotency_and_human_candidate() -
         assert response.json()["workflow_kind"] == "source.capture"
         assert fake.enqueued[0]["task_type"] == "source.capture"
         assert fake.enqueued[0]["candidate_id"] == UUID("40000000-0000-0000-0000-000000000001")
+    finally:
+        workspace._service = original
+
+
+def test_project_overview_exposes_guided_progress_without_mutation() -> None:
+    fake = FakeWorkspace()
+    original = workspace._service
+    workspace._service = lambda: fake
+    try:
+        response = TestClient(create_app()).get(f"/api/projects/{PROJECT_ID}/overview")
+        assert response.status_code == 200
+        assert response.json()["next_action"] == "sources"
+        assert response.json()["metrics"]["api_cost_usd"] == 0
+    finally:
+        workspace._service = original
+
+
+def test_failed_run_retry_requires_an_explicit_idempotency_key() -> None:
+    fake = FakeWorkspace()
+    original = workspace._service
+    workspace._service = lambda: fake
+    try:
+        client = TestClient(create_app())
+        assert client.post(f"/api/runs/{RUN_ID}/retry").status_code == 422
+        response = client.post(
+            f"/api/runs/{RUN_ID}/retry",
+            headers={"Idempotency-Key": "manual-retry-0001"},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "queued"
     finally:
         workspace._service = original
 
