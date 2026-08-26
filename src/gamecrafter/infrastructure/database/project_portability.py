@@ -206,6 +206,11 @@ class DatabaseProjectPortabilityService:
                     )
                     object_id_map[archived_id] = archived_id
 
+                # Core table inserts below do not trigger the ORM autoflush. Persist
+                # restored object metadata first so PostgreSQL can validate the
+                # source_assets foreign key in the same transaction.
+                session.flush()
+
                 for table in Base.metadata.sorted_tables:
                     table_rows = records.get(table.name)
                     if not table_rows:
