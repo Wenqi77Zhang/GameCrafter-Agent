@@ -75,4 +75,12 @@ The course game-marketing requirements remain the minimum acceptance line for M2
 - M4 implements evidence-bound English TikTok script generation, canonical version digests,
   deterministic 100-point evaluation, a hard automatic-revision budget, human-edited versions,
   mandatory final approval, and audited Markdown/JSON export. This closes the first complete local
-  product slice; M5 is the next milestone.
+  product slice.
+- M5 is complete: it adds a five-step guided journey, project progress/value metrics, audited
+  human retry of terminal jobs, deterministic trend normalization/deduplication/clustering,
+  production-preview containers, and desktop/mobile Chromium acceptance. This is the portfolio-ready
+  local release.
+
+M6–M8 remain deliberate future product expansions. They are not part of the local first-release
+boundary and are not represented as implemented: accounts require identity and isolation policy,
+teams require RBAC and revocation, and GDD Studio requires a separately approved private-data model.

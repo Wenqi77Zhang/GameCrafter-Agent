@@ -1,0 +1,84 @@
+name: gamecrafter-production
+
+x-app-environment: &app-environment
+  GAMECRAFTER_ENVIRONMENT: production
+  GAMECRAFTER_DATABASE_URL: postgresql+psycopg://gamecrafter:${GAMECRAFTER_POSTGRES_PASSWORD:-gamecrafter_local_only_change_me}@postgres:5432/gamecrafter
+  GAMECRAFTER_OBJECT_STORAGE_PATH: /app/data/objects
+  GAMECRAFTER_WEB_ORIGIN: http://localhost:8080
+  GAMECRAFTER_MODEL_PROVIDER: replay
+  GAMECRAFTER_MODEL_REPLAY_FIXTURE_PATH: /app/fixtures/nte/official-homepage-en-v1.json
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: deploy/Dockerfile.api
+  environment: *app-environment
+  volumes:
+    - gamecrafter-objects:/app/data/objects
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.2-pg17-bookworm
+    environment:
+      POSTGRES_DB: gamecrafter
+      POSTGRES_USER: gamecrafter
+      POSTGRES_PASSWORD: ${GAMECRAFTER_POSTGRES_PASSWORD:-gamecrafter_local_only_change_me}
+    volumes:
+      - gamecrafter-postgres-production:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gamecrafter -d gamecrafter"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    <<: *app
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "apps.worker.main"]
+    environment:
+      <<: *app-environment
+      GAMECRAFTER_WORKER_ID: production-worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  gamecrafter-postgres-production:
+  gamecrafter-objects:
+

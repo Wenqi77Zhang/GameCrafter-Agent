@@ -12,7 +12,7 @@ def test_health_endpoint_reports_current_foundation_status() -> None:
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["service"] == "gamecrafter-api"
-    assert payload["phase"] == "M4"
+    assert payload["phase"] == "M5"
     assert payload["version"] == "0.1.0"
 
 

@@ -66,7 +66,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M4 runtime
+## Implemented M1-A to M5 runtime
 
 ```mermaid
 flowchart LR
@@ -212,6 +212,34 @@ is the immutable knowledge/trend input, reasoning is deterministic fit and evalu
 versioned script command, and learning is deliberately limited to append-only human feedback and
 future offline rule improvement. Runtime rules do not self-modify. PostgreSQL verifies cross-row
 lineage and immutability even if an API or UI client is bypassed.
+
+## Implemented M5 experience and operations layer
+
+```mermaid
+flowchart LR
+    USER["Beginner user"]
+    JOURNEY["Five-step guided journey"]
+    OVERVIEW["Project overview read model"]
+    METRICS["Evidence, trend, version, run, and cost metrics"]
+    RUNS["Durable run timeline"]
+    RETRY{"Human fixes visible cause and retries?"}
+    QUEUE["Same bounded PostgreSQL queue"]
+    RAW["Immutable verified trend observations"]
+    PROCESS["trend-processing-v1 normalize, dedupe, cluster, freshness"]
+    PROD["Nginx + API + worker + PostgreSQL production preview"]
+
+    USER --> JOURNEY --> OVERVIEW --> METRICS
+    JOURNEY --> RUNS --> RETRY
+    RETRY -->|"explicit command + audit event"| QUEUE
+    RAW --> PROCESS --> JOURNEY
+    PROD --> JOURNEY
+```
+
+The overview is a read model, not a second workflow engine. It derives stage completion from real
+persisted artifacts. Trend processing never rewrites the raw observation and discloses its rule
+version, fingerprint, duplicate lineage, cluster key/size, and current freshness label. Manual
+retry resets only failed jobs after a terminal state, is idempotent by command key, and appends
+`run.retried`; it cannot retry successful, running, or cancelled work.
 
 ## Implemented M1-B B3 ingestion and persistence flow
 
