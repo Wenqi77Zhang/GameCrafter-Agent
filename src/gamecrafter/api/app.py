@@ -1,7 +1,9 @@
 """FastAPI application factory."""
 
+import logging
 import re
-from uuid import UUID
+from time import perf_counter
+from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +16,7 @@ from gamecrafter.api.routes.identity import SESSION_COOKIE, identity_service
 from gamecrafter.api.routes.identity import router as identity_router
 from gamecrafter.api.routes.knowledge import router as knowledge_router
 from gamecrafter.api.routes.marketing import router as marketing_router
+from gamecrafter.api.routes.operations import router as operations_router
 from gamecrafter.api.routes.readiness import router as readiness_router
 from gamecrafter.api.routes.scripts import router as scripts_router
 from gamecrafter.api.routes.workspace import router as workspace_router
@@ -22,6 +25,8 @@ from gamecrafter.config.settings import get_settings
 _PROJECT_PATH = re.compile(r"^/api/projects/([0-9a-fA-F-]{36})(?:/|$)")
 _RUN_PATH = re.compile(r"^/api/runs/([0-9a-fA-F-]{36})(?:/|$)")
 _ROLE_RANK = {"viewer": 1, "reviewer": 2, "editor": 3, "owner": 4}
+_REQUEST_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{7,63}$")
+_LOGGER = logging.getLogger("gamecrafter.http")
 
 
 def _required_project_role(request: Request) -> str:
@@ -111,6 +116,34 @@ def create_app() -> FastAPI:
         )
         return response
 
+    @application.middleware("http")
+    async def request_trace(request: Request, call_next):
+        supplied = request.headers.get("X-Request-ID", "")
+        request_id = supplied if _REQUEST_ID.fullmatch(supplied) else uuid4().hex
+        request.state.request_id = request_id
+        started = perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:  # noqa: BLE001 - boundary logs and re-raises unknown application faults
+            _LOGGER.exception(
+                "request_failed method=%s path=%s request_id=%s duration_ms=%d",
+                request.method,
+                request.url.path,
+                request_id,
+                int((perf_counter() - started) * 1000),
+            )
+            raise
+        response.headers["X-Request-ID"] = request_id
+        _LOGGER.info(
+            "request_complete method=%s path=%s status=%d request_id=%s duration_ms=%d",
+            request.method,
+            request.url.path,
+            response.status_code,
+            request_id,
+            int((perf_counter() - started) * 1000),
+        )
+        return response
+
     application.include_router(health_router)
     application.include_router(readiness_router)
     application.include_router(health_router, prefix="/api", include_in_schema=False)
@@ -120,6 +153,7 @@ def create_app() -> FastAPI:
     application.include_router(gdd_router)
     application.include_router(knowledge_router)
     application.include_router(marketing_router)
+    application.include_router(operations_router)
     application.include_router(scripts_router)
     return application
 

@@ -1,4 +1,4 @@
-# Mature local-product acceptance matrix (M9–M12)
+# Mature local-product acceptance matrix (M9–M13)
 
 This matrix closes the gap between “feature complete” and a product that can safely keep a small
 studio's evidence and decisions for long-term local use. It extends, rather than replaces,
@@ -13,6 +13,8 @@ studio's evidence and decisions for long-term local use. It extends, rather than
 | Login abuse resistance | failures are throttled across restarts using only a normalized-email SHA-256 | fifth failure blocks the identifier for 15 minutes; response stays generic; successful login clears failures | persistent throttle test and migration 0017 |
 | Browser hardening | API and production web responses prevent framing, MIME sniffing, broad referrers and unneeded device permissions; CSP limits content origins | unsafe embedding and unexpected active content are browser-blocked | header integration test and production smoke |
 | Accessible operation | active workspace is programmatically exposed, keyboard focus is visible, status messages are announced, destructive controls are disabled until confirmed | mouse-only use is not required for core journeys | Vitest, Chromium desktop/mobile and manual keyboard check |
+| Self-diagnosing runtime | worker persists its latest heartbeat; Account shows worker freshness and aggregate queued, leased, failed and expired work | stopped/missing worker becomes visible without taking down the recovery UI; no task payload or private data is exposed | service/API/UI tests, migration 0018 and production worker acceptance |
+| Request correlation | every response has a bounded request ID and completion log with method, path, status and duration | malformed IDs are replaced; query strings, bodies, credentials and private content are not logged | middleware regression test and production response inspection |
 | Honest product boundary | strict zero-paid-API local product is explicit; public hosting, payment, auto-posting, video rendering, OCR and TikTok scraping are not claimed | unavailable capabilities are documented as exclusions, never simulated | README, roadmap, architecture and redundancy audit |
 
 ## Release definition

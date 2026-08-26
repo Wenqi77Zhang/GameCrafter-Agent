@@ -18,9 +18,18 @@ For the current click-by-click flow and Agent responsibility boundaries, see
 
 ## Current status
 
-The repository has reached the **M12 mature local product release**. The original NTE-to-English-
+The repository has reached the **M13 self-diagnosing mature local product release**. The original NTE-to-English-
 TikTok workflow remains the primary validation path; later capabilities extend it without
 weakening evidence, privacy, human control, or the strict zero-paid-API boundary.
+
+M13 closes the operational blind spot that previously let a healthy page hide a stopped worker:
+
+- the worker now persists a bounded liveness heartbeat, while the authenticated Account workspace
+  reports database connectivity, worker freshness, queued/leased/failed counts and expired leases;
+- missing and stale workers produce explicit attention guidance without making the API container
+  unavailable, so the user can still open the diagnostic and recovery interface;
+- every HTTP response carries a bounded request ID and server logs correlate method, safe path,
+  status and duration without logging query strings, credentials or private request bodies.
 
 The M9–M12 maturity pass adds:
 

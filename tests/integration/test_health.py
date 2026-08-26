@@ -12,8 +12,19 @@ def test_health_endpoint_reports_current_foundation_status() -> None:
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["service"] == "gamecrafter-api"
-    assert payload["phase"] == "M12-local"
+    assert payload["phase"] == "M13-local"
     assert payload["version"] == "0.1.0"
+
+
+def test_request_id_is_echoed_only_when_safely_bounded() -> None:
+    client = TestClient(create_app())
+
+    supplied = client.get("/health", headers={"X-Request-ID": "release-check-123"})
+    replaced = client.get("/health", headers={"X-Request-ID": "unsafe request id value"})
+
+    assert supplied.headers["X-Request-ID"] == "release-check-123"
+    assert replaced.headers["X-Request-ID"] != "unsafe request id value"
+    assert len(replaced.headers["X-Request-ID"]) == 32
 
 
 def test_agent_catalog_discloses_all_roles_and_execution_modes() -> None:

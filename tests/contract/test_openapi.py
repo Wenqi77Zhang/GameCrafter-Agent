@@ -6,6 +6,7 @@ def test_health_contract_is_published_in_openapi() -> None:
 
     assert "/health" in schema["paths"]
     assert "/ready" in schema["paths"]
+    assert "/api/operations/status" in schema["paths"]
     assert "/api/projects" in schema["paths"]
     assert "/api/projects/{project_id}/source-discoveries" in schema["paths"]
     assert "/api/projects/{project_id}/source-imports" in schema["paths"]

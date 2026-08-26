@@ -73,3 +73,8 @@ shared or remote deployment.
 - The bundled local PostgreSQL application role owns its local database and can use that transaction-
   local purge. A future hosted deployment must replace this with a narrowly privileged server-side
   purge procedure and a non-owner runtime role before accepting untrusted tenants.
+- Runtime diagnosis exposes only heartbeat age and aggregate queue state. Worker identifiers, job
+  payloads, project IDs and private evidence are not returned by the operations endpoint.
+- Request correlation accepts only bounded alphanumeric IDs with `.`, `_`, and `-`; malformed input
+  is replaced. Completion logs contain only method, URL path, response status, duration and request
+  ID—never query strings, headers, request bodies or credentials.

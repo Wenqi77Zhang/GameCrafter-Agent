@@ -1780,3 +1780,19 @@ class SecurityAuditRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class RuntimeHeartbeatRecord(Base):
+    """Latest liveness signal for one local background runtime instance."""
+
+    __tablename__ = "runtime_heartbeats"
+    __table_args__ = (
+        CheckConstraint("component_type IN ('worker')", name="ck_runtime_heartbeats_type"),
+        Index("ix_runtime_heartbeats_type_seen", "component_type", "last_seen_at"),
+    )
+
+    component_key: Mapped[str] = mapped_column(String(180), primary_key=True)
+    component_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    instance_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

@@ -8,6 +8,7 @@ import time
 from gamecrafter.application.jobs import Worker
 from gamecrafter.config.settings import get_settings
 from gamecrafter.infrastructure.database.job_queue import DatabaseJobQueue
+from gamecrafter.infrastructure.database.operations_service import DatabaseOperationsService
 from gamecrafter.infrastructure.database.session import get_session_factory
 from gamecrafter.infrastructure.ingestion.handlers import build_source_handlers
 from gamecrafter.infrastructure.models.handlers import build_knowledge_handlers
@@ -44,8 +45,14 @@ def main() -> int:
     args = parser.parse_args()
     settings = get_settings()
     worker = create_worker()
+    operations = DatabaseOperationsService(get_session_factory())
+    next_heartbeat = 0.0
 
     while True:
+        monotonic_now = time.monotonic()
+        if monotonic_now >= next_heartbeat:
+            operations.heartbeat(settings.worker_id)
+            next_heartbeat = monotonic_now + settings.worker_heartbeat_seconds
         worked = worker.run_once()
         if args.once:
             return 0

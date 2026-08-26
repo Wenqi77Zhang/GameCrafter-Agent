@@ -39,7 +39,9 @@ class Settings(BaseSettings):
     source_targeted_candidate_limit: int = Field(default=100, ge=1, le=100)
     worker_id: str = "local-worker"
     worker_poll_seconds: float = 1.0
+    worker_heartbeat_seconds: float = Field(default=10.0, ge=1.0, le=60.0)
     job_lease_seconds: int = 60
+    worker_stale_after_seconds: int = Field(default=300, ge=30, le=3600)
     model_provider: Literal["disabled", "replay", "ollama"] = "disabled"
     model_replay_fixture_path: Path | None = None
     ollama_base_url: HttpUrl = HttpUrl("http://127.0.0.1:11434")

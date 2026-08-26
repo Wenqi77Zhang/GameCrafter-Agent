@@ -75,7 +75,7 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M8-local runtime
+## Implemented M1-A to M13-local runtime
 
 ```mermaid
 flowchart LR
@@ -89,6 +89,8 @@ flowchart LR
     WORKER["Python worker"]
     HANDLER["Registered source and knowledge handlers"]
     IDENTITY["Opaque sessions and owner/editor/reviewer/viewer RBAC"]
+    HEARTBEAT[("runtime_heartbeats")]
+    OPERATIONS["Privacy-safe operations status"]
 
     USER --> WEB --> API
     API -->|"sources, candidates, runs"| WEB
@@ -103,6 +105,9 @@ flowchart LR
     WORKER -->|"registered discovery and capture jobs"| HANDLER
     WORKER -->|"checkpoint and terminal state"| RUNS
     WORKER -->|"append-only event"| AUDIT
+    WORKER -->|"bounded latest liveness"| HEARTBEAT
+    HEARTBEAT --> OPERATIONS --> WEB
+    JOBS -->|"aggregate counts and expired leases"| OPERATIONS
 ```
 
 The worker-to-handler arrow is implemented in M1-B B3; the commands, queries, and event delivery are

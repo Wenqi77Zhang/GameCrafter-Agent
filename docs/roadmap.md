@@ -18,6 +18,7 @@ Each milestone must produce a runnable slice, tests, a failure case, evidence, a
 | M10 | Complete team governance | role changes, atomic ownership transfer, project continuity, security audit |
 | M11 | Local security hardening | persistent login throttle, exact-origin session protection, browser security headers |
 | M12 | Mature local release | accessible operation, recovery UX, full production/database/browser acceptance |
+| M13 | Self-diagnosing operations | worker heartbeat, queue/lease diagnosis, request correlation, visible remediation |
 
 The course game-marketing requirements remain the minimum acceptance line for M2–M5, but the product is no longer constrained to a four-day team submission.
 
@@ -85,7 +86,7 @@ The course game-marketing requirements remain the minimum acceptance line for M2
   production-preview containers, and desktop/mobile Chromium acceptance. This is the portfolio-ready
   local release.
 
-M1.1 and M6–M12 are complete for the mature local-product boundary. M1.1 adds bounded private text,
+M1.1 and M6–M13 are complete for the mature local-product boundary. M1.1 adds bounded private text,
 transcript, and owned-GDD evidence plus real public trend connectors. M6 adds optional local
 identity, isolation, quotas, portable export, project deletion, and guarded account deletion. M7
 adds four-role RBAC, expiring hashed invitations, and immediate revocation. M8 adds source-bound GDD
@@ -94,6 +95,7 @@ export-only backup claim with a versioned, hash-verified recovery path. M10 adds
 changes and atomic ownership transfer for a team and all its projects. M11 adds persistent login
 throttling, exact-Origin protection for cookie writes, CSP and browser hardening headers. M12 adds
 the visible recovery experience and closes the local database, production and browser release
-gates. Payment
+gates. M13 makes background execution observable through persistent worker liveness, aggregate
+queue/lease state and bounded request correlation. Payment
 processing and anonymous public hosting remain outside scope because they contradict the confirmed
 zero-cost local boundary and would require a separate commercial/privacy decision.

@@ -97,6 +97,14 @@ function workspaceFetch(options?: {
     }
     if (path === "/api/auth/me") return json({ user: auth.user, teams: [] });
     if (path === "/api/auth/security-events") return json({ items: [] });
+    if (path === "/api/operations/status") return json({
+      status: "ready",
+      database: "connected",
+      worker: { status: "healthy", last_seen_at: "2026-08-27T00:00:00Z", age_seconds: 1, stale_after_seconds: 300 },
+      queue: { queued: 0, leased: 0, failed: 0, oldest_queued_age_seconds: null, expired_leases: 0 },
+      attention_codes: [],
+      observed_at: "2026-08-27T00:00:01Z",
+    });
     if (path === "/api/project-restores" && init?.method === "POST") {
       return json({ restored: true, project_id: project.id, project_slug: project.slug }, 201);
     }
@@ -107,7 +115,7 @@ function workspaceFetch(options?: {
     if (path.endsWith("/overview")) {
       return json({
         project_id: project.id,
-        release: "M12-local",
+        release: "M13-local",
         next_action: "sources",
         stages: [
           { key: "sources", status: "not_started" },
@@ -442,6 +450,15 @@ test("restores a verified project backup from the account workspace", async () =
     ),
   );
   expect(await screen.findByText("备份已验证并恢复。")).toBeInTheDocument();
+});
+
+test("shows whether the local worker can drain the durable queue", async () => {
+  workspaceFetch();
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "账户与团队" }));
+  expect(await screen.findByRole("heading", { name: "本机运行诊断" })).toBeInTheDocument();
+  expect(screen.getByText("运行正常")).toBeInTheDocument();
+  expect(screen.getByText("运行中")).toBeInTheDocument();
 });
 
 test("bootstraps the first local owner before exposing tenant projects", async () => {
