@@ -38,6 +38,7 @@ def test_python_exports_pin_versions_and_artifact_hashes() -> None:
 
 def test_locked_exports_cover_every_direct_dependency() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    uv = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
     production = (ROOT / "requirements.lock").read_text(encoding="utf-8")
     development = (ROOT / "requirements-dev.lock").read_text(encoding="utf-8")
     production_names = set(re.findall(r"(?m)^([a-z0-9][a-z0-9._-]*)==", production))
@@ -47,6 +48,23 @@ def test_locked_exports_cover_every_direct_dependency() -> None:
     dev = {_dependency_name(requirement) for requirement in project["optional-dependencies"]["dev"]}
     assert direct <= production_names
     assert direct | dev <= development_names
+    uv_resolution = {
+        (package["name"].lower().replace("_", "-"), package["version"])
+        for package in uv["package"]
+        if package["name"] != "gamecrafter"
+    }
+    development_resolution = {
+        (match.group(1).lower().replace("_", "-"), match.group(2))
+        for match in re.finditer(r"(?m)^([a-z0-9][a-z0-9._-]*)==([^\s\\]+)", development)
+    }
+    assert development_resolution == uv_resolution
+
+
+def test_dependency_automation_covers_supported_release_inputs() -> None:
+    dependabot = (ROOT / ".github/dependabot.yml").read_text(encoding="utf-8")
+    ecosystems = set(re.findall(r"package-ecosystem:\s*([a-z-]+)", dependabot))
+    assert ecosystems == {"uv", "docker", "docker-compose", "github-actions"}
+    assert "package-ecosystem: npm" not in dependabot
 
 
 def test_local_setup_and_startup_consume_the_reproducible_release() -> None:

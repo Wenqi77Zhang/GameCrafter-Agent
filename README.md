@@ -27,6 +27,10 @@ dependency graphs and artifact hashes are committed, Docker base images and GitH
 pinned to immutable digests/commits, CI installs only the locked graph, and backend/frontend/API
 versions agree on `1.0.0`. See [`docs/security/reproducible-releases.md`](docs/security/reproducible-releases.md)
 for the controlled update procedure.
+Repository security reports and contributions follow [`SECURITY.md`](SECURITY.md) and
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Long-term update coverage and the intentional pnpm 11
+automation exception are recorded in
+[`docs/security/dependency-maintenance.md`](docs/security/dependency-maintenance.md).
 
 M13 closes the operational blind spot that previously let a healthy page hide a stopped worker:
 
