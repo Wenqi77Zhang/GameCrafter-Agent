@@ -19,8 +19,17 @@ def assert_page(page: Page, url: str, screenshot: Path) -> None:
     create = page.get_by_role("button", name="创建《异环》项目")
     if create.count():
         create.click()
-    page.get_by_role("heading", name="从资料到可交付脚本").wait_for(timeout=10_000)
+    page.get_by_role("heading", name="异环海外营销工作台").wait_for(timeout=10_000)
+    page.locator("#journey-title").wait_for(timeout=10_000)
     page.get_by_role("button", name=re.compile(r"继续下一步|首条营销链路已完成")).wait_for()
+    recommended = page.get_by_role("button", name=re.compile("导入异环英文官网首页"))
+    if recommended.count():
+        recommended.wait_for(timeout=10_000)
+        box = recommended.bounding_box()
+        if box is None or box["y"] >= page.viewport_size["height"]:
+            raise AssertionError("recommended first action is not visible in the initial viewport")
+    if page.locator(".journey-details").evaluate("element => element.open"):
+        raise AssertionError("diagnostic journey detail should be collapsed by default")
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 2")
     if overflow:
         raise AssertionError("page has horizontal overflow")

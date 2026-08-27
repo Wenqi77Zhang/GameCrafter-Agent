@@ -9,6 +9,8 @@
 - One-command production startup with readiness waiting and a read-only Chinese local doctor.
 - Hashed Python locks, frozen frontend graph and immutable build/CI inputs.
 - Private vulnerability-reporting guidance, contribution rules and supported dependency automation.
+- Beginner-first Chinese workspace with one visible current task, collapsed diagnostics, a direct
+  NTE homepage action and a non-wrapping mobile navigation rail.
 
 Public SaaS hosting, billing, automatic TikTok posting, video rendering, OCR and unofficial TikTok
 scraping are not part of this zero-paid-API local release.

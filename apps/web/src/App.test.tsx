@@ -380,13 +380,15 @@ test("defaults to Simplified Chinese and loads the NTE source workspace", async 
   workspaceFetch();
   render(<App />);
 
-  await screen.findByRole("heading", { name: "把公开资料变成可复核的游戏知识。" });
+  await screen.findByRole("heading", { name: "异环海外营销工作台" });
   expect(screen.getByText("公开官网资料是可追溯证据，不等同于游戏公司的内部 GDD。")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "English" })).toBeInTheDocument();
   expect(screen.getByText("异环")).toBeInTheDocument();
-  expect(await screen.findByRole("heading", { name: "从资料到可交付脚本" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "添加来源" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /继续下一步 · 添加来源/ })).toBeInTheDocument();
-  expect(screen.getByText("暂无待选候选。先运行一次来源发现。")).toBeInTheDocument();
+  expect(screen.getByText("第 1 / 5 步")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /导入异环英文官网首页/ })).toBeInTheDocument();
+  expect(screen.getByText("这里仅显示“官网更新发现”的候选；直接导入官网首页不会经过此区域。")).toBeInTheDocument();
 });
 
 test("keeps discovery controls unavailable while the project database is still loading", () => {
@@ -401,6 +403,24 @@ test("keeps discovery controls unavailable while the project database is still l
   expect(screen.queryByRole("button", { name: /开始发现/ })).not.toBeInTheDocument();
 });
 
+test("imports the recommended NTE homepage without requiring URL entry", async () => {
+  const fetchMock = workspaceFetch();
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: /导入异环英文官网首页/ }));
+
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/source-imports",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ url: "https://nte.perfectworld.com/en/main.html" }),
+      }),
+    ),
+  );
+  expect(screen.getByText("任务已进入本地队列")).toBeInTheDocument();
+});
+
 test("switches to English and remembers the preference", async () => {
   workspaceFetch();
   render(<App />);
@@ -408,7 +428,7 @@ test("switches to English and remembers the preference", async () => {
 
   fireEvent.click(language);
 
-  expect(screen.getByRole("heading", { name: "Turn public material into reviewable game knowledge." })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "NTE overseas marketing workspace" })).toBeInTheDocument();
   expect(localStorage.getItem("gamecrafter-language")).toBe("en");
   expect(screen.getByRole("button", { name: "简体中文" })).toBeInTheDocument();
 });
@@ -474,7 +494,7 @@ test("bootstraps the first local owner before exposing tenant projects", async (
     "/api/auth/bootstrap",
     expect.objectContaining({ method: "POST" }),
   ));
-  expect(await screen.findByRole("heading", { name: "把公开资料变成可复核的游戏知识。" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "异环海外营销工作台" })).toBeInTheDocument();
 });
 
 test("requires a human click before importing a discovered candidate", async () => {
@@ -589,7 +609,7 @@ test("lets the user retry a run only after it reaches needs-attention", async ()
   });
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: /运行记录/ }));
-  fireEvent.click(await screen.findByRole("button", { name: /快速发现.*needs_attention/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /来源发现.*needs_attention/i }));
   fireEvent.click(screen.getByRole("button", { name: "问题修复后重新运行" }));
   await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
     "/api/runs/failed-run-1/retry",
@@ -727,7 +747,7 @@ test("offers a direct Sources shortcut when no evidence version exists", async (
   fireEvent.click(await screen.findByRole("button", { name: "去添加来源" }));
 
   expect(screen.getByRole("button", { name: /^来源/ })).toHaveClass("active");
-  expect(screen.getByText("暂无待选候选。先运行一次来源发现。")).toBeInTheDocument();
+  expect(screen.getByText("这里仅显示“官网更新发现”的候选；直接导入官网首页不会经过此区域。")).toBeInTheDocument();
 });
 
 test("shows deterministic conflict relations and preserves evidence navigation", async () => {

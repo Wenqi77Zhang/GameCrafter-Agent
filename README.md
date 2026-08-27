@@ -22,6 +22,11 @@ The repository has reached **GameCrafter 1.0.0 / M14**, a reproducible, self-dia
 TikTok workflow remains the primary validation path; later capabilities extend it without
 weakening evidence, privacy, human control, or the strict zero-paid-API boundary.
 
+The default Chinese workspace now keeps one current task above the fold. A first-time user can
+import the allowlisted NTE English homepage without typing a URL; optional article discovery and
+diagnostic metrics stay collapsed until they are needed. Mobile navigation remains a single
+horizontal rail instead of wrapping into an ambiguous second row.
+
 M14 turns the verified product into a reproducible release: Python production/development
 dependency graphs and artifact hashes are committed, Docker base images and GitHub Actions are
 pinned to immutable digests/commits, CI installs only the locked graph, and backend/frontend/API

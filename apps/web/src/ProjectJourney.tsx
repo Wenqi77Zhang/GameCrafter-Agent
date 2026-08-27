@@ -43,6 +43,10 @@ const text = {
     statuses: { not_started: "未开始", in_progress: "进行中", complete: "已完成" },
     next: "继续下一步",
     done: "首条营销链路已完成",
+    current: "当前任务",
+    progress: "总体进度",
+    stepCount: (current: number) => `第 ${current} / 5 步`,
+    details: "查看全部步骤与运行数据",
     diagnostics: "运行概况",
     evidence: "证据版本",
     claims: "候选知识",
@@ -60,6 +64,10 @@ const text = {
     statuses: { not_started: "Not started", in_progress: "In progress", complete: "Complete" },
     next: "Continue",
     done: "First marketing journey complete",
+    current: "Current task",
+    progress: "Overall progress",
+    stepCount: (current: number) => `Step ${current} of 5`,
+    details: "View all steps and run data",
     diagnostics: "Run overview",
     evidence: "Evidence versions",
     claims: "Candidate facts",
@@ -105,10 +113,19 @@ export function ProjectJourney({
 
   const nextStage = overview.next_action === "complete" ? null : overview.next_action;
   const metrics = overview.metrics;
+  const completedStages = overview.stages.filter((stage) => stage.status === "complete").length;
+  const currentStep = nextStage
+    ? overview.stages.findIndex((stage) => stage.key === nextStage) + 1
+    : overview.stages.length;
+  const progress = nextStage ? (completedStages / overview.stages.length) * 100 : 100;
   return (
     <section className="journey" aria-labelledby="journey-title">
       <div className="journey-heading">
-        <div><p className="eyebrow">Guided workflow · {overview.release}</p><h2 id="journey-title">{t.title}</h2><p>{t.subtitle}</p></div>
+        <div>
+          <p className="eyebrow">{t.current}</p>
+          <h2 id="journey-title">{nextStage ? t.stages[nextStage] : t.done}</h2>
+          <p>{t.subtitle}</p>
+        </div>
         <button
           className="primary-button"
           type="button"
@@ -118,28 +135,35 @@ export function ProjectJourney({
           {nextStage ? `${t.next} · ${t.stages[nextStage]}` : t.done}
         </button>
       </div>
-      <ol className="journey-steps">
-        {overview.stages.map((stage, index) => (
-          <li key={stage.key} className={`journey-step journey-step--${stage.status}`}>
-            <button type="button" onClick={() => onNavigate(stageTabs[stage.key])}>
-              <span>{stage.status === "complete" ? "✓" : index + 1}</span>
-              <strong>{t.stages[stage.key]}</strong>
-              <small>{t.statuses[stage.status]}</small>
-            </button>
-          </li>
-        ))}
-      </ol>
-      <div className="journey-metrics" aria-label={t.diagnostics}>
-        <span><strong>{metrics.evidence_versions}</strong>{t.evidence}</span>
-        <span><strong>{metrics.candidate_claims}</strong>{t.claims}</span>
-        <span><strong>{metrics.verified_trend_signals}</strong>{t.signals}</span>
-        <span><strong>{metrics.script_versions}</strong>{t.versions}</span>
-        <span><strong>{metrics.successful_runs}</strong>{t.runs}</span>
-        <button type="button" className={metrics.attention_runs > 0 ? "metric-alert" : ""} onClick={() => onNavigate("runs")}>
-          <strong>{metrics.attention_runs + metrics.active_runs}</strong>{t.attention}
-        </button>
-        <span><strong>${metrics.api_cost_usd.toFixed(2)}</strong>{t.cost}</span>
+      <div className="journey-progress" aria-label={t.progress}>
+        <span><i style={{ width: `${progress}%` }} /></span>
+        <small>{t.stepCount(currentStep)}</small>
       </div>
+      <details className="journey-details">
+        <summary>{t.details}</summary>
+        <ol className="journey-steps">
+          {overview.stages.map((stage, index) => (
+            <li key={stage.key} className={`journey-step journey-step--${stage.status}`}>
+              <button type="button" onClick={() => onNavigate(stageTabs[stage.key])}>
+                <span>{stage.status === "complete" ? "✓" : index + 1}</span>
+                <strong>{t.stages[stage.key]}</strong>
+                <small>{t.statuses[stage.status]}</small>
+              </button>
+            </li>
+          ))}
+        </ol>
+        <div className="journey-metrics" aria-label={t.diagnostics}>
+          <span><strong>{metrics.evidence_versions}</strong>{t.evidence}</span>
+          <span><strong>{metrics.candidate_claims}</strong>{t.claims}</span>
+          <span><strong>{metrics.verified_trend_signals}</strong>{t.signals}</span>
+          <span><strong>{metrics.script_versions}</strong>{t.versions}</span>
+          <span><strong>{metrics.successful_runs}</strong>{t.runs}</span>
+          <button type="button" className={metrics.attention_runs > 0 ? "metric-alert" : ""} onClick={() => onNavigate("runs")}>
+            <strong>{metrics.attention_runs + metrics.active_runs}</strong>{t.attention}
+          </button>
+          <span><strong>${metrics.api_cost_usd.toFixed(2)}</strong>{t.cost}</span>
+        </div>
+      </details>
     </section>
   );
 }

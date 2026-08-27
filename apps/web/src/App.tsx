@@ -43,6 +43,9 @@ type AuditEvent = WorkspaceAuditEvent;
 
 const copy = {
   "zh-CN": {
+    brandSubtitle: "知识与营销工作台",
+    hubLabel: "游戏知识与营销",
+    footerPrinciples: "事实 · 证据 · 人工控制",
     sources: "来源",
     knowledge: "知识",
     gdd: "GDD",
@@ -50,11 +53,17 @@ const copy = {
     scripts: "创作",
     runs: "运行记录",
     account: "账户与团队",
+    accountShort: "账户",
     createNte: "创建《异环》项目",
     emptyProject: "先创建本地《异环》验证项目，再开始采集官方公开资料。",
+    workbenchTitle: "异环海外营销工作台",
     evidenceNotice: "公开官网资料是可追溯证据，不等同于游戏公司的内部 GDD。",
-    quick: "快速发现",
-    quickHint: "首次使用只需点击“异环国际服 · 英文（推荐）”。成功后在右侧确认候选，再导入来源。不会递归抓取整站。",
+    quick: "第一步：添加异环官方资料",
+    quickHint: "第一次使用建议直接导入英文官网首页。你明确点击后，系统只读取这一页，不会抓取整站。",
+    recommendedImport: "导入异环英文官网首页",
+    recommendedHint: "推荐 · 无需填写网址 · 适合首条验证链路",
+    discoverUpdates: "查找更多官网更新文章（可选）",
+    runDiscover: "来源发现",
     advanced: "高级方式",
     targeted: "定向发现",
     direct: "直接导入官方页面",
@@ -73,8 +82,8 @@ const copy = {
     candidates: "待选候选",
     captured: "已保存来源",
     selectImport: "选择并导入",
-    noCandidates: "暂无待选候选。先运行一次来源发现。",
-    noSources: "尚未保存来源。候选必须经你确认后才会采集。",
+    noCandidates: "这里仅显示“官网更新发现”的候选；直接导入官网首页不会经过此区域。",
+    noSources: "尚未保存来源。点击左侧推荐按钮后，可在运行记录查看采集进度。",
     noRuns: "暂无运行记录。",
     timeline: "审计时间线",
     selectRun: "选择一条运行记录查看可恢复的实时进度。",
@@ -105,6 +114,9 @@ const copy = {
     privacy: "本地私有存储 · 零付费 API",
   },
   en: {
+    brandSubtitle: "Knowledge + Marketing Studio",
+    hubLabel: "GAME KNOWLEDGE + MARKETING",
+    footerPrinciples: "Facts · Evidence · Human control",
     sources: "Sources",
     knowledge: "Knowledge",
     gdd: "GDD",
@@ -112,11 +124,17 @@ const copy = {
     scripts: "Create",
     runs: "Runs",
     account: "Account & teams",
+    accountShort: "Account",
     createNte: "Create NTE project",
     emptyProject: "Create the local NTE validation project before collecting public official sources.",
+    workbenchTitle: "NTE overseas marketing workspace",
     evidenceNotice: "Public official material is traceable evidence, not the studio's internal GDD.",
-    quick: "Quick discovery",
-    quickHint: "For the first run, click “NTE Global · English (recommended)”. Review the candidates on the right, then import one. The site is never crawled recursively.",
+    quick: "Step 1: add an official NTE source",
+    quickHint: "For a first run, import the English homepage directly. The system reads only that page after your explicit click and never crawls the full site.",
+    recommendedImport: "Import the NTE English homepage",
+    recommendedHint: "Recommended · no URL entry · best for the first journey",
+    discoverUpdates: "Find more official updates (optional)",
+    runDiscover: "Source discovery",
     advanced: "Advanced",
     targeted: "Targeted discovery",
     direct: "Import an official page",
@@ -135,8 +153,8 @@ const copy = {
     candidates: "Candidates for review",
     captured: "Saved sources",
     selectImport: "Select and import",
-    noCandidates: "No candidates yet. Run source discovery first.",
-    noSources: "No saved sources. Capture starts only after your approval.",
+    noCandidates: "This area is only for optional update-discovery candidates; direct homepage import does not appear here.",
+    noSources: "No saved sources. Use the recommended action, then follow capture progress in Runs.",
     noRuns: "No runs yet.",
     timeline: "Audit timeline",
     selectRun: "Select a run to view its resumable live progress.",
@@ -401,6 +419,13 @@ export function App() {
       `quick-${profile.id}`,
     );
 
+  const importRecommendedHomepage = () =>
+    submitRun(
+      `/api/projects/${projectId}/source-imports`,
+      { url: "https://nte.perfectworld.com/en/main.html" },
+      "recommended-homepage",
+    );
+
   const targetedDiscover = (event: FormEvent) => {
     event.preventDefault();
     const body: Record<string, unknown> = {
@@ -497,7 +522,7 @@ export function App() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">G</span>
-          <div><strong>GameCrafter</strong><small>Knowledge + Marketing Studio</small></div>
+          <div><strong>GameCrafter</strong><small>{t.brandSubtitle}</small></div>
         </div>
         <div className="top-actions">
           <span className="privacy-note">{t.privacy}</span>
@@ -531,8 +556,8 @@ export function App() {
         <>
           <section className="workspace-heading">
             <div>
-              <p className="eyebrow">Game Knowledge Hub</p>
-              <h1>{language === "zh-CN" ? "把公开资料变成可复核的游戏知识。" : "Turn public material into reviewable game knowledge."}</h1>
+              <p className="eyebrow">{t.hubLabel}</p>
+              <h1>{t.workbenchTitle}</h1>
               <p>{t.evidenceNotice}</p>
             </div>
             {projects.length > 0 && (
@@ -579,8 +604,8 @@ export function App() {
                 <button aria-current={tab === "runs" ? "page" : undefined} className={tab === "runs" ? "active" : ""} type="button" onClick={() => setTab("runs")}>
                   {t.runs}<span>{runs.length}</span>
                 </button>
-                <button aria-current={tab === "account" ? "page" : undefined} className={tab === "account" ? "active" : ""} type="button" onClick={() => setTab("account")}>
-                  {t.account}
+                <button aria-label={t.account} aria-current={tab === "account" ? "page" : undefined} className={tab === "account" ? "active" : ""} type="button" onClick={() => setTab("account")}>
+                  <span className="tab-label-long">{t.account}</span><span className="tab-label-short">{t.accountShort}</span>
                 </button>
                 <button className="refresh-button" type="button" onClick={refreshAll}>{t.refresh}</button>
               </nav>
@@ -592,13 +617,20 @@ export function App() {
                   <aside className="control-stack">
                     <section className="panel">
                       <div className="panel-heading"><span>01</span><div><h2>{t.quick}</h2><p>{t.quickHint}</p></div></div>
-                      <div className="profile-grid">
-                        {quickProfiles.map((profile) => (
-                          <button key={profile.id} type="button" disabled={busy !== null} onClick={() => void quickDiscover(profile)}>
-                            <span>{language === "zh-CN" ? profile.labelZh : profile.labelEn}</span><small>{busy === `quick-${profile.id}` ? t.working : t.discover}</small>
-                          </button>
-                        ))}
-                      </div>
+                      <button className="recommended-source" type="button" disabled={busy !== null} onClick={() => void importRecommendedHomepage()}>
+                        <span><strong>{t.recommendedImport}</strong><small>{t.recommendedHint}</small></span>
+                        <em>{busy === "recommended-homepage" ? t.working : t.import}</em>
+                      </button>
+                      <details className="discovery-options">
+                        <summary>{t.discoverUpdates}</summary>
+                        <div className="profile-grid">
+                          {quickProfiles.map((profile) => (
+                            <button key={profile.id} type="button" disabled={busy !== null} onClick={() => void quickDiscover(profile)}>
+                              <span>{language === "zh-CN" ? profile.labelZh : profile.labelEn}</span><small>{busy === `quick-${profile.id}` ? t.working : t.discover}</small>
+                            </button>
+                          ))}
+                        </div>
+                      </details>
                     </section>
 
                     <details className="panel advanced-panel">
@@ -703,7 +735,7 @@ export function App() {
                   <section className="run-list">
                     {runs.length === 0 ? <div className="empty-state">{t.noRuns}</div> : runs.map((run) => (
                       <button className={selectedRun === run.id ? "run-card active" : "run-card"} key={run.id} type="button" onClick={() => setSelectedRun(run.id)}>
-                        <div><strong>{run.task_type === "source.discover" ? t.quick : run.task_type === "source.capture" ? t.import : run.task_type === "knowledge.extract" ? t.extract : run.task_type}</strong><small>{formatDate(run.created_at, language)}</small></div>
+                        <div><strong>{run.task_type === "source.discover" ? t.runDiscover : run.task_type === "source.capture" ? t.import : run.task_type === "knowledge.extract" ? t.extract : run.task_type}</strong><small>{formatDate(run.created_at, language)}</small></div>
                         <span className={`run-status run-status--${run.status}`}>{run.status}</span>
                         <p>{t.checkpoint}: {run.checkpoint}</p>
                         {run.last_error_code && <p className="run-error">{t.error}: {run.last_error_code}</p>}
@@ -737,7 +769,7 @@ export function App() {
           )}
         </>
       )}
-      <footer><span>GameCrafter v2</span><span>Facts · Evidence · Human control</span></footer>
+      <footer><span>GameCrafter 1.0</span><span>{t.footerPrinciples}</span></footer>
     </main>
   );
 }
