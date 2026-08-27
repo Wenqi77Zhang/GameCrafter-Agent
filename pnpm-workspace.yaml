@@ -2,3 +2,5 @@ packages:
   - apps/web
 allowBuilds:
   esbuild: true
+overrides:
+  nanoid: 3.3.18
