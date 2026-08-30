@@ -20,6 +20,7 @@ Each milestone must produce a runnable slice, tests, a failure case, evidence, a
 | M12 | Mature local release | accessible operation, recovery UX, full production/database/browser acceptance |
 | M13 | Self-diagnosing operations | worker heartbeat, queue/lease diagnosis, request correlation, visible remediation |
 | M14 | Reproducible 1.0 release | hashed dependency locks, immutable build inputs, aligned versions, release evidence |
+| M15 | Live local-Agent hardening | runtime/model preflight, subject-safe prompts, partial-candidate isolation, adversarial reviewer acceptance |
 
 The course game-marketing requirements remain the minimum acceptance line for M2–M5, but the product is no longer constrained to a four-day team submission.
 
@@ -87,7 +88,7 @@ The course game-marketing requirements remain the minimum acceptance line for M2
   production-preview containers, and desktop/mobile Chromium acceptance. This is the portfolio-ready
   local release.
 
-M1.1 and M6–M14 are complete for the mature local-product boundary. M1.1 adds bounded private text,
+M1.1 and M6–M15 are complete for the mature local-product boundary. M1.1 adds bounded private text,
 transcript, and owned-GDD evidence plus real public trend connectors. M6 adds optional local
 identity, isolation, quotas, portable export, project deletion, and guarded account deletion. M7
 adds four-role RBAC, expiring hashed invitations, and immediate revocation. M8 adds source-bound GDD
@@ -99,6 +100,8 @@ the visible recovery experience and closes the local database, production and br
 gates. M13 makes background execution observable through persistent worker liveness, aggregate
 queue/lease state and bounded request correlation. M14 pins the tested Python graph, container
 bases and CI actions and aligns every product surface on version 1.0.0, so a later rebuild cannot
-silently select a different dependency set. Payment processing and anonymous public hosting remain
-outside scope because they contradict the confirmed
-zero-cost local boundary and would require a separate commercial/privacy decision.
+silently select a different dependency set. M15 verifies the production NTE capture-to-review path
+against the real local model, removes internal identifiers from model inputs, isolates invalid
+candidates per chunk, and strengthens character-identity review against mention-only evidence.
+Payment processing and anonymous public hosting remain outside scope because they contradict the
+confirmed zero-cost local boundary and would require a separate commercial/privacy decision.

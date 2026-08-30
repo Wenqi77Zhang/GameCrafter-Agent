@@ -37,6 +37,13 @@ Repository security reports and contributions follow [`SECURITY.md`](SECURITY.md
 automation exception are recorded in
 [`docs/security/dependency-maintenance.md`](docs/security/dependency-maintenance.md).
 
+The production stack now defaults to the zero-cost local Ollama adapter and checks that the exact
+configured model is actually present before enabling Curator or Reviewer actions. The live NTE
+English homepage has been verified through four extraction chunks and the independent Reviewer:
+the Curator retained eight exact-quote candidates, while Reviewer 1.2 approved six and rejected two
+ambiguous name mentions. Internal entity keys are not sent to the model, and user-confirmed names
+remain scope hints rather than evidence.
+
 M13 closes the operational blind spot that previously let a healthy page hide a stopped worker:
 
 - the worker now persists a bounded liveness heartbeat, while the authenticated Account workspace

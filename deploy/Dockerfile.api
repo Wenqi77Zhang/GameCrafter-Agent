@@ -7,14 +7,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY pyproject.toml requirements.lock README.md LICENSE alembic.ini ./
+
+RUN python -m pip install --no-cache-dir --require-hashes -r requirements.lock
+
 COPY src ./src
 COPY migrations ./migrations
 COPY apps/__init__.py ./apps/__init__.py
 COPY apps/api ./apps/api
 COPY apps/worker ./apps/worker
 COPY fixtures ./fixtures
-
-RUN python -m pip install --no-cache-dir --require-hashes -r requirements.lock
 
 RUN useradd --create-home --uid 10001 gamecrafter \
     && mkdir -p /app/data/objects \

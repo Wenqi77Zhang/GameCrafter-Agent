@@ -24,6 +24,7 @@ class ExtractionTarget:
     source_version_id: UUID
     subject_entity_id: UUID
     subject_entity_key: str
+    subject_labels: tuple[str, ...]
     locale: str
     region: str
     object_key: str

@@ -26,6 +26,7 @@ def document(text: str = "0123456789factABCDEFGHIJfactKLMNOPQRST") -> Extraction
     return ExtractionDocument(
         source_version_id=UUID("00000000-0000-0000-0000-00000000c222"),
         subject_entity_key="game:nte",
+        subject_labels=("NTE", "Neverness to Everness"),
         normalized_text=text,
         locale="en",
         region="global",

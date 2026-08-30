@@ -42,7 +42,7 @@ KNOWLEDGE_CURATOR = AgentSpec(
 KNOWLEDGE_REVIEWER = AgentSpec(
     "knowledge.reviewer",
     "Knowledge Reviewer",
-    "1.1.0",
+    "1.2.0",
     AgentMode.LOCAL_MODEL,
     "independent adversarial review",
     True,

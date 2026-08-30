@@ -1,6 +1,6 @@
 # GameCrafter constrained multi-Agent v1
 
-Status: implemented and acceptance-tested on 2026-08-26.
+Status: implemented and live-NTE acceptance-tested on 2026-08-30.
 
 GameCrafter uses eight versioned specialist roles coordinated by the durable Harness. Agents exchange
 typed, persisted artifacts rather than free-form conversations. Deterministic validation remains
@@ -25,6 +25,17 @@ call. Later model upgrades must retain the same contracts and pass offline evalu
 Knowledge review produces `agent_approved`, `agent_rejected`, or `needs_human`. Deterministic gates
 run before the reviewer. A human confirms the reviewed knowledge pack once; only unresolved claims
 require individual attention. Topic selection and final script export remain human gates.
+
+Curator v5 receives a controlled subject type and user-confirmed display labels, but never the
+internal entity key. Labels identify the review scope and cannot substitute for a public-source
+quote. A malformed or unsupported candidate is discarded without being persisted; other chunks
+continue. Names classified as game or character identities must occur in their exact cited quote.
+
+Reviewer 1.2 adds an independent grammatical-subject check for character identities. A direct
+clause such as `Shinku can ...` may be proposed for approval. A possessive (`Inanna's ...`) or an
+attribution (`according to Sakiri`) is only a mention and is rejected or routed to human attention.
+This deterministic post-model policy remains authoritative even if the local 4B model is
+overconfident.
 
 Security-sensitive account, RBAC, quota, secret, integrity, export, and deletion decisions are not
 Agents. They are deterministic platform policies. This prevents a model from granting itself
@@ -51,3 +62,12 @@ deterministic roles retain the same typed-artifact and audit boundary.
 
 Starting extraction or review twice is safe. An exact completed target is returned instead of
 creating another batch, while a changed source version or prompt creates a separate auditable run.
+
+## Live NTE acceptance record
+
+On 2026-08-30 the production stack captured the allowlisted English NTE homepage, preserved its
+normalized-text digest, and invoked local `qwen3.5:4b` over four deterministic chunks. Curator v5
+persisted eight candidates with exact source offsets. Reviewer 1.2 independently reviewed all
+eight, approved six, and rejected the two attribution/possessive identity errors. Provider-reported
+usage was local token accounting only; paid API cost remained zero. The fixture-backed PostgreSQL
+acceptance remains separate and deterministic for CI.

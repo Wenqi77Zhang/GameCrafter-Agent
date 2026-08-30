@@ -38,6 +38,17 @@ class AgentReviewConflictError(AgentReviewStateError):
     pass
 
 
+def _identity_is_direct_subject(value: str, quote: str) -> bool:
+    """Conservatively recognize a character name used as the quoted clause subject."""
+
+    name = value.strip().casefold()
+    evidence = quote.strip().casefold()
+    if not name or not evidence.startswith(name):
+        return False
+    suffix = evidence[len(name) :]
+    return not suffix.startswith(("'s", "’s"))
+
+
 class DatabaseAgentReviewService:
     """Keeps model review immutable, bounded, idempotent, and human-controlled."""
 
@@ -165,6 +176,36 @@ class DatabaseAgentReviewService:
                 )
                 if item.decision == "agent_approved"
                 and any(marker in f" {item.rationale.casefold()}" for marker in inference_markers)
+                else item
+                for item in governed
+            ]
+            ambiguous_identities: set[UUID] = set()
+            for claim in claims:
+                if claim.predicate != "character.identity" or not isinstance(claim.value, str):
+                    continue
+                quotes = tuple(
+                    session.scalars(
+                        select(ClaimEvidenceSpanRecord.quote)
+                        .where(ClaimEvidenceSpanRecord.claim_id == claim.id)
+                        .order_by(ClaimEvidenceSpanRecord.ordinal)
+                    )
+                )
+                if quotes and not any(
+                    _identity_is_direct_subject(claim.value, quote) for quote in quotes
+                ):
+                    ambiguous_identities.add(claim.id)
+            governed = [
+                AgentClaimDecision(
+                    item.claim_id,
+                    "needs_human",
+                    item.suggested_predicate,
+                    item.priority,
+                    "identity_context_ambiguous",
+                    "The name is mentioned, but the quote does not clearly "
+                    "describe that character.",
+                    tuple(sorted(set((*item.risk_codes, "semantic_scope")))),
+                )
+                if item.decision == "agent_approved" and item.claim_id in ambiguous_identities
                 else item
                 for item in governed
             ]

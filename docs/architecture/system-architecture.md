@@ -439,14 +439,14 @@ before transaction execution and will prevent empty snapshots.
 
 ```mermaid
 flowchart LR
-    REQUEST["Bounded normalized-text request"]
+    REQUEST["Bounded normalized text plus subject type and display labels"]
     PORT["Application ModelGateway port"]
     DISABLED["Disabled gateway"]
     REPLAY["Exact offline Replay gateway"]
     OLLAMA["Loopback-only local Ollama gateway"]
     OPENAI["Dependency-injected OpenAI Responses adapter"]
     SCHEMA["Strict structured claim schema"]
-    EVIDENCE["Exact quote and range validator"]
+    EVIDENCE["Exact quote, range, and identity-name validator"]
     CANDIDATE["Framework-independent candidate claims"]
 
     REQUEST --> PORT
@@ -463,7 +463,9 @@ fails closed. Replay accepts a fixture only when its key matches the exact sourc
 offset, subject, locale, region, prompt version, and schema version. The Ollama adapter accepts an
 injected transport that is restricted to a loopback HTTP endpoint. It requests JSON Schema output,
 records local token counts, and deterministically corrects offset arithmetic only when the returned
-exact quote occurs once in the supplied chunk; missing or ambiguous quotes still fail closed.
+exact quote has a unique or safely anchored position. Internal entity keys never enter the model
+payload. Display labels scope the task but cannot serve as evidence. An invalid individual
+candidate is dropped; valid candidates from the same or later chunks remain eligible.
 
 The OpenAI adapter constructs a Responses request with strict JSON Schema, `store: false`, bounded
 output, low reasoning effort, and no source identifier, URL, path, secret, raw HTML, image, or log
@@ -473,7 +475,8 @@ remain later work, and the confirmed strict zero-cost policy prohibits cloud exe
 
 Both replay and provider output pass the same decoder. A candidate is rejected unless every quote
 exactly equals its cited chunk range, its declared value kind matches its JSON value, and its
-predicate belongs to the controlled vocabulary. Chunk-relative ranges become source-version
+predicate belongs to the controlled vocabulary. Game and character identity values must also occur
+inside their cited quotes. Chunk-relative ranges become source-version
 absolute ranges before leaving the adapter.
 
 ## Implemented M1-C C2.2 deterministic extraction Harness
@@ -483,15 +486,15 @@ flowchart LR
     DOCUMENT["Immutable normalized source text"]
     CHUNKER["unicode-boundary-v1 chunker"]
     CHUNKS["Ordered exact 4,000/400 slices"]
-    REQUESTS["Fingerprint-bound extraction requests"]
+    REQUESTS["Fingerprint-bound requests without internal entity keys in model payloads"]
     GATEWAY["Exact replay or local Ollama gateway"]
-    VALIDATE["Strict schema and evidence validation"]
+    VALIDATE["Per-candidate schema, evidence, and identity validation"]
     DEDUPE["Stable predicate/value/evidence deduplication"]
     MANIFEST["Document result and invocation manifest"]
     FAIL["Safe whole-document failure"]
 
     DOCUMENT --> CHUNKER --> CHUNKS --> REQUESTS --> GATEWAY --> VALIDATE --> DEDUPE --> MANIFEST
-    REQUESTS -. "missing fixture, invalid output, or fingerprint mismatch" .-> FAIL
+    REQUESTS -. "provider failure, invalid envelope, or fingerprint mismatch" .-> FAIL
 ```
 
 The chunker never trims or normalizes its input. It prefers paragraph, newline, and sentence

@@ -7,8 +7,11 @@ x-app-environment: &app-environment
   GAMECRAFTER_WEB_ORIGIN: http://127.0.0.1:8080
   GAMECRAFTER_AUTH_ENABLED: ${GAMECRAFTER_AUTH_ENABLED:-false}
   GAMECRAFTER_AUTH_COOKIE_SECURE: ${GAMECRAFTER_AUTH_COOKIE_SECURE:-false}
-  GAMECRAFTER_MODEL_PROVIDER: replay
+  GAMECRAFTER_MODEL_PROVIDER: ${GAMECRAFTER_MODEL_PROVIDER:-ollama}
   GAMECRAFTER_MODEL_REPLAY_FIXTURE_PATH: /app/fixtures/nte/official-homepage-en-v1.json
+  GAMECRAFTER_OLLAMA_BASE_URL: ${GAMECRAFTER_DOCKER_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+  GAMECRAFTER_OLLAMA_MODEL: ${GAMECRAFTER_OLLAMA_MODEL:-qwen3.5:4b}
+  GAMECRAFTER_OLLAMA_TIMEOUT_SECONDS: ${GAMECRAFTER_OLLAMA_TIMEOUT_SECONDS:-180}
 
 x-app: &app
   build:
@@ -17,6 +20,8 @@ x-app: &app
   environment: *app-environment
   volumes:
     - gamecrafter-objects:/app/data/objects
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
   restart: unless-stopped
 
 services:

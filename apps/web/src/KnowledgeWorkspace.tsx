@@ -361,6 +361,8 @@ const text = {
       target_invalid: "所选实体或证据版本不满足提取约束。",
       available: "该实体与证据版本拥有完整、精确、零 API 成本的本地回放。",
       ollama_available: "已配置本地 Ollama 模型；候选仍须经过精确证据校验和人工审核。",
+      ollama_unreachable: "本地 Ollama 暂时无法连接。请先启动 Ollama，再点击刷新。",
+      ollama_model_missing: "本地 Ollama 缺少项目配置的模型，请先安装对应模型。",
     },
   },
   en: {
@@ -505,6 +507,8 @@ const text = {
       target_invalid: "The selected entity or evidence version violates extraction constraints.",
       available: "This exact entity and evidence version has a complete zero-API-cost local replay.",
       ollama_available: "A local Ollama model is configured; candidates still require exact evidence validation and human review.",
+      ollama_unreachable: "Local Ollama is unreachable. Start Ollama, then refresh.",
+      ollama_model_missing: "The configured model is missing from local Ollama. Install it first.",
     },
   },
 } as const;

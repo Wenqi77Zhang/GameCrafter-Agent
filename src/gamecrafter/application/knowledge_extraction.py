@@ -34,6 +34,7 @@ class ExtractionDocument:
 
     source_version_id: UUID
     subject_entity_key: str
+    subject_labels: tuple[str, ...]
     normalized_text: str
     locale: str
     region: str
@@ -45,6 +46,10 @@ class ExtractionDocument:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must not be blank")
+        if not self.subject_labels or any(
+            not isinstance(label, str) or not label.strip() for label in self.subject_labels
+        ):
+            raise ValueError("subject_labels must contain non-blank strings")
 
     @property
     def text_sha256(self) -> str:
@@ -214,6 +219,7 @@ class ExtractionHarness:
         return ClaimExtractionRequest(
             source_version_id=document.source_version_id,
             subject_entity_key=document.subject_entity_key,
+            subject_labels=document.subject_labels,
             text=chunk.text,
             text_start_offset=chunk.start_offset,
             locale=document.locale,

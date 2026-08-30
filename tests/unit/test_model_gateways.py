@@ -31,6 +31,7 @@ def extraction_request(
     return ClaimExtractionRequest(
         source_version_id=UUID("00000000-0000-0000-0000-000000000123"),
         subject_entity_key="game:nte",
+        subject_labels=("NTE", "Neverness to Everness"),
         text=text,
         text_start_offset=text_start_offset,
         locale="en",
@@ -65,6 +66,7 @@ def test_request_fingerprint_binds_prompt_schema_and_exact_text() -> None:
     changed = ClaimExtractionRequest(
         source_version_id=request.source_version_id,
         subject_entity_key=request.subject_entity_key,
+        subject_labels=request.subject_labels,
         text=f"{request.text} ",
         text_start_offset=request.text_start_offset,
         locale=request.locale,
@@ -75,6 +77,18 @@ def test_request_fingerprint_binds_prompt_schema_and_exact_text() -> None:
 
     assert len(request.fingerprint_sha256) == 64
     assert request.fingerprint_sha256 != changed.fingerprint_sha256
+    changed_labels = ClaimExtractionRequest(
+        source_version_id=request.source_version_id,
+        subject_entity_key=request.subject_entity_key,
+        subject_labels=("Different game",),
+        text=request.text,
+        text_start_offset=request.text_start_offset,
+        locale=request.locale,
+        region=request.region,
+        prompt_version=request.prompt_version,
+        schema_version=request.schema_version,
+    )
+    assert request.fingerprint_sha256 != changed_labels.fingerprint_sha256
 
 
 def test_disabled_gateway_fails_closed() -> None:
@@ -147,6 +161,10 @@ def test_ollama_local_gateway_uses_loopback_schema_and_validates_evidence() -> N
     assert payload["stream"] is False
     assert payload["think"] is False
     assert payload["format"]["additionalProperties"] is False
+    user_payload = json.loads(payload["messages"][1]["content"])
+    assert user_payload["subject_entity_type"] == "game"
+    assert user_payload["subject_labels"] == ["NTE", "Neverness to Everness"]
+    assert "subject_entity_key" not in user_payload
 
 
 def test_ollama_gateway_corrects_offsets_only_for_a_unique_exact_quote() -> None:
@@ -170,6 +188,7 @@ def test_ollama_gateway_corrects_offsets_only_for_a_unique_exact_quote() -> None
 def test_ollama_gateway_resolves_repeated_quote_near_unique_claim_anchor() -> None:
     request = extraction_request(text="Alpha shared evidence. Beta shared evidence.")
     payload = valid_payload()
+    payload["claims"][0]["predicate"] = "feature.description"
     payload["claims"][0]["evidence"] = [
         {"start_offset": 999, "end_offset": 1004, "quote": "Beta"},
         {"start_offset": 999, "end_offset": 1005, "quote": "shared"},
@@ -188,7 +207,7 @@ def test_ollama_gateway_resolves_repeated_quote_near_unique_claim_anchor() -> No
     assert result.claims[0].evidence[1].start_offset == 128
 
 
-def test_ollama_gateway_does_not_guess_between_repeated_quotes_without_anchor() -> None:
+def test_ollama_gateway_drops_repeated_quote_without_anchor() -> None:
     request = extraction_request(text="shared and shared")
     payload = valid_payload()
     payload["claims"][0]["evidence"] = [
@@ -203,13 +222,14 @@ def test_ollama_gateway_does_not_guess_between_repeated_quotes_without_anchor() 
             "done": True,
         }
 
-    with pytest.raises(InvalidModelOutputError, match="no evidence-valid claims"):
-        OllamaLocalGateway(requester=requester).extract_claims(request)
+    result = OllamaLocalGateway(requester=requester).extract_claims(request)
+    assert result.claims == ()
 
 
 def test_ollama_gateway_resolves_ambiguous_quotes_from_unique_pair_proximity() -> None:
     request = extraction_request(text="NTE Full Name. filler NTE gap gap Full Name.")
     payload = valid_payload()
+    payload["claims"][0]["predicate"] = "feature.description"
     payload["claims"][0]["evidence"] = [
         {"start_offset": 999, "end_offset": 1002, "quote": "NTE"},
         {"start_offset": 999, "end_offset": 1008, "quote": "Full Name"},
@@ -261,7 +281,7 @@ def test_ollama_gateway_discards_one_invalid_candidate_without_weakening_evidenc
     assert result.claims[0].predicate.value == "game.name"
 
 
-def test_ollama_gateway_fails_when_every_candidate_lacks_exact_evidence() -> None:
+def test_ollama_gateway_drops_every_candidate_that_lacks_exact_evidence() -> None:
     payload = valid_payload()
     payload["claims"][0]["evidence"] = [
         {"start_offset": 0, "end_offset": 7, "quote": "invented evidence"},
@@ -275,8 +295,41 @@ def test_ollama_gateway_fails_when_every_candidate_lacks_exact_evidence() -> Non
             "done": True,
         }
 
-    with pytest.raises(InvalidModelOutputError, match="no evidence-valid claims"):
-        OllamaLocalGateway(requester=requester).extract_claims(extraction_request())
+    result = OllamaLocalGateway(requester=requester).extract_claims(extraction_request())
+    assert result.claims == ()
+
+
+def test_ollama_gateway_drops_game_name_not_stated_by_its_exact_quote() -> None:
+    payload = valid_payload()
+    payload["claims"][0]["value"] = "Live: Smoke"
+
+    def requester(body: dict[str, object]) -> dict[str, object]:
+        del body
+        return {
+            "created_at": "2026-08-20T00:00:00Z",
+            "message": {"content": json.dumps(payload)},
+            "done": True,
+        }
+
+    result = OllamaLocalGateway(requester=requester).extract_claims(extraction_request())
+    assert result.claims == ()
+
+
+def test_ollama_gateway_drops_character_identity_not_stated_by_its_quote() -> None:
+    payload = valid_payload()
+    payload["claims"][0]["predicate"] = "character.identity"
+    payload["claims"][0]["value"] = "Invented Character"
+
+    def requester(body: dict[str, object]) -> dict[str, object]:
+        del body
+        return {
+            "created_at": "2026-08-20T00:00:00Z",
+            "message": {"content": json.dumps(payload)},
+            "done": True,
+        }
+
+    result = OllamaLocalGateway(requester=requester).extract_claims(extraction_request())
+    assert result.claims == ()
 
 
 def test_strict_schema_forbids_undeclared_object_properties() -> None:
@@ -342,7 +395,10 @@ def test_openai_adapter_uses_store_false_and_strict_structured_output() -> None:
     text = responses.kwargs["text"]
     assert text["format"]["type"] == "json_schema"
     assert text["format"]["strict"] is True
-    assert "source_version_id" not in json.dumps(responses.kwargs["input"])
+    serialized_input = json.dumps(responses.kwargs["input"])
+    assert "source_version_id" not in serialized_input
+    assert "subject_entity_key" not in serialized_input
+    assert "subject_labels" in serialized_input
 
 
 def test_openai_adapter_rejects_incomplete_or_malformed_output() -> None:

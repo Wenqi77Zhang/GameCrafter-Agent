@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Production Compose now defaults to the loopback-only local Ollama path and probes both the
+  runtime and exact configured model before extraction or Agent review can be queued.
+- Knowledge Curator prompt v5 sends only the controlled subject type plus user-confirmed display
+  labels, never the internal entity key; exact evidence remains authoritative.
+- Invalid local-model candidates are discarded per candidate so one weak page segment cannot stop
+  later valid segments, while fabricated game and character names are blocked unless they occur in
+  the cited quote.
+- Knowledge Reviewer 1.2 rejects possessive and attribution-only character mentions such as
+  `Inanna's` and `according to Sakiri` instead of approving them as character identities.
+- The live NTE English homepage path was exercised through capture, four local-model chunks,
+  eight persisted candidates, and independent review: six approved and two rejected, at zero API
+  cost. The committed replay remains the deterministic offline CI path.
+- The API container installs locked dependencies before copying application source, allowing later
+  code-only rebuilds to reuse the dependency layer.
+
 ## 1.0.0 - 2026-08-27
 
 - Complete local-first NTE evidence-to-English-TikTok marketing workflow.

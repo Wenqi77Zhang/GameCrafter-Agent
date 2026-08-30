@@ -69,6 +69,7 @@ class KnowledgeExtractionHandlers:
                 ExtractionDocument(
                     source_version_id=target.source_version_id,
                     subject_entity_key=target.subject_entity_key,
+                    subject_labels=target.subject_labels,
                     normalized_text=normalized_text,
                     locale=target.locale,
                     region=target.region,
