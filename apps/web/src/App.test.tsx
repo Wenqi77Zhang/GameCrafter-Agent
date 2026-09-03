@@ -386,7 +386,7 @@ test("defaults to Simplified Chinese and loads the NTE source workspace", async 
   expect(screen.getByRole("button", { name: "English" })).toBeInTheDocument();
   expect(screen.getByText("异环")).toBeInTheDocument();
   expect(await screen.findByRole("heading", { name: "收集可信资料" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /继续当前任务 · 添加可信资料/ })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: /继续当前任务 · 添加可信资料/ })).toBeInTheDocument();
   expect(screen.getByText("第 1 / 5 步")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /导入异环英文官网首页/ })).toBeInTheDocument();
   expect(screen.getByText("这里仅显示“官网更新发现”的候选；直接导入官网首页不会经过此区域。")).toBeInTheDocument();
