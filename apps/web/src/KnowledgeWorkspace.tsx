@@ -235,6 +235,8 @@ const text = {
     reasonPlaceholder: "例如：修正输入错误",
     cancel: "取消",
     noEntity: "尚无游戏实体。先创建一个实体；当前验证案例默认使用《异环》。",
+    useProjectEntity: "使用当前项目：",
+    useProjectEntityHint: "名称与英文别名已准备好，创建后可立即提取。",
     sourceVersion: "证据版本",
     latest: "最新",
     historical: "历史",
@@ -381,6 +383,8 @@ const text = {
     reasonPlaceholder: "For example: correct an input mistake",
     cancel: "Cancel",
     noEntity: "No game entity yet. Create one first; the current validation case defaults to NTE.",
+    useProjectEntity: "Use current project: ",
+    useProjectEntityHint: "The name and English aliases are ready; extraction is available immediately after creation.",
     sourceVersion: "Evidence version",
     latest: "Latest",
     historical: "Historical",
@@ -876,15 +880,14 @@ export function KnowledgeWorkspace({
     }[decision];
   };
 
-  const submitEntity = async (event: FormEvent) => {
-    event.preventDefault();
+  const createEntityRecord = async (displayName: string, aliasText: string) => {
     setBusy("create");
     setMessage(null);
     try {
       const created = await api<Entity>(`/api/projects/${projectId}/knowledge-entities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: entityName, aliases: aliases(entityAliases) }),
+        body: JSON.stringify({ display_name: displayName, aliases: aliases(aliasText) }),
       });
       await loadCatalog();
       setSelectedEntityId(created.id);
@@ -894,6 +897,11 @@ export function KnowledgeWorkspace({
     } finally {
       setBusy(null);
     }
+  };
+
+  const submitEntity = async (event: FormEvent) => {
+    event.preventDefault();
+    await createEntityRecord(entityName, entityAliases);
   };
 
   const correctEntity = async (event: FormEvent) => {
@@ -1164,7 +1172,13 @@ export function KnowledgeWorkspace({
         <section className="panel knowledge-setup-card">
           <div className="setup-label"><span>01</span><strong>{t.entity}</strong></div>
           {entities.length === 0 ? (
-            <div className="knowledge-empty-compact"><p>{t.noEntity}</p></div>
+            <div className="knowledge-empty-compact knowledge-empty-compact--action">
+              <p>{t.noEntity}</p>
+              <button className="primary-button" type="button" disabled={busy !== null} onClick={() => void createEntityRecord(projectName, entityAliases)}>
+                {busy === "create" ? t.submitting : `${t.useProjectEntity}${projectName}`}
+              </button>
+              <small>{t.useProjectEntityHint}</small>
+            </div>
           ) : (
             <>
               <select

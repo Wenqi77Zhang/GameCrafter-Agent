@@ -70,6 +70,7 @@ function workspaceFetch(options?: {
   scriptRuns?: Array<Record<string, unknown>>;
   gddDocuments?: Array<Record<string, unknown>>;
   runs?: Array<Record<string, unknown>>;
+  overview?: Record<string, unknown>;
   auth?: { enabled: boolean; bootstrap_required: boolean; user: Record<string, unknown> | null };
 }) {
   const projects = options?.projects ?? [project];
@@ -113,7 +114,7 @@ function workspaceFetch(options?: {
     if (path === "/api/projects") return json({ items: projects });
     if (path.endsWith("/candidates")) return json({ items: candidates });
     if (path.endsWith("/overview")) {
-      return json({
+      return json(options?.overview ?? {
         project_id: project.id,
         release: "M14-local",
         next_action: "sources",
@@ -384,8 +385,8 @@ test("defaults to Simplified Chinese and loads the NTE source workspace", async 
   expect(screen.getByText("公开官网资料是可追溯证据，不等同于游戏公司的内部 GDD。")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "English" })).toBeInTheDocument();
   expect(screen.getByText("异环")).toBeInTheDocument();
-  expect(await screen.findByRole("heading", { name: "添加来源" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /继续下一步 · 添加来源/ })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "收集可信资料" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /继续当前任务 · 添加可信资料/ })).toBeInTheDocument();
   expect(screen.getByText("第 1 / 5 步")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /导入异环英文官网首页/ })).toBeInTheDocument();
   expect(screen.getByText("这里仅显示“官网更新发现”的候选；直接导入官网首页不会经过此区域。")).toBeInTheDocument();
@@ -431,6 +432,51 @@ test("switches to English and remembers the preference", async () => {
   expect(screen.getByRole("heading", { name: "NTE overseas marketing workspace" })).toBeInTheDocument();
   expect(localStorage.getItem("gamecrafter-language")).toBe("en");
   expect(screen.getByRole("button", { name: "简体中文" })).toBeInTheDocument();
+});
+
+test("automatically opens the server-recommended current task", async () => {
+  workspaceFetch({
+    entities: [entity],
+    versions: [sourceVersion],
+    overview: {
+      project_id: project.id,
+      release: "M16-guided-ui",
+      next_action: "knowledge",
+      stages: [
+        { key: "sources", status: "complete" },
+        { key: "knowledge", status: "in_progress" },
+        { key: "marketing", status: "not_started" },
+        { key: "creation", status: "not_started" },
+        { key: "delivery", status: "not_started" },
+      ],
+      metrics: {
+        evidence_versions: 1, candidate_claims: 0, published_snapshots: 0,
+        verified_trend_signals: 0, approved_topics: 0, script_versions: 0,
+        exports: 0, successful_runs: 1, attention_runs: 0, active_runs: 0,
+        api_cost_usd: 0,
+      },
+    },
+  });
+  render(<App />);
+
+  expect(await screen.findByRole("heading", { name: "让审核 Agent 整理游戏知识" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "知识" })).toHaveClass("active");
+  expect(screen.getByText("第 2 / 5 步")).toBeInTheDocument();
+});
+
+test("keeps background work visible without forcing the technical run screen", async () => {
+  workspaceFetch({
+    runs: [{
+      id: "active-run-1", workflow_kind: "source.capture", task_type: "source.capture",
+      status: "running", checkpoint: "source.fetch", last_error_code: null,
+      last_error_detail: null, created_at: "2026-08-31T00:00:00Z", finished_at: null,
+    }],
+  });
+  render(<App />);
+
+  expect(await screen.findByText("系统正在后台处理")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "收集可信资料" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "查看技术详情" })).toBeInTheDocument();
 });
 
 test("can create the local NTE validation project", async () => {
@@ -737,6 +783,21 @@ test("creates and corrects a generic game entity through auditable forms", async
       expect.objectContaining({ method: "PUT" }),
     ),
   );
+});
+
+test("creates the current NTE entity with one guided click", async () => {
+  const fetchMock = workspaceFetch({ entities: [], versions: [sourceVersion] });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "知识" }));
+  fireEvent.click(await screen.findByRole("button", { name: "使用当前项目：异环" }));
+
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+    "/api/projects/project-1/knowledge-entities",
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ display_name: "异环", aliases: ["NTE: Neverness to Everness"] }),
+    }),
+  ));
 });
 
 test("offers a direct Sources shortcut when no evidence version exists", async () => {

@@ -89,7 +89,9 @@ The M6–M8 completion release adds:
 M5 adds:
 
 - a beginner-oriented five-step journey from Sources to an approved export, with one visible next
-  action instead of requiring users to infer the tab order;
+  action instead of requiring users to infer the tab order. The M16 interface promotes this into a
+  persistent production route, automatically opens the server-recommended task, and moves GDD,
+  Runs, and Account into a clearly secondary tools layer;
 - a project overview API and UI metrics for evidence, Claims, verified trends, script versions,
   successful/active/attention runs, and the truthful zero-dollar API cost;
 - deterministic trend normalization, exact-duplicate detection, related-event clustering,
@@ -298,6 +300,15 @@ The M5 production preview remains local and costs nothing to run beyond the user
 Open `http://127.0.0.1:8080`. Use `.\scripts\production.ps1 down` to stop it. This packaging is a
 repeatable deployment artifact, not a claim that a public hosted service or payment system exists.
 Optional local accounts and teams can be enabled through the documented environment switch.
+
+The interface opens the current server-recommended task automatically. Follow the five cards in
+**Your production route** rather than switching workspaces manually. A source or extraction job
+runs in the background and remains visible above the task without redirecting the user to technical
+logs. **GDD**, **Runs**, and **Account** are optional tools, not required steps in the first NTE
+validation journey. When no game entity exists, the Knowledge task offers a one-click NTE entity
+creation path with the prepared English alias. See
+[`docs/product/guided-workspace.md`](docs/product/guided-workspace.md) for the interaction contract
+and beginner acceptance route.
 
 ```mermaid
 flowchart LR

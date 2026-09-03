@@ -112,6 +112,12 @@ const copy = {
     checkpoint: "检查点",
     error: "需要人工关注",
     privacy: "本地私有存储 · 零付费 API",
+    taskWorkspace: "当前任务工作区",
+    tools: "工具与记录",
+    completion: "完成标志",
+    backgroundWorking: "系统正在后台处理",
+    backgroundHint: "你可以留在当前页面。任务完成后，资料和制作进度会自动更新。",
+    viewDetails: "查看技术详情",
   },
   en: {
     brandSubtitle: "Knowledge + Marketing Studio",
@@ -183,8 +189,35 @@ const copy = {
     checkpoint: "Checkpoint",
     error: "Needs attention",
     privacy: "Private local storage · zero paid APIs",
+    taskWorkspace: "Current task workspace",
+    tools: "Tools and records",
+    completion: "Completion signal",
+    backgroundWorking: "The system is working in the background",
+    backgroundHint: "Stay on this page. Material and production progress update automatically when the task finishes.",
+    viewDetails: "View technical details",
   },
 } as const;
+
+const workspaceGuide: Record<Language, Record<Tab, { title: string; why: string; done: string; kind: "task" | "tool" }>> = {
+  "zh-CN": {
+    sources: { title: "收集可信资料", why: "先给智能体可靠原料。官网与本地资料都会保留来源、版本和地区信息。", done: "至少保存 1 个包含证据版本的来源", kind: "task" },
+    knowledge: { title: "让审核 Agent 整理游戏知识", why: "系统提取事实并自动审核；只有歧义、冲突或低置信度内容才需要你决定。", done: "发布 1 个可供营销使用的知识快照", kind: "task" },
+    marketing: { title: "确定 TikTok 营销角度", why: "把经过审核的游戏事实与英语市场趋势匹配，避免只有热度、没有产品关联。", done: "确认 1 个有证据支撑的营销选题", kind: "task" },
+    scripts: { title: "生成、评价并交付脚本", why: "创作 Agent 生成英文脚本，评价 Agent 检查事实、节奏和平台适配，再由你最终确认。", done: "通过质量门并导出最终版本", kind: "task" },
+    gdd: { title: "整理自有 GDD", why: "这是可选的专业工具，只用于你有权使用的内部或自有资料，不影响首条官网验证链路。", done: "需要时建立可回溯章节结构", kind: "tool" },
+    runs: { title: "查看运行与故障详情", why: "这里面向排错与回溯。普通流程不需要盯着它，系统会在任务需要处理时提醒你。", done: "确认失败原因、审计事件或重试结果", kind: "tool" },
+    account: { title: "账户、团队与数据管理", why: "管理本地账户、协作成员、备份与数据生命周期。单人本地验证可以暂时忽略。", done: "按需要完成账户或数据操作", kind: "tool" },
+  },
+  en: {
+    sources: { title: "Collect trusted material", why: "Give the agents reliable inputs first. Official and private material retain source, version, and region metadata.", done: "Save at least one source with an evidence version", kind: "task" },
+    knowledge: { title: "Let the Review Agent build game knowledge", why: "Facts are extracted and reviewed automatically; you only decide ambiguous, conflicting, or low-confidence items.", done: "Publish one marketing-ready knowledge snapshot", kind: "task" },
+    marketing: { title: "Choose a TikTok marketing angle", why: "Match approved game facts with English-market trends so popularity stays relevant to the product.", done: "Approve one evidence-backed topic", kind: "task" },
+    scripts: { title: "Create, evaluate, and deliver a script", why: "The Creation Agent writes the English script, the Evaluation Agent checks it, and you make the final delivery decision.", done: "Pass the quality gate and export the final version", kind: "task" },
+    gdd: { title: "Structure your own GDD", why: "This optional professional tool is only for material you are entitled to use; the first official-site journey does not depend on it.", done: "Create a traceable chapter structure when needed", kind: "tool" },
+    runs: { title: "Inspect runs and failures", why: "This is for diagnosis and traceability. You do not need to watch it during a normal journey; the system surfaces attention items.", done: "Confirm a failure cause, audit event, or retry result", kind: "tool" },
+    account: { title: "Manage account, team, and data", why: "Manage local access, collaborators, backups, and data lifecycle. A solo local validation can ignore this for now.", done: "Complete account or data operations when needed", kind: "tool" },
+  },
+};
 
 const quickProfiles = [
   {
@@ -360,6 +393,11 @@ export function App() {
     () => projects.find((project) => project.id === projectId) ?? null,
     [projects, projectId],
   );
+  const activeRun = useMemo(
+    () => runs.find((run) => ["queued", "running", "retry_wait"].includes(run.status)) ?? null,
+    [runs],
+  );
+  const guide = workspaceGuide[language][tab];
 
   const toggleLanguage = () => {
     const next = language === "zh-CN" ? "en" : "zh-CN";
@@ -403,7 +441,6 @@ export function App() {
       });
       setMessage({ kind: "ok", text: t.queued });
       setSelectedRun(run.id);
-      setTab("runs");
       await refreshWorkspace();
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
@@ -578,39 +615,41 @@ export function App() {
               </button>
             </section>
           ) : (
-            <>
+            <div className="guided-workspace">
               <ProjectJourney
                 projectId={projectId}
                 language={language}
                 refreshToken={knowledgeRefreshToken}
+                activeTab={tab}
                 onNavigate={setTab}
               />
-              <nav className="tabs" aria-label="Workspace">
-                <button aria-current={tab === "sources" ? "page" : undefined} className={tab === "sources" ? "active" : ""} type="button" onClick={() => setTab("sources")}>
-                  {t.sources}<span>{sources.length}</span>
-                </button>
-                <button aria-current={tab === "knowledge" ? "page" : undefined} className={tab === "knowledge" ? "active" : ""} type="button" onClick={() => setTab("knowledge")}>
-                  {t.knowledge}
-                </button>
-                <button aria-current={tab === "gdd" ? "page" : undefined} className={tab === "gdd" ? "active" : ""} type="button" onClick={() => setTab("gdd")}>
-                  {t.gdd}
-                </button>
-                <button aria-current={tab === "marketing" ? "page" : undefined} className={tab === "marketing" ? "active" : ""} type="button" onClick={() => setTab("marketing")}>
-                  {t.marketing}
-                </button>
-                <button aria-current={tab === "scripts" ? "page" : undefined} className={tab === "scripts" ? "active" : ""} type="button" onClick={() => setTab("scripts")}>
-                  {t.scripts}
-                </button>
-                <button aria-current={tab === "runs" ? "page" : undefined} className={tab === "runs" ? "active" : ""} type="button" onClick={() => setTab("runs")}>
-                  {t.runs}<span>{runs.length}</span>
-                </button>
-                <button aria-label={t.account} aria-current={tab === "account" ? "page" : undefined} className={tab === "account" ? "active" : ""} type="button" onClick={() => setTab("account")}>
-                  <span className="tab-label-long">{t.account}</span><span className="tab-label-short">{t.accountShort}</span>
-                </button>
-                <button className="refresh-button" type="button" onClick={refreshAll}>{t.refresh}</button>
-              </nav>
+              <section className="workflow-canvas">
+                <nav className="utility-nav" aria-label={t.tools}>
+                  <span>{guide.kind === "task" ? t.taskWorkspace : t.tools}</span>
+                  <div>
+                    <button aria-current={tab === "gdd" ? "page" : undefined} type="button" onClick={() => setTab("gdd")}>{t.gdd}</button>
+                    <button aria-current={tab === "runs" ? "page" : undefined} type="button" onClick={() => setTab("runs")}>{t.runs}<em>{runs.length}</em></button>
+                    <button aria-label={t.account} aria-current={tab === "account" ? "page" : undefined} type="button" onClick={() => setTab("account")}>{t.accountShort}</button>
+                    <button type="button" onClick={refreshAll}>{t.refresh}</button>
+                  </div>
+                </nav>
 
-              {message && <div className={`notice notice--${message.kind}`} role="status">{message.text}</div>}
+                <header className="workspace-guide">
+                  <span>{guide.kind === "task" ? t.taskWorkspace : t.tools}</span>
+                  <h2>{guide.title}</h2>
+                  <p>{guide.why}</p>
+                  <dl><dt>{t.completion}</dt><dd>{guide.done}</dd></dl>
+                </header>
+
+                {activeRun && (
+                  <section className="background-run" role="status" aria-live="polite">
+                    <span className="status-dot" />
+                    <div><strong>{t.backgroundWorking}</strong><p>{t.backgroundHint}</p></div>
+                    <button type="button" onClick={() => { setSelectedRun(activeRun.id); setTab("runs"); }}>{t.viewDetails}</button>
+                  </section>
+                )}
+
+                {message && <div className={`notice notice--${message.kind}`} role="status">{message.text}</div>}
 
               {tab === "sources" ? (
                 <div className="source-layout">
@@ -765,7 +804,8 @@ export function App() {
                   </section>
                 </div>
               )}
-            </>
+              </section>
+            </div>
           )}
         </>
       )}
