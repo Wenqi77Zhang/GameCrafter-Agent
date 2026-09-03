@@ -307,6 +307,14 @@ def list_topic_candidates(project_id: UUID, task_id: UUID) -> dict[str, object]:
         raise _error(error) from error
 
 
+@router.get("/projects/{project_id}/marketing-tasks/{task_id}/strategy-brief")
+def get_marketing_strategy_brief(project_id: UUID, task_id: UUID) -> dict[str, object]:
+    try:
+        return _service().get_strategy_brief(project_id=project_id, task_id=task_id)
+    except (MarketingServiceNotFoundError, MarketingServiceConflictError) as error:
+        raise _error(error) from error
+
+
 @router.post(
     "/projects/{project_id}/marketing-tasks/{task_id}/topic-candidates/{candidate_id}/reviews",
     status_code=status.HTTP_201_CREATED,

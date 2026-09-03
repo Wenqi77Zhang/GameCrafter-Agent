@@ -67,6 +67,7 @@ function workspaceFetch(options?: {
   marketingTasks?: Array<Record<string, unknown>>;
   trendSignals?: Array<Record<string, unknown>>;
   topicCandidates?: Array<Record<string, unknown>>;
+  strategyBrief?: Record<string, unknown>;
   scriptRuns?: Array<Record<string, unknown>>;
   gddDocuments?: Array<Record<string, unknown>>;
   runs?: Array<Record<string, unknown>>;
@@ -307,6 +308,40 @@ function workspaceFetch(options?: {
     }
     if (path.endsWith("/topic-analysis") && init?.method === "POST") {
       return json({ items: topicCandidates });
+    }
+    if (path.endsWith("/strategy-brief")) {
+      const candidate = topicCandidates[0];
+      const task = marketingTasks[0];
+      const signal = (candidate?.trend_signal ?? {}) as Record<string, unknown>;
+      return json(options?.strategyBrief ?? {
+        schema_version: "marketing-strategy-brief-v1",
+        status: candidate?.status === "approve" ? "approved" : "draft",
+        candidate_id: candidate?.id,
+        direction_key: "trend_led_discovery",
+        game_name: "Neverness to Everness",
+        marketing_direction: candidate?.angle,
+        recommended_topic: candidate?.hook,
+        core_message: "Use the verified #NTE signal as the entry point, then earn interest with approved knowledge.",
+        audience: task?.audience ?? "Potential new players",
+        goal: task?.goal ?? "Awareness",
+        platform: task?.platform ?? "TikTok",
+        markets: task?.markets ?? ["US", "UK"],
+        output_language: task?.output_language ?? "en",
+        duration_seconds: task?.duration_seconds ?? 30,
+        fit_score: candidate?.score ?? 100,
+        why_this_direction: candidate?.rationale,
+        execution_plan: [
+          { key: "hook", start_second: 0, end_second: 4, guidance: candidate?.hook },
+          { key: "proof", start_second: 4, end_second: 20, guidance: "Show approved game facts." },
+          { key: "payoff", start_second: 20, end_second: 26, guidance: "Resolve the hook visually." },
+          { key: "cta", start_second: 26, end_second: 30, guidance: "Ask what viewers want to discover next." },
+        ],
+        proof_facts: [{ snapshot_member_id: "member-1", predicate: "game.name", value: "Neverness to Everness", matched_to_trend: true }],
+        trend_evidence: { title: signal.title, source_name: signal.source_name, source_url: signal.source_url, observed_at: signal.observed_at, region: signal.region, metric_name: signal.metric_name, metric_value: signal.metric_value },
+        knowledge_snapshot: { id: "snapshot-1", version_number: 1, proof_fact_count: 1 },
+        risks: candidate?.risks ?? [], human_decision: null, alternatives: [],
+        agent: { key: "marketing.campaign_strategist", version: "1.1.0", mode: "deterministic", model_used: false },
+      });
     }
     if (path.endsWith("/script-runs")) return json({ items: scriptRuns });
     if (path.includes("/topic-candidates/") && path.endsWith("/reviews") && init?.method === "POST") {
@@ -1073,8 +1108,15 @@ test("shows traceable deterministic topic fit and records the human gate", async
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: "营销" }));
 
+  expect(await screen.findByRole("heading", { name: "热点驱动的游戏认知" })).toBeInTheDocument();
+  expect(screen.getByText("营销策略结论")).toBeInTheDocument();
+  expect(screen.getByText("推荐英语视频话题")).toBeInTheDocument();
+  expect(screen.getByText("30 秒内容结构")).toBeInTheDocument();
+  expect(screen.getByText("可使用的已审核事实")).toBeInTheDocument();
+  expect(screen.getByText("Neverness to Everness", { selector: ".strategy-proof strong" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "审核这个方向" })).toBeInTheDocument();
   expect(await screen.findByText("确定性规则 · 无模型调用")).toBeInTheDocument();
-  expect(screen.getByText("What if #NTE happened inside Neverness to Everness?")).toBeInTheDocument();
+  expect(screen.getAllByText("What if #NTE happened inside Neverness to Everness?").length).toBeGreaterThan(0);
   fireEvent.change(screen.getByLabelText("决定理由"), {
     target: { value: "趋势来源、市场与知识证据均符合本次目标。" },
   });
@@ -1086,6 +1128,8 @@ test("shows traceable deterministic topic fit and records the human gate", async
     ),
   );
   expect(await screen.findByText("趋势来源、市场与知识证据均符合本次目标。")).toBeInTheDocument();
+  expect(await screen.findByText("已确认 · 可直接生成脚本")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "按此方向生成脚本" })).toBeInTheDocument();
 });
 
 test("renders the zero-cost script evaluation and final human gate", async () => {
