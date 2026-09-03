@@ -10,6 +10,20 @@ type Signal = { id: string; source_name: string; source_url: string; observed_at
 type Connector = { key: "gdelt-doc" | "google-news-rss" | "youtube-data" | "tiktok-manual"; name: string; mode: string; available: boolean; requires_secret: boolean; cost: string };
 type TopicReview = { id: string; decision: "approve" | "reject" | "defer"; reason: string; reviewer_id: string; created_at: string };
 type Candidate = { id: string; trend_signal: Signal; score: number; dimensions: Record<string, { score: number; max: number }>; matched_snapshot_member_ids: string[]; angle: string; hook: string; rationale: string; risks: string[]; rule_version: string; status: "unreviewed" | "approve" | "reject" | "defer"; review_history: TopicReview[] };
+type StrategyBrief = {
+  schema_version: string; status: "draft" | "approved"; candidate_id: string;
+  direction_key: "character_trend_crossover" | "gameplay_proof" | "world_discovery" | "trend_led_discovery";
+  game_name: string; marketing_direction: string; recommended_topic: string; core_message: string;
+  audience: string; goal: string; platform: string; markets: string[]; output_language: string;
+  duration_seconds: number; fit_score: number; why_this_direction: string;
+  execution_plan: Array<{ key: "hook" | "proof" | "payoff" | "cta"; start_second: number; end_second: number; guidance: string }>;
+  proof_facts: Array<{ snapshot_member_id: string; predicate: string; value: unknown; matched_to_trend: boolean }>;
+  trend_evidence: { title: string; source_name: string; source_url: string; observed_at: string; region: string; metric_name: string | null; metric_value: number | null };
+  knowledge_snapshot: { id: string; version_number: number; proof_fact_count: number };
+  risks: string[]; human_decision: { decision: string; reason: string; reviewer_id: string; created_at: string } | null;
+  alternatives: Array<{ candidate_id: string; topic: string; direction: string; fit_score: number }>;
+  agent: { key: string; version: string; mode: string; model_used: boolean };
+};
 
 const copy = {
   "zh-CN": {
@@ -20,6 +34,7 @@ const copy = {
     humanGate: "人工选题门", decision: "决定", reason: "决定理由", approve: "批准", reject: "拒绝", defer: "暂缓", record: "记录人工决定", history: "决定历史", selected: "已批准选题", working: "处理中…", chooseTask: "选择任务", refresh: "刷新",
     processing: "确定性清洗", cluster: "同事件", duplicate: "精确重复", freshness: { fresh: "近期", aging: "较旧", stale: "过期" },
     connector: "自动热点来源", connectorHint: "GDELT 无需密钥；YouTube 使用你本机配置的免费 API 配额。系统不会抓取 TikTok。", connectorSource: "来源", query: "检索主题", lookback: "回溯小时", limit: "最多返回", sync: "获取近期热点", unavailableConnector: "未配置", syncResult: "热点同步完成",
+    strategy: "营销策略结论", strategyHint: "这份结论把趋势、已审核游戏事实和创作要求合并为一个可直接执行的方向。", draftStrategy: "Agent 推荐草案 · 确认后进入创作", approvedStrategy: "已确认 · 可直接生成脚本", direction: "推荐营销方向", videoTopic: "推荐英语视频话题", message: "核心传播逻辑", audienceLabel: "目标受众", delivery: "成片规格", why: "为什么推荐它", plan: "30 秒内容结构", proof: "可使用的已审核事实", proofHint: "脚本只能据此展开，不应补充未证实设定。", trace: "趋势证据", reviewStrategy: "审核这个方向", createFromStrategy: "按此方向生成脚本", alternatives: "备选话题", decisionBasis: "人工确认理由", agentLabel: "生成方式", zeroCost: "确定性 Campaign Strategist · 零模型费用", beat: { hook: "抓住注意", proof: "展示事实", payoff: "兑现看点", cta: "引导互动" }, directionNames: { character_trend_crossover: "角色优先的趋势联动", gameplay_proof: "用热点证明玩法卖点", world_discovery: "借势热点探索游戏世界", trend_led_discovery: "热点驱动的游戏认知" }, noProof: "当前方向没有可直接匹配的知识事实，请谨慎审核。",
   },
   en: {
     eyebrow: "MARKETING · M2/M3", title: "Choose a topic from traceable trends, not model guesses.", intro: "Fetch recent candidates from documented public APIs or manually verify TikTok Creative Center. Every record keeps its real source and time.",
@@ -29,17 +44,19 @@ const copy = {
     humanGate: "Human topic gate", decision: "Decision", reason: "Decision reason", approve: "Approve", reject: "Reject", defer: "Defer", record: "Record human decision", history: "Decision history", selected: "Approved topic", working: "Working…", chooseTask: "Choose task", refresh: "Refresh",
     processing: "Deterministic processing", cluster: "Same event", duplicate: "Exact duplicate", freshness: { fresh: "Fresh", aging: "Aging", stale: "Stale" },
     connector: "Automated trend sources", connectorHint: "GDELT needs no key. YouTube uses free API quota configured locally. GameCrafter never scrapes TikTok.", connectorSource: "Source", query: "Search topic", lookback: "Lookback hours", limit: "Maximum results", sync: "Fetch recent trends", unavailableConnector: "Not configured", syncResult: "Trend sync completed",
+    strategy: "Marketing strategy conclusion", strategyHint: "This conclusion combines trend evidence, reviewed game facts, and delivery constraints into one executable direction.", draftStrategy: "Agent recommendation · confirm before creation", approvedStrategy: "Approved · ready for script creation", direction: "Recommended direction", videoTopic: "Recommended English video topic", message: "Core communication logic", audienceLabel: "Target audience", delivery: "Deliverable", why: "Why this direction", plan: "30-second content structure", proof: "Reviewed facts you may use", proofHint: "The script must stay within these facts and avoid unsupported lore.", trace: "Trend evidence", reviewStrategy: "Review this direction", createFromStrategy: "Create script from this direction", alternatives: "Alternative topics", decisionBasis: "Human approval reason", agentLabel: "Generated by", zeroCost: "Deterministic Campaign Strategist · zero model cost", beat: { hook: "Hook", proof: "Evidence", payoff: "Payoff", cta: "Interaction" }, directionNames: { character_trend_crossover: "Character-first trend crossover", gameplay_proof: "Prove gameplay value through a trend", world_discovery: "Trend-led world discovery", trend_led_discovery: "Trend-led game discovery" }, noProof: "No directly matched knowledge fact is available; review this direction cautiously.",
   },
 } as const;
 
 const initialObserved = () => { const date = new Date(); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); return date.toISOString().slice(0, 16); };
 const signalProcessing = (item: Signal): SignalProcessing => item.processing ?? { version: "legacy", normalized_title: item.title.toLocaleLowerCase(), content_fingerprint_sha256: "", duplicate_of_signal_id: null, cluster_key: "legacy", cluster_size: 1, freshness: "fresh" };
 
-export function MarketingWorkspace({ projectId, language }: { projectId: string; language: Language }) {
+export function MarketingWorkspace({ projectId, language, onContinue }: { projectId: string; language: Language; onContinue?: () => void }) {
   const t = copy[language];
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]); const [tasks, setTasks] = useState<Task[]>([]); const [signals, setSignals] = useState<Signal[]>([]); const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [connectors, setConnectors] = useState<Connector[]>([]); const [connectorKey, setConnectorKey] = useState<"gdelt-doc" | "google-news-rss" | "youtube-data">("google-news-rss"); const [connectorQuery, setConnectorQuery] = useState("open world games anime RPG"); const [connectorRegion, setConnectorRegion] = useState("US"); const [lookbackHours, setLookbackHours] = useState("24"); const [connectorLimit, setConnectorLimit] = useState("10");
   const [taskId, setTaskId] = useState(""); const [snapshotId, setSnapshotId] = useState(""); const [busy, setBusy] = useState<string | null>(null); const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [strategy, setStrategy] = useState<StrategyBrief | null>(null);
   const [sourceUrl, setSourceUrl] = useState(""); const [observedAt, setObservedAt] = useState(initialObserved); const [region, setRegion] = useState("US"); const [signalType, setSignalType] = useState("hashtag"); const [trendTitle, setTrendTitle] = useState(""); const [keywords, setKeywords] = useState(""); const [metricName, setMetricName] = useState(""); const [metricValue, setMetricValue] = useState(""); const [signalNotes, setSignalNotes] = useState("");
   const [selectedCandidateId, setSelectedCandidateId] = useState(""); const [decision, setDecision] = useState<"approve" | "reject" | "defer">("approve"); const [reason, setReason] = useState("");
 
@@ -52,9 +69,10 @@ export function MarketingWorkspace({ projectId, language }: { projectId: string;
   }, [projectId]);
 
   const loadCandidates = useCallback(async () => {
-    if (!taskId) { setCandidates([]); return; }
+    if (!taskId) { setCandidates([]); setStrategy(null); return; }
     const payload = await api<{ items: Candidate[] }>(`/api/projects/${projectId}/marketing-tasks/${taskId}/topic-candidates`);
     setCandidates(payload.items); setSelectedCandidateId((current) => payload.items.some((item) => item.id === current) ? current : payload.items[0]?.id || "");
+    setStrategy(payload.items.length ? await api<StrategyBrief>(`/api/projects/${projectId}/marketing-tasks/${taskId}/strategy-brief`) : null);
   }, [projectId, taskId]);
 
   useEffect(() => { void load().catch((error: unknown) => setNotice({ kind: "error", text: error instanceof Error ? error.message : String(error) })); }, [load]);
@@ -88,7 +106,7 @@ export function MarketingWorkspace({ projectId, language }: { projectId: string;
 
   const analyze = async () => {
     if (!taskId) return; setBusy("analysis");
-    try { const payload = await api<{ items: Candidate[] }>(`/api/projects/${projectId}/marketing-tasks/${taskId}/topic-analysis`, { method: "POST" }); setCandidates(payload.items); setSelectedCandidateId(payload.items[0]?.id || ""); await load(); setNotice({ kind: "ok", text: t.analyze }); }
+    try { const payload = await api<{ items: Candidate[] }>(`/api/projects/${projectId}/marketing-tasks/${taskId}/topic-analysis`, { method: "POST" }); setCandidates(payload.items); setSelectedCandidateId(payload.items[0]?.id || ""); await Promise.all([load(), loadCandidates()]); setNotice({ kind: "ok", text: t.analyze }); }
     catch (error) { setNotice({ kind: "error", text: error instanceof Error ? error.message : String(error) }); } finally { setBusy(null); }
   };
 
@@ -101,6 +119,20 @@ export function MarketingWorkspace({ projectId, language }: { projectId: string;
   return <div className="marketing-workspace">
     <section className="marketing-intro"><div><p className="eyebrow">{t.eyebrow}</p><h2>{t.title}</h2><p>{t.intro}</p></div><button className="ghost-button" type="button" onClick={() => void load()}>{t.refresh}</button></section>
     {notice && <div className={`notice notice--${notice.kind}`} role="status">{notice.text}</div>}
+    {strategy && <section className={`strategy-brief strategy-brief--${strategy.status}`} aria-labelledby="strategy-title">
+      <header className="strategy-brief__header"><div><p className="eyebrow">{t.strategy}</p><h2 id="strategy-title">{t.directionNames[strategy.direction_key]}</h2><p>{t.strategyHint}</p></div><span className="strategy-status">{strategy.status === "approved" ? t.approvedStrategy : t.draftStrategy}</span></header>
+      <div className="strategy-brief__hero">
+        <div className="strategy-conclusion"><span>{t.direction}</span><strong>{strategy.marketing_direction}</strong><span>{t.videoTopic}</span><blockquote>{strategy.recommended_topic}</blockquote><span>{t.message}</span><p>{strategy.core_message}</p></div>
+        <dl className="strategy-facts"><div><dt>{t.audienceLabel}</dt><dd>{strategy.audience}</dd></div><div><dt>{t.delivery}</dt><dd>{strategy.platform} · {strategy.duration_seconds}s · {strategy.markets.join(" / ")} · {strategy.output_language.toUpperCase()}</dd></div><div><dt>Fit</dt><dd><strong>{strategy.fit_score}/100</strong></dd></div></dl>
+      </div>
+      <div className="strategy-brief__grid">
+        <section><h3>{t.plan}</h3><ol className="strategy-beats">{strategy.execution_plan.map((item) => <li key={item.key}><span>{item.start_second}–{item.end_second}s</span><div><strong>{t.beat[item.key]}</strong><p>{item.guidance}</p></div></li>)}</ol></section>
+        <section><h3>{t.proof}</h3><p className="section-hint">{t.proofHint}</p>{strategy.proof_facts.length ? <ul className="strategy-proof">{strategy.proof_facts.map((fact) => <li key={fact.snapshot_member_id}><span>{fact.predicate.replaceAll(".", " · ")}</span><strong>{typeof fact.value === "string" ? fact.value : JSON.stringify(fact.value)}</strong>{fact.matched_to_trend && <em>trend match</em>}</li>)}</ul> : <p>{t.noProof}</p>}<a href={strategy.trend_evidence.source_url} target="_blank" rel="noreferrer">{t.trace}: {strategy.trend_evidence.source_name} · {strategy.trend_evidence.region}</a></section>
+      </div>
+      <details className="strategy-reasoning"><summary>{t.why}</summary><p>{strategy.why_this_direction}</p>{strategy.risks.length > 0 && <ul>{strategy.risks.map((risk) => <li key={risk}>{risk.replaceAll("_", " ")}</li>)}</ul>}<p><strong>{t.agentLabel}:</strong> {t.zeroCost} · {strategy.schema_version}</p></details>
+      {strategy.human_decision && <p className="strategy-decision"><strong>{t.decisionBasis}:</strong> {strategy.human_decision.reason}</p>}
+      <div className="strategy-actions"><button className="primary-button" type="button" onClick={() => strategy.status === "approved" ? onContinue?.() : document.getElementById("topic-review")?.scrollIntoView({ behavior: "smooth", block: "center" })}>{strategy.status === "approved" ? t.createFromStrategy : t.reviewStrategy}</button>{strategy.alternatives.length > 0 && <details><summary>{t.alternatives} · {strategy.alternatives.length}</summary>{strategy.alternatives.map((item) => <button key={item.candidate_id} type="button" onClick={() => setSelectedCandidateId(item.candidate_id)}><strong>{item.fit_score}</strong><span>{item.topic}</span></button>)}</details>}</div>
+    </section>}
     <div className="marketing-setup-grid">
       <section className="panel"><div className="panel-heading"><span>01</span><div><h2>{t.task}</h2><p>{t.taskHint}</p></div></div>
         {snapshots.length === 0 ? <div className="empty-state">{t.noSnapshot}</div> : <><label><span>{t.snapshot}</span><select value={snapshotId} onChange={(event) => setSnapshotId(event.target.value)}>{snapshots.map((item) => <option key={item.id} value={item.id}>v{item.version_number} · {item.member_count} facts</option>)}</select></label><button className="primary-button" type="button" disabled={busy !== null} onClick={() => void createTask()}>{busy === "task" ? t.working : t.createTask}</button></>}
@@ -117,7 +149,7 @@ export function MarketingWorkspace({ projectId, language }: { projectId: string;
     <section className="trend-ledger"><div className="list-heading"><h2>{t.signal}</h2><span>{signals.length}</span></div>{signals.length === 0 ? <div className="empty-state">{t.noSignals}</div> : <div className="signal-grid">{signals.map((item) => { const processing = signalProcessing(item); return <article className={`signal-card signal-card--${processing.freshness}`} key={item.id}><div className="card-meta"><span>{item.region}</span><span>{item.signal_type}</span><span>{t.freshness[processing.freshness]}</span>{processing.cluster_size > 1 && <span>{t.cluster} × {processing.cluster_size}</span>}{processing.duplicate_of_signal_id && <span>{t.duplicate}</span>}</div><h3>{item.title}</h3><a href={item.source_url} target="_blank" rel="noreferrer">{item.source_name}</a><p>{item.metric_name ? `${item.metric_name}: ${item.metric_value}` : "Metric not recorded"}</p><details><summary>{t.processing} · {processing.version}</summary><code>{processing.normalized_title} · {processing.cluster_key}</code></details></article>; })}</div>}<button className="secondary-button" type="button" disabled={!taskId || !signals.length || busy !== null} onClick={() => void analyze()}>{busy === "analysis" ? t.working : t.analyze}</button></section>
     <section className="topic-workbench"><div className="list-heading"><h2>{t.candidates}</h2><span>{candidates.length}</span></div>{candidates.length === 0 ? <div className="empty-state">{t.noCandidates}</div> : <div className="topic-grid"><div className="topic-list">{candidates.map((item) => <button type="button" key={item.id} className={selectedCandidateId === item.id ? "topic-card active" : "topic-card"} onClick={() => setSelectedCandidateId(item.id)}><span className="topic-score">{item.score}</span><div><strong>{item.trend_signal.title}</strong><p>{item.angle}</p><small>{item.status} · {item.rule_version}</small></div></button>)}</div>
       {selectedCandidate && <article className="topic-detail"><div className="policy-banner"><strong>{t.deterministic}</strong><span>{selectedCandidate.rule_version}</span></div><h3>{selectedCandidate.hook}</h3><p>{selectedCandidate.rationale}</p><a href={selectedCandidate.trend_signal.source_url} target="_blank" rel="noreferrer">{t.evidence}: {selectedCandidate.trend_signal.source_name}</a><h4>{t.dimensions}</h4><dl className="score-grid">{dimensionEntries.map(([name, value]) => <div key={name}><dt>{name.replaceAll("_", " ")}</dt><dd>{value.score}/{value.max}</dd></div>)}</dl><h4>{t.matched}</h4><p>{selectedCandidate.matched_snapshot_member_ids.length ? `${selectedCandidate.matched_snapshot_member_ids.length} snapshot members` : t.noMatch}</p><h4>{t.risks}</h4><ul>{selectedCandidate.risks.map((risk) => <li key={risk}>{risk.replaceAll("_", " ")}</li>)}</ul>
-        <form className="topic-review-form" onSubmit={review}><h4>{t.humanGate}</h4><label><span>{t.decision}</span><select value={decision} onChange={(event) => setDecision(event.target.value as typeof decision)}><option value="approve">{t.approve}</option><option value="reject">{t.reject}</option><option value="defer">{t.defer}</option></select></label><label><span>{t.reason}</span><textarea required maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} /></label><button className="primary-button" type="submit" disabled={busy !== null}>{busy === "review" ? t.working : t.record}</button></form>
+        <form id="topic-review" className="topic-review-form" onSubmit={review}><h4>{t.humanGate}</h4><label><span>{t.decision}</span><select value={decision} onChange={(event) => setDecision(event.target.value as typeof decision)}><option value="approve">{t.approve}</option><option value="reject">{t.reject}</option><option value="defer">{t.defer}</option></select></label><label><span>{t.reason}</span><textarea required maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} /></label><button className="primary-button" type="submit" disabled={busy !== null}>{busy === "review" ? t.working : t.record}</button></form>
         {selectedCandidate.review_history.length > 0 && <div className="topic-history"><h4>{t.history}</h4>{[...selectedCandidate.review_history].reverse().map((item) => <div key={item.id}><strong>{item.decision}</strong><span>{formatDate(item.created_at, language)}</span><p>{item.reason}</p></div>)}</div>}
       </article>}
     </div>}</section>

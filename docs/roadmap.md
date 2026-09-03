@@ -22,6 +22,7 @@ Each milestone must produce a runnable slice, tests, a failure case, evidence, a
 | M14 | Reproducible 1.0 release | hashed dependency locks, immutable build inputs, aligned versions, release evidence |
 | M15 | Live local-Agent hardening | runtime/model preflight, subject-safe prompts, partial-candidate isolation, adversarial reviewer acceptance |
 | M16 | Guided production workspace | automatic current-task routing, progressive disclosure, background-run feedback, beginner acceptance |
+| M17 | Readable marketing conclusion | versioned strategy brief, evidence-bound direction/topic, timed execution plan, direct creation handoff |
 
 The course game-marketing requirements remain the minimum acceptance line for M2–M5, but the product is no longer constrained to a four-day team submission.
 
@@ -108,5 +109,9 @@ M16 replaces the flat workspace switcher with a persistent five-step production 
 server-recommended task on entry and after a stage advances, keeps background work visible without
 forcing users into run logs, separates optional professional tools, and adds a one-click current-game
 entity path for the first NTE knowledge extraction.
+M17 closes the marketing-output gap: Campaign Strategist 1.1 now turns ranked trend fit and a frozen
+knowledge snapshot into a bilingual-interface strategy brief with one clear direction, recommended
+English topic, core message, timed beats, exact proof facts, provenance, risks, alternatives, approval
+state, and a direct Script Writer handoff. The projection is deterministic and keeps API cost at zero.
 Payment processing and anonymous public hosting remain outside scope because they contradict the
 confirmed zero-cost local boundary and would require a separate commercial/privacy decision.

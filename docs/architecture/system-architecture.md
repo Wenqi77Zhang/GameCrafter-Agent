@@ -12,7 +12,8 @@ flowchart LR
     CURATOR["Knowledge Curator v2: local Ollama"]
     REVIEWER["Knowledge Reviewer v1: independent local Ollama"]
     TREND["Trend Analyst v1: deterministic"]
-    STRATEGY["Campaign Strategist v1: deterministic"]
+    STRATEGY["Campaign Strategist v1.1: deterministic strategy brief"]
+    BRIEF[("Versioned marketing strategy brief")]
     WRITER["Script Writer v1: deterministic"]
     CRITIC["Quality and Compliance Critic v1: deterministic"]
     GDD["GDD Architect v1: deterministic"]
@@ -22,7 +23,7 @@ flowchart LR
     STORE[("Typed immutable artifacts and audit events")]
 
     HUMAN --> HARNESS --> SOURCE --> CURATOR --> REVIEWER --> PACK --> STORE
-    STORE --> TREND --> STRATEGY --> TOPIC --> WRITER --> CRITIC --> FINAL
+    STORE --> TREND --> STRATEGY --> BRIEF --> TOPIC --> WRITER --> CRITIC --> FINAL
     CURATOR --> STORE
     REVIEWER --> STORE
     TREND --> STORE
@@ -49,6 +50,12 @@ from human reviews. Suggested predicate changes always route to a person. Determ
 removes exact duplicates and caps the proposed pack at 15 approved facts after all review batches.
 One explicit human command may confirm the clear keep/remove suggestions; ambiguous items, topic
 selection, and final export remain individual human gates.
+
+Campaign Strategist 1.1 projects the highest-ranked or approved topic into
+`marketing-strategy-brief-v1`. The read model combines only frozen task constraints, ranked trend
+evidence, and approved snapshot facts. It exposes a direction, topic, message, timed execution plan,
+proof facts, alternatives, risks, human decision, and direct Script Writer handoff without adding a
+model call or inventing new game facts.
 
 ## System context
 

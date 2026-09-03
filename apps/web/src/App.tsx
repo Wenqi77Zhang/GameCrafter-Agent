@@ -759,7 +759,7 @@ export function App() {
               ) : tab === "gdd" && selectedProject ? (
                 <GddWorkspace projectId={projectId} language={language} />
               ) : tab === "marketing" && selectedProject ? (
-                <MarketingWorkspace projectId={projectId} language={language} />
+                <MarketingWorkspace projectId={projectId} language={language} onContinue={() => setTab("scripts")} />
               ) : tab === "scripts" && selectedProject ? (
                 <ScriptWorkspace projectId={projectId} language={language} />
               ) : tab === "account" ? (

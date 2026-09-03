@@ -41,6 +41,14 @@ class FakeMarketingService:
         self.calls.append(("list_candidates", kwargs))
         return [{"id": str(CANDIDATE_ID), "status": "unreviewed"}]
 
+    def get_strategy_brief(self, **kwargs):
+        self.calls.append(("strategy_brief", kwargs))
+        return {
+            "schema_version": "marketing-strategy-brief-v1",
+            "status": "draft",
+            "recommended_topic": "What if #NTE happened inside Neverness to Everness?",
+        }
+
     def review_topic(self, **kwargs):
         self.calls.append(("review", kwargs))
         return {"id": "review-1", "decision": kwargs["decision"]}, True
@@ -101,6 +109,9 @@ def test_marketing_api_exposes_traceable_trend_to_topic_commands(monkeypatch) ->
     assert signal.status_code == 201
     analyzed = client.post(f"/api/projects/{PROJECT_ID}/marketing-tasks/{TASK_ID}/topic-analysis")
     assert analyzed.status_code == 200 and analyzed.json()["items"][0]["score"] == 100
+    strategy = client.get(f"/api/projects/{PROJECT_ID}/marketing-tasks/{TASK_ID}/strategy-brief")
+    assert strategy.status_code == 200
+    assert strategy.json()["schema_version"] == "marketing-strategy-brief-v1"
     review = client.post(
         f"/api/projects/{PROJECT_ID}/marketing-tasks/{TASK_ID}/topic-candidates/"
         f"{CANDIDATE_ID}/reviews",
@@ -108,7 +119,13 @@ def test_marketing_api_exposes_traceable_trend_to_topic_commands(monkeypatch) ->
         json={"decision": "approve", "reason": "Verified fit and evidence."},
     )
     assert review.status_code == 201 and review.json()["decision"] == "approve"
-    assert [name for name, _ in fake.calls] == ["task", "signal", "analyze", "review"]
+    assert [name for name, _ in fake.calls] == [
+        "task",
+        "signal",
+        "analyze",
+        "strategy_brief",
+        "review",
+    ]
 
 
 def test_marketing_api_requires_idempotency_header() -> None:

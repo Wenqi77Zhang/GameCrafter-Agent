@@ -58,7 +58,7 @@ TREND_ANALYST = AgentSpec(
 CAMPAIGN_STRATEGIST = AgentSpec(
     "marketing.campaign_strategist",
     "Campaign Strategist",
-    "1.0.0",
+    "1.1.0",
     AgentMode.DETERMINISTIC,
     "plan from frozen evidence",
     True,

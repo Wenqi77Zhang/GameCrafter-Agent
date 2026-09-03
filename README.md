@@ -102,6 +102,10 @@ M5 adds:
 - a production-preview Docker stack with migration, API, worker, PostgreSQL, object storage, Nginx,
   dependency health checks, and a single local URL;
 - real Chromium desktop/mobile acceptance with horizontal-overflow and console-error checks.
+- a readable Campaign Strategist brief that turns the selected trend and frozen knowledge snapshot
+  into one explicit marketing direction, English video topic, core message, timed content plan,
+  usable proof facts, evidence link, risks, alternatives, and a direct handoff to script creation;
+  the brief is deterministic, versioned, auditable, and keeps paid API cost at zero.
 
 Implemented through M4:
 

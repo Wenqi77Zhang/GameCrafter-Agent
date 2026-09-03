@@ -13,7 +13,7 @@ publication gates.
 | `knowledge.curator` | evidence-bound candidate extraction | local Ollama |
 | `knowledge.reviewer` | independent semantic review and risk routing | local Ollama |
 | `marketing.trend_analyst` | verified trend evidence analysis | deterministic |
-| `marketing.campaign_strategist` | frozen knowledge/trend topic strategy | deterministic |
+| `marketing.campaign_strategist` | frozen knowledge/trend strategy brief and creation handoff | deterministic |
 | `creation.script_writer` | structured TikTok script generation | deterministic |
 | `creation.quality_critic` | quality, evidence, format, and compliance evaluation | deterministic |
 | `design.gdd_architect` | exact-offset GDD chapters and explicit assumption separation | deterministic |
@@ -25,6 +25,12 @@ call. Later model upgrades must retain the same contracts and pass offline evalu
 Knowledge review produces `agent_approved`, `agent_rejected`, or `needs_human`. Deterministic gates
 run before the reviewer. A human confirms the reviewed knowledge pack once; only unresolved claims
 require individual attention. Topic selection and final script export remain human gates.
+
+Campaign Strategist 1.1 emits the versioned `marketing-strategy-brief-v1` read model. The user sees
+one explicit direction, recommended English topic, core message, timed content structure, approved
+proof facts, trend provenance, risks, and up to two alternatives. A draft remains reviewable; an
+approved brief exposes a direct transition to Script Writer. This closes the gap between technical
+fit scoring and a marketing conclusion a domestic studio user can actually read and execute.
 
 Curator v5 receives a controlled subject type and user-confirmed display labels, but never the
 internal entity key. Labels identify the review scope and cannot substitute for a public-source
