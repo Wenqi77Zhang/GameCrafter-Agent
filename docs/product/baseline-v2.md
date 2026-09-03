@@ -1,6 +1,6 @@
 # GameCrafter v2 product baseline
 
-Status: confirmed on 2026-07-27.
+Status: confirmed on 2026-07-27; local-product boundary extended and completed on 2026-08-26.
 
 GameCrafter is a long-term personal product, portfolio project, and potential commercial product. It is no longer a four-day team assignment.
 
@@ -10,7 +10,7 @@ GameCrafter is an evidence-aware game knowledge and marketing workspace for inde
 
 The first complete slice:
 
-1. imports public game evidence;
+1. imports public game evidence and bounded private text owned by the user;
 2. builds a human-reviewed Game Knowledge Hub;
 3. retrieves real trend signals;
 4. explains game, platform, market, audience, and goal fit;
@@ -28,11 +28,17 @@ The first complete slice:
 - Audience: potential new players in English-speaking markets
 - Output: a 25–35 second English vertical-video marketing script
 
-## First-release boundaries
+## Complete local-release boundaries
 
-The first release is local and single-user. It does not include accounts, multi-tenancy, team collaboration, billing, a complete GDD Studio, video rendering, or unauthorized TikTok scraping.
+The default release remains local and single-user, with optional local accounts, tenant isolation,
+four-role team collaboration, portable export/deletion, and GDD Studio available behind an explicit
+configuration switch. It does not include payment processing, anonymous public hosting, video
+rendering, binary office-document OCR, or unauthorized TikTok scraping.
 
-Public sources must not be described as an internal GDD. For existing games, the Knowledge Hub creates a sourced Public Game Intelligence Profile. User-owned internal documents may be supported locally, but online private uploads require later authentication and isolation work.
+Public sources must not be described as an internal GDD. For existing games, the Knowledge Hub
+creates a sourced Public Game Intelligence Profile. User-owned internal documents stay in local
+content-addressed storage; authenticated Internet deployment would require a separate TLS,
+infrastructure, privacy, and commercial release decision.
 
 ## M1 official-source policy
 

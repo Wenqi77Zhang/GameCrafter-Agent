@@ -2,7 +2,7 @@ name: gamecrafter
 
 services:
   postgres:
-    image: pgvector/pgvector:0.8.2-pg17-bookworm
+    image: pgvector/pgvector:0.8.2-pg17-bookworm@sha256:feb68f4f15446397d8cac7f4fe48fe4586de83160d1fc48b46283312d1a33966
     environment:
       POSTGRES_DB: gamecrafter
       POSTGRES_USER: gamecrafter

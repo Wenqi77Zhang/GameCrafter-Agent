@@ -37,6 +37,7 @@ class _RequestData(BaseModel):
 
     source_version_id: str = Field(min_length=1)
     subject_entity_key: str = Field(min_length=1)
+    subject_labels: list[str] = Field(min_length=1, max_length=21)
     text: str = Field(min_length=1)
     text_start_offset: int = Field(ge=0)
     locale: str = Field(min_length=1)
@@ -93,6 +94,7 @@ def load_replay_fixture(path: Path) -> LoadedReplayFixture:
         request = ClaimExtractionRequest(
             source_version_id=UUID(request_data.source_version_id),
             subject_entity_key=request_data.subject_entity_key,
+            subject_labels=tuple(request_data.subject_labels),
             text=request_data.text,
             text_start_offset=request_data.text_start_offset,
             locale=request_data.locale,
@@ -125,6 +127,7 @@ def load_replay_fixture(path: Path) -> LoadedReplayFixture:
     document = ExtractionDocument(
         source_version_id=request.source_version_id,
         subject_entity_key=request.subject_entity_key,
+        subject_labels=request.subject_labels,
         normalized_text=request.text,
         locale=request.locale,
         region=request.region,

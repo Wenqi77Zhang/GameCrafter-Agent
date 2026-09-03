@@ -19,10 +19,10 @@ if (-not $pnpm) {
 
 Push-Location $repoRoot
 try {
-    & $python -m ruff format --check src tests apps/api apps/worker migrations
+    & $python -m ruff format --check src tests apps/api apps/worker migrations scripts
     if ($LASTEXITCODE -ne 0) { throw "Python formatting check failed." }
 
-    & $python -m ruff check src tests apps/api apps/worker migrations
+    & $python -m ruff check src tests apps/api apps/worker migrations scripts
     if ($LASTEXITCODE -ne 0) { throw "Python lint check failed." }
 
     & $python -m pytest --basetemp $pytestTemp
@@ -39,7 +39,7 @@ try {
 
     if ($env:GAMECRAFTER_BROWSER_ACCEPTANCE_URL) {
         & $python scripts/m5_browser_acceptance.py --url $env:GAMECRAFTER_BROWSER_ACCEPTANCE_URL
-        if ($LASTEXITCODE -ne 0) { throw "M5 browser acceptance failed." }
+        if ($LASTEXITCODE -ne 0) { throw "Complete local browser acceptance failed." }
     }
 
     Write-Host "All locally available GameCrafter checks passed."

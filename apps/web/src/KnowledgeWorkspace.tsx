@@ -235,6 +235,8 @@ const text = {
     reasonPlaceholder: "例如：修正输入错误",
     cancel: "取消",
     noEntity: "尚无游戏实体。先创建一个实体；当前验证案例默认使用《异环》。",
+    useProjectEntity: "使用当前项目：",
+    useProjectEntityHint: "名称与英文别名已准备好，创建后可立即提取。",
     sourceVersion: "证据版本",
     latest: "最新",
     historical: "历史",
@@ -330,6 +332,11 @@ const text = {
     publishingSnapshot: "正在原子发布…",
     snapshotPublished: "知识快照已发布，后续流程将引用这个不可变版本。",
     snapshotHistory: "快照版本历史",
+    synthesis: "多来源联合视图",
+    synthesisHint: "只对已批准快照做确定性汇总，不生成新事实。",
+    distinctSources: "独立来源",
+    corroborated: "多来源相互印证",
+    singleSource: "仅单一来源",
     noSnapshots: "尚未发布知识快照。",
     latestSnapshot: "最新",
     snapshotFacts: "条事实",
@@ -356,6 +363,8 @@ const text = {
       target_invalid: "所选实体或证据版本不满足提取约束。",
       available: "该实体与证据版本拥有完整、精确、零 API 成本的本地回放。",
       ollama_available: "已配置本地 Ollama 模型；候选仍须经过精确证据校验和人工审核。",
+      ollama_unreachable: "本地 Ollama 暂时无法连接。请先启动 Ollama，再点击刷新。",
+      ollama_model_missing: "本地 Ollama 缺少项目配置的模型，请先安装对应模型。",
     },
   },
   en: {
@@ -374,6 +383,8 @@ const text = {
     reasonPlaceholder: "For example: correct an input mistake",
     cancel: "Cancel",
     noEntity: "No game entity yet. Create one first; the current validation case defaults to NTE.",
+    useProjectEntity: "Use current project: ",
+    useProjectEntityHint: "The name and English aliases are ready; extraction is available immediately after creation.",
     sourceVersion: "Evidence version",
     latest: "Latest",
     historical: "Historical",
@@ -469,6 +480,11 @@ const text = {
     publishingSnapshot: "Publishing atomically…",
     snapshotPublished: "The knowledge snapshot was published; downstream workflows will reference this immutable version.",
     snapshotHistory: "Snapshot version history",
+    synthesis: "Multi-source synthesis",
+    synthesisHint: "Deterministic summary of the approved snapshot only; it creates no new facts.",
+    distinctSources: "Distinct sources",
+    corroborated: "Multi-source corroborated",
+    singleSource: "Single-source only",
     noSnapshots: "No knowledge snapshot has been published yet.",
     latestSnapshot: "Latest",
     snapshotFacts: "facts",
@@ -495,6 +511,8 @@ const text = {
       target_invalid: "The selected entity or evidence version violates extraction constraints.",
       available: "This exact entity and evidence version has a complete zero-API-cost local replay.",
       ollama_available: "A local Ollama model is configured; candidates still require exact evidence validation and human review.",
+      ollama_unreachable: "Local Ollama is unreachable. Start Ollama, then refresh.",
+      ollama_model_missing: "The configured model is missing from local Ollama. Install it first.",
     },
   },
 } as const;
@@ -550,6 +568,26 @@ function displayValue(value: unknown): string {
     return String((value as { entity_key: unknown }).entity_key);
   }
   return JSON.stringify(value);
+}
+
+function snapshotSynthesis(snapshot: KnowledgeSnapshot) {
+  const sources = new Set<string>();
+  const groups = new Map<string, Set<string>>();
+  for (const member of snapshot.members) {
+    const key = `${member.subject.entity_id}\u0000${member.predicate}\u0000${JSON.stringify(member.value)}`;
+    const group = groups.get(key) ?? new Set<string>();
+    for (const evidence of member.evidence) {
+      sources.add(evidence.source_id);
+      group.add(evidence.source_id);
+    }
+    groups.set(key, group);
+  }
+  return {
+    sourceCount: sources.size,
+    corroborated: [...groups.values()].filter((items) => items.size >= 2).length,
+    singleSource: [...groups.values()].filter((items) => items.size === 1).length,
+    ruleVersion: "multi-source-synthesis-v1",
+  };
 }
 
 function parseEditedValue(kind: string, input: string): unknown {
@@ -842,15 +880,14 @@ export function KnowledgeWorkspace({
     }[decision];
   };
 
-  const submitEntity = async (event: FormEvent) => {
-    event.preventDefault();
+  const createEntityRecord = async (displayName: string, aliasText: string) => {
     setBusy("create");
     setMessage(null);
     try {
       const created = await api<Entity>(`/api/projects/${projectId}/knowledge-entities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: entityName, aliases: aliases(entityAliases) }),
+        body: JSON.stringify({ display_name: displayName, aliases: aliases(aliasText) }),
       });
       await loadCatalog();
       setSelectedEntityId(created.id);
@@ -860,6 +897,11 @@ export function KnowledgeWorkspace({
     } finally {
       setBusy(null);
     }
+  };
+
+  const submitEntity = async (event: FormEvent) => {
+    event.preventDefault();
+    await createEntityRecord(entityName, entityAliases);
   };
 
   const correctEntity = async (event: FormEvent) => {
@@ -1130,7 +1172,13 @@ export function KnowledgeWorkspace({
         <section className="panel knowledge-setup-card">
           <div className="setup-label"><span>01</span><strong>{t.entity}</strong></div>
           {entities.length === 0 ? (
-            <div className="knowledge-empty-compact"><p>{t.noEntity}</p></div>
+            <div className="knowledge-empty-compact knowledge-empty-compact--action">
+              <p>{t.noEntity}</p>
+              <button className="primary-button" type="button" disabled={busy !== null} onClick={() => void createEntityRecord(projectName, entityAliases)}>
+                {busy === "create" ? t.submitting : `${t.useProjectEntity}${projectName}`}
+              </button>
+              <small>{t.useProjectEntityHint}</small>
+            </div>
           ) : (
             <>
               <select
@@ -1567,6 +1615,15 @@ export function KnowledgeWorkspace({
                   <div className="snapshot-detail">
                     <code>{snapshot.schema_version} · {snapshot.content_sha256}</code>
                     {snapshot.notes && <p>{snapshot.notes}</p>}
+                    {(() => {
+                      const synthesis = snapshotSynthesis(snapshot);
+                      return <div className="snapshot-metrics" aria-label={t.synthesis}>
+                        <div><span>{t.distinctSources}</span><strong>{synthesis.sourceCount}</strong></div>
+                        <div><span>{t.corroborated}</span><strong>{synthesis.corroborated}</strong></div>
+                        <div><span>{t.singleSource}</span><strong>{synthesis.singleSource}</strong></div>
+                        <div><span>{t.synthesisHint}</span><code>{synthesis.ruleVersion}</code></div>
+                      </div>;
+                    })()}
                     <div className="snapshot-members">
                       {snapshot.members.map((member) => (
                         <article key={`${snapshot.id}-${member.review_id}`}>

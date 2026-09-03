@@ -83,6 +83,10 @@ class ProjectRecord(Base):
     slug: Mapped[str] = mapped_column(String(80), nullable=False)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     default_locale: Mapped[str] = mapped_column(String(16), nullable=False, default="zh-CN")
+    owner_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    team_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("teams.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
@@ -98,7 +102,7 @@ class ContentFamilyRecord(Base):
     __table_args__ = (
         CheckConstraint(
             "source_type IN ('overview', 'character', 'world', 'gameplay', 'news', "
-            "'update', 'event', 'guide_faq', 'other')",
+            "'update', 'event', 'guide_faq', 'document', 'transcript', 'gdd', 'other')",
             name="ck_content_families_source_type",
         ),
         UniqueConstraint("project_id", "family_key", name="uq_content_families_project_key"),
@@ -130,7 +134,7 @@ class SourceRecord(Base):
         CheckConstraint("status IN ('active', 'archived')", name="ck_sources_status"),
         CheckConstraint(
             "source_type IN ('overview', 'character', 'world', 'gameplay', 'news', "
-            "'update', 'event', 'guide_faq', 'other')",
+            "'update', 'event', 'guide_faq', 'document', 'transcript', 'gdd', 'other')",
             name="ck_sources_source_type",
         ),
         UniqueConstraint("project_id", "canonical_url", name="uq_sources_project_url"),
@@ -193,7 +197,7 @@ class SourceVersionRecord(Base):
     __table_args__ = (
         CheckConstraint("version_number > 0", name="ck_source_versions_number_positive"),
         CheckConstraint(
-            "capture_method IN ('http', 'playwright')",
+            "capture_method IN ('http', 'playwright', 'local_upload')",
             name="ck_source_versions_capture_method",
         ),
         CheckConstraint(
@@ -259,7 +263,7 @@ class SourceAssetRecord(Base):
     __tablename__ = "source_assets"
     __table_args__ = (
         CheckConstraint(
-            "role IN ('raw_html', 'normalized_text', 'image')",
+            "role IN ('raw_html', 'raw_document', 'normalized_text', 'image')",
             name="ck_source_assets_role",
         ),
         CheckConstraint("ordinal >= 0", name="ck_source_assets_ordinal_nonnegative"),
@@ -352,7 +356,7 @@ class DiscoveryCandidateRecord(Base):
         ),
         CheckConstraint(
             "source_type IN ('overview', 'character', 'world', 'gameplay', 'news', "
-            "'update', 'event', 'guide_faq', 'other')",
+            "'update', 'event', 'guide_faq', 'document', 'transcript', 'gdd', 'other')",
             name="ck_discovery_candidates_source_type",
         ),
         UniqueConstraint(
@@ -1494,3 +1498,301 @@ class ScriptExportRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class GddDocumentRecord(Base):
+    """One structured GDD bound to an immutable private evidence version."""
+
+    __tablename__ = "gdd_documents"
+    __table_args__ = (
+        CheckConstraint("status IN ('draft', 'approved')", name="ck_gdd_documents_status"),
+        UniqueConstraint("project_id", "source_version_id", name="uq_gdd_project_source_version"),
+        Index("ix_gdd_documents_project_created", "project_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_version_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("source_versions.id", ondelete="RESTRICT"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="draft")
+    parser_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
+class GddChapterRecord(Base):
+    """Deterministically parsed chapter with exact source-text offsets."""
+
+    __tablename__ = "gdd_chapters"
+    __table_args__ = (
+        CheckConstraint("heading_level BETWEEN 1 AND 6", name="ck_gdd_chapters_level"),
+        CheckConstraint(
+            "start_offset >= 0 AND end_offset > start_offset", name="ck_gdd_chapters_offsets"
+        ),
+        CheckConstraint("length(content_sha256) = 64", name="ck_gdd_chapters_digest"),
+        UniqueConstraint("document_id", "ordinal", name="uq_gdd_chapters_document_ordinal"),
+        Index("ix_gdd_chapters_document_ordinal", "document_id", "ordinal"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    document_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("gdd_documents.id", ondelete="CASCADE"), nullable=False
+    )
+    parent_chapter_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("gdd_chapters.id", ondelete="SET NULL")
+    )
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    heading_level: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    start_offset: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_offset: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class GddAssumptionRecord(Base):
+    """Explicit non-factual design assumption; never merged into sourced knowledge."""
+
+    __tablename__ = "gdd_assumptions"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('proposed', 'approved', 'rejected')",
+            name="ck_gdd_assumptions_status",
+        ),
+        UniqueConstraint("document_id", "command_key", name="uq_gdd_assumptions_command"),
+        Index("ix_gdd_assumptions_document_created", "document_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    document_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("gdd_documents.id", ondelete="CASCADE"), nullable=False
+    )
+    chapter_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("gdd_chapters.id", ondelete="SET NULL")
+    )
+    statement: Mapped[str] = mapped_column(String(2000), nullable=False)
+    rationale: Mapped[str] = mapped_column(String(2000), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="proposed")
+    decided_by: Mapped[str | None] = mapped_column(String(120))
+    decision_reason: Mapped[str | None] = mapped_column(String(1000))
+    command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class GddRevisionRecord(Base):
+    """Immutable chapter and assumption manifest for an approved GDD revision."""
+
+    __tablename__ = "gdd_revisions"
+    __table_args__ = (
+        CheckConstraint("revision_number > 0", name="ck_gdd_revisions_number"),
+        CheckConstraint("length(content_sha256) = 64", name="ck_gdd_revisions_digest"),
+        UniqueConstraint("document_id", "revision_number", name="uq_gdd_revisions_number"),
+        UniqueConstraint("document_id", "command_key", name="uq_gdd_revisions_command"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    document_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("gdd_documents.id", ondelete="RESTRICT"), nullable=False
+    )
+    revision_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    manifest: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    notes: Mapped[str | None] = mapped_column(String(2000))
+    command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    approved_by: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class UserRecord(Base):
+    """Local account identity with a memory-hard password hash."""
+
+    __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'disabled')", name="ck_users_status"),
+        UniqueConstraint("email_normalized", name="uq_users_email"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    email_normalized: Mapped[str] = mapped_column(String(320), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class UserSessionRecord(Base):
+    """Opaque, revocable local web session; the raw token is never persisted."""
+
+    __tablename__ = "user_sessions"
+    __table_args__ = (
+        CheckConstraint("length(token_sha256) = 64", name="ck_user_sessions_digest"),
+        UniqueConstraint("token_sha256", name="uq_user_sessions_digest"),
+        Index("ix_user_sessions_user_expiry", "user_id", "expires_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    token_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class AuthLoginThrottleRecord(Base):
+    """Privacy-preserving persistent login throttle keyed only by normalized-email hash."""
+
+    __tablename__ = "auth_login_throttles"
+    __table_args__ = (
+        CheckConstraint("length(email_sha256) = 64", name="ck_auth_login_throttles_digest"),
+        CheckConstraint("failure_count >= 0", name="ck_auth_login_throttles_count"),
+    )
+
+    email_sha256: Mapped[str] = mapped_column(String(64), primary_key=True)
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    blocked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
+class TeamRecord(Base):
+    """Small-team tenant boundary."""
+
+    __tablename__ = "teams"
+    __table_args__ = (UniqueConstraint("slug", name="uq_teams_slug"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    slug: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_by: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class TeamMembershipRecord(Base):
+    """Current role and revocation state for one team member."""
+
+    __tablename__ = "team_memberships"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('owner', 'editor', 'reviewer', 'viewer')",
+            name="ck_team_memberships_role",
+        ),
+        CheckConstraint("status IN ('active', 'revoked')", name="ck_team_memberships_status"),
+        UniqueConstraint("team_id", "user_id", name="uq_team_memberships_user"),
+        Index("ix_team_memberships_user_status", "user_id", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    team_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(24), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class TeamInvitationRecord(Base):
+    """Single-use, hashed invitation token with explicit expiry and revocation."""
+
+    __tablename__ = "team_invitations"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('editor', 'reviewer', 'viewer')", name="ck_team_invitations_role"
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'accepted', 'revoked', 'expired')",
+            name="ck_team_invitations_status",
+        ),
+        CheckConstraint("length(token_sha256) = 64", name="ck_team_invitations_digest"),
+        UniqueConstraint("token_sha256", name="uq_team_invitations_digest"),
+        Index("ix_team_invitations_team_status", "team_id", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    team_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False
+    )
+    email_normalized: Mapped[str] = mapped_column(String(320), nullable=False)
+    role: Mapped[str] = mapped_column(String(24), nullable=False)
+    token_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_by: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    accepted_by: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SecurityAuditRecord(Base):
+    """Append-only account/team security event without secrets or private content."""
+
+    __tablename__ = "security_audit_events"
+    __table_args__ = (
+        Index("ix_security_audit_team_created", "team_id", "created_at"),
+        Index("ix_security_audit_actor_created", "actor_user_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    event_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    actor_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    team_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("teams.id", ondelete="SET NULL"))
+    payload: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class RuntimeHeartbeatRecord(Base):
+    """Latest liveness signal for one local background runtime instance."""
+
+    __tablename__ = "runtime_heartbeats"
+    __table_args__ = (
+        CheckConstraint("component_type IN ('worker')", name="ck_runtime_heartbeats_type"),
+        Index("ix_runtime_heartbeats_type_seen", "component_type", "last_seen_at"),
+    )
+
+    component_key: Mapped[str] = mapped_column(String(180), primary_key=True)
+    component_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    instance_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

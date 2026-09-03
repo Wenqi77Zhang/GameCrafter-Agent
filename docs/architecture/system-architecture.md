@@ -8,38 +8,54 @@ GameCrafter v2 uses a modular monolith with explicit domain and adapter boundari
 flowchart LR
     HUMAN["Chinese studio user"]
     HARNESS["Durable Harness: typed jobs, gates, retries, audit"]
+    SOURCE["Source and Provenance Steward v1: deterministic"]
     CURATOR["Knowledge Curator v2: local Ollama"]
     REVIEWER["Knowledge Reviewer v1: independent local Ollama"]
     TREND["Trend Analyst v1: deterministic"]
-    STRATEGY["Campaign Strategist v1: deterministic"]
+    STRATEGY["Campaign Strategist v1.1: deterministic strategy brief"]
+    BRIEF[("Versioned marketing strategy brief")]
     WRITER["Script Writer v1: deterministic"]
     CRITIC["Quality and Compliance Critic v1: deterministic"]
+    GDD["GDD Architect v1: deterministic"]
     PACK{"Human knowledge-pack confirmation"}
     TOPIC{"Human topic choice"}
     FINAL{"Human final export approval"}
     STORE[("Typed immutable artifacts and audit events")]
 
-    HUMAN --> HARNESS --> CURATOR --> REVIEWER --> PACK --> STORE
-    STORE --> TREND --> STRATEGY --> TOPIC --> WRITER --> CRITIC --> FINAL
+    HUMAN --> HARNESS --> SOURCE --> CURATOR --> REVIEWER --> PACK --> STORE
+    STORE --> TREND --> STRATEGY --> BRIEF --> TOPIC --> WRITER --> CRITIC --> FINAL
     CURATOR --> STORE
     REVIEWER --> STORE
     TREND --> STORE
     STRATEGY --> STORE
     WRITER --> STORE
     CRITIC --> STORE
+    SOURCE --> STORE
+    STORE --> GDD --> STORE
 ```
 
-The Harness is the orchestrator, not a seventh Agent. Specialists do not hold an unconstrained
+The Harness is the orchestrator, not another Agent. Eight specialists do not hold an unconstrained
 conversation: each receives a bounded, versioned input and emits a typed artifact. The two
 knowledge roles use the loopback-only local model; the four downstream roles expose their existing
 deterministic rules as versioned specialists and never pretend that a model was called. This is a
 workflow/DAG with independent evaluator stages, not ReAct, ReWOO, or a self-modifying swarm.
+
+The Source Steward owns bounded collection and provenance contracts; the GDD Architect performs
+exact-offset structural parsing and keeps design assumptions outside factual knowledge. Identity,
+RBAC, quotas, hashing, deletion, and integrity checks remain deterministic platform policy rather
+than being delegated to an Agent that could improvise a security decision.
 
 The reviewer writes `agent_approved`, `agent_rejected`, or `needs_human` into a ledger separate
 from human reviews. Suggested predicate changes always route to a person. Deterministic governance
 removes exact duplicates and caps the proposed pack at 15 approved facts after all review batches.
 One explicit human command may confirm the clear keep/remove suggestions; ambiguous items, topic
 selection, and final export remain individual human gates.
+
+Campaign Strategist 1.1 projects the highest-ranked or approved topic into
+`marketing-strategy-brief-v1`. The read model combines only frozen task constraints, ranked trend
+evidence, and approved snapshot facts. It exposes a direction, topic, message, timed execution plan,
+proof facts, alternatives, risks, human decision, and direct Script Writer handoff without adding a
+model call or inventing new game facts.
 
 ## System context
 
@@ -66,12 +82,12 @@ flowchart LR
 
 External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
 
-## Implemented M1-A to M5 runtime
+## Implemented M1-A to M13-local runtime
 
 ```mermaid
 flowchart LR
     USER["Local user"]
-    WEB["React Sources, Knowledge, Marketing, Create, and Runs workspace"]
+    WEB["React Sources, Knowledge, GDD, Marketing, Create, Runs, and Account workspace"]
     API["FastAPI"]
     COMMAND["Validated workspace commands and queries"]
     RUNS[("workflow_runs")]
@@ -79,6 +95,9 @@ flowchart LR
     AUDIT[("audit_events")]
     WORKER["Python worker"]
     HANDLER["Registered source and knowledge handlers"]
+    IDENTITY["Opaque sessions and owner/editor/reviewer/viewer RBAC"]
+    HEARTBEAT[("runtime_heartbeats")]
+    OPERATIONS["Privacy-safe operations status"]
 
     USER --> WEB --> API
     API -->|"sources, candidates, runs"| WEB
@@ -86,12 +105,16 @@ flowchart LR
     API -. "resumable SSE audit events" .-> WEB
     API -->|"database readiness"| RUNS
     API --> COMMAND
+    WEB --> IDENTITY --> API
     COMMAND -->|"atomic idempotent enqueue"| RUNS
     COMMAND --> JOBS
     JOBS -->|"lease with bounded retry"| WORKER
     WORKER -->|"registered discovery and capture jobs"| HANDLER
     WORKER -->|"checkpoint and terminal state"| RUNS
     WORKER -->|"append-only event"| AUDIT
+    WORKER -->|"bounded latest liveness"| HEARTBEAT
+    HEARTBEAT --> OPERATIONS --> WEB
+    JOBS -->|"aggregate counts and expired leases"| OPERATIONS
 ```
 
 The worker-to-handler arrow is implemented in M1-B B3; the commands, queries, and event delivery are
@@ -101,7 +124,7 @@ consistency. The worker never claims a website or model capability until its typ
 implemented and registered. C2.4a adds Knowledge delivery queries and correction commands; C2.4b
 connects them to a bilingual, responsive interface without weakening the human-review boundary.
 
-## Implemented M1-B B1 evidence contracts
+## Historical M1-B B1 evidence-contract stage
 
 ```mermaid
 flowchart LR
@@ -120,16 +143,16 @@ flowchart LR
     PROJECT --> FAMILY
     PROJECT --> SOURCE
     FAMILY -->|"optional grouping"| SOURCE
-    CANDIDATE -. "imported source; handler not implemented" .-> SOURCE
+    CANDIDATE -. "implemented later by B3/B4" .-> SOURCE
     SOURCE --> VERSION --> ASSET --> OBJECT
     PORT --> LOCAL
-    OBJECT -. "metadata only; capture not implemented" .-> PORT
+    OBJECT -. "physical capture implemented later by B3" .-> PORT
 ```
 
-B1 creates these domain, database, and storage contracts. It does not discover or capture a live
-website. PostgreSQL prevents updates to stored-object metadata, source versions, and evidence links;
-a meaningful change must create a new version. Physical object deletion remains a later,
-dependency-aware application command.
+This diagram records the original B1 contract-only stage; B3/B4 and M6 now implement the dotted
+capabilities. PostgreSQL prevents updates to stored-object metadata, source versions, and evidence
+links; a meaningful change must create a new version. Project deletion removes only unreferenced
+objects after dependency-aware database deletion.
 
 ## Implemented M1-B B2 controlled source boundary
 
@@ -240,6 +263,35 @@ persisted artifacts. Trend processing never rewrites the raw observation and dis
 version, fingerprint, duplicate lineage, cluster key/size, and current freshness label. Manual
 retry resets only failed jobs after a terminal state, is idempotent by command key, and appends
 `run.retried`; it cannot retry successful, running, or cancelled work.
+
+## Implemented M6-M8 local product layer
+
+```mermaid
+flowchart LR
+    ACCOUNT["Local account: scrypt password + opaque session"]
+    TEAM["Team RBAC and revocable invitations"]
+    PROJECT["Tenant-isolated project"]
+    EXPORT["Portable ZIP with records + verified objects"]
+    DELETE{"Typed irreversible confirmation"}
+    LOCAL["Private document, transcript, or owned GDD"]
+    VERSION["Immutable local evidence version"]
+    GDD["GDD Architect exact-offset chapters"]
+    ASSUME{"Explicit human assumption decision"}
+    REVISION["Immutable approved GDD revision"]
+
+    ACCOUNT --> TEAM --> PROJECT
+    PROJECT --> EXPORT
+    PROJECT --> DELETE
+    LOCAL --> VERSION --> GDD --> ASSUME --> REVISION
+    REVISION --> PROJECT
+```
+
+M6 is local-first rather than a hosted billing claim: it provides identity, isolation, resource
+quotas, private storage, full project export, project deletion, and guarded account deletion with
+no paid identity service. M7 provides immediate revocation and four roles; security and integrity
+rules are enforced by middleware and database services, not by an LLM. M8 binds every chapter to
+one immutable GDD source version and exact character offsets, stores assumptions in a separate
+ledger, blocks publication while assumptions are undecided, and versions a canonical manifest.
 
 ## Implemented M1-B B3 ingestion and persistence flow
 
@@ -394,14 +446,14 @@ before transaction execution and will prevent empty snapshots.
 
 ```mermaid
 flowchart LR
-    REQUEST["Bounded normalized-text request"]
+    REQUEST["Bounded normalized text plus subject type and display labels"]
     PORT["Application ModelGateway port"]
     DISABLED["Disabled gateway"]
     REPLAY["Exact offline Replay gateway"]
     OLLAMA["Loopback-only local Ollama gateway"]
     OPENAI["Dependency-injected OpenAI Responses adapter"]
     SCHEMA["Strict structured claim schema"]
-    EVIDENCE["Exact quote and range validator"]
+    EVIDENCE["Exact quote, range, and identity-name validator"]
     CANDIDATE["Framework-independent candidate claims"]
 
     REQUEST --> PORT
@@ -418,7 +470,9 @@ fails closed. Replay accepts a fixture only when its key matches the exact sourc
 offset, subject, locale, region, prompt version, and schema version. The Ollama adapter accepts an
 injected transport that is restricted to a loopback HTTP endpoint. It requests JSON Schema output,
 records local token counts, and deterministically corrects offset arithmetic only when the returned
-exact quote occurs once in the supplied chunk; missing or ambiguous quotes still fail closed.
+exact quote has a unique or safely anchored position. Internal entity keys never enter the model
+payload. Display labels scope the task but cannot serve as evidence. An invalid individual
+candidate is dropped; valid candidates from the same or later chunks remain eligible.
 
 The OpenAI adapter constructs a Responses request with strict JSON Schema, `store: false`, bounded
 output, low reasoning effort, and no source identifier, URL, path, secret, raw HTML, image, or log
@@ -428,7 +482,8 @@ remain later work, and the confirmed strict zero-cost policy prohibits cloud exe
 
 Both replay and provider output pass the same decoder. A candidate is rejected unless every quote
 exactly equals its cited chunk range, its declared value kind matches its JSON value, and its
-predicate belongs to the controlled vocabulary. Chunk-relative ranges become source-version
+predicate belongs to the controlled vocabulary. Game and character identity values must also occur
+inside their cited quotes. Chunk-relative ranges become source-version
 absolute ranges before leaving the adapter.
 
 ## Implemented M1-C C2.2 deterministic extraction Harness
@@ -438,15 +493,15 @@ flowchart LR
     DOCUMENT["Immutable normalized source text"]
     CHUNKER["unicode-boundary-v1 chunker"]
     CHUNKS["Ordered exact 4,000/400 slices"]
-    REQUESTS["Fingerprint-bound extraction requests"]
+    REQUESTS["Fingerprint-bound requests without internal entity keys in model payloads"]
     GATEWAY["Exact replay or local Ollama gateway"]
-    VALIDATE["Strict schema and evidence validation"]
+    VALIDATE["Per-candidate schema, evidence, and identity validation"]
     DEDUPE["Stable predicate/value/evidence deduplication"]
     MANIFEST["Document result and invocation manifest"]
     FAIL["Safe whole-document failure"]
 
     DOCUMENT --> CHUNKER --> CHUNKS --> REQUESTS --> GATEWAY --> VALIDATE --> DEDUPE --> MANIFEST
-    REQUESTS -. "missing fixture, invalid output, or fingerprint mismatch" .-> FAIL
+    REQUESTS -. "provider failure, invalid envelope, or fingerprint mismatch" .-> FAIL
 ```
 
 The chunker never trims or normalizes its input. It prefers paragraph, newline, and sentence
@@ -808,6 +863,49 @@ the signal's immutable record time, market alignment uses the frozen task market
 completeness reports whether a metric was recorded, and relevance preserves exact matching snapshot
 member IDs. Scores rank candidates but cannot pass the human approval gate.
 
+## Verified recovery and ownership DAG
+
+```mermaid
+flowchart LR
+    OWNER["Local owner"] --> EXPORT["Versioned portable export"]
+    EXPORT --> RECORDS["Typed project-descendant records"]
+    EXPORT --> OBJECTS["Content-addressed private objects"]
+    RECORDS --> ARCHIVE["M9 ZIP manifest"]
+    OBJECTS --> ARCHIVE
+    ARCHIVE --> LIMITS{"Entry, path, expansion and version checks"}
+    LIMITS -->|fail| REJECT["Reject without database writes"]
+    LIMITS -->|pass| DIGESTS{"Counts and every SHA-256 match"}
+    DIGESTS -->|fail| REJECT
+    DIGESTS -->|pass| COLLISIONS{"Project, slug and object collision checks"}
+    COLLISIONS -->|fail| REJECT
+    COLLISIONS -->|pass| RESTORE["Single database transaction"]
+    RESTORE --> TENANT["Assign current owner and default team"]
+    RESTORE --> DEDUPE["Remap already stored immutable objects"]
+    RESTORE --> PROJECT["Recovered project and full lineage"]
+```
+
+Archived `owner_user_id` and `team_id` values are never trusted during restore. In account mode the
+API applies the current authenticated owner, their default local team and the existing project
+quota. Stored objects can be reused only when digest, key, size and media type all agree. Any
+transaction failure removes newly written unreferenced objects.
+
+```mermaid
+flowchart LR
+    CURRENT["Current team owner"] --> ROLE["Change non-owner role"]
+    CURRENT --> TRANSFER{"Explicit ownership transfer"}
+    ROLE --> RBAC["Permission change effective immediately"]
+    TRANSFER --> TARGET["Active target member becomes owner"]
+    TRANSFER --> PRIOR["Prior owner becomes editor"]
+    TRANSFER --> PROJECTS["All team projects change owner atomically"]
+    TARGET --> AUDIT["Append-only security audit"]
+    PRIOR --> AUDIT
+    PROJECTS --> AUDIT
+```
+
+The ownership operation is a database transaction, not an Agent decision. No specialist Agent can
+grant itself access, weaken a role, change a team owner, bypass the exact-Origin boundary, or alter
+the recovery verifier.
+
 ## Component relationships
 
 ```mermaid
@@ -882,7 +980,7 @@ The Agent Harness is the controlled execution shell around graphs and specialist
 
 The initial ToolProvider implementations stay in-process. MCP is an optional adapter behind that boundary only when cross-application reuse or independently managed permissions justify it; MCP is not the core orchestration mechanism.
 
-## Planned specialist nodes
+## Implemented specialist roles
 
 - Knowledge Curator: structures evidence-backed game claims.
 - Trend Analyst: clusters trends and explains task fit.

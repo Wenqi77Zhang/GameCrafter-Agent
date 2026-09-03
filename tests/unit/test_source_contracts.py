@@ -23,7 +23,7 @@ def test_evidence_digest_rejects_non_sha256_values(value: str) -> None:
         EvidenceDigest(value)
 
 
-def test_source_type_contract_contains_the_confirmed_nine_categories() -> None:
+def test_source_type_contract_contains_public_and_private_evidence_categories() -> None:
     assert {source_type.value for source_type in SourceType} == {
         "overview",
         "character",
@@ -33,5 +33,8 @@ def test_source_type_contract_contains_the_confirmed_nine_categories() -> None:
         "update",
         "event",
         "guide_faq",
+        "document",
+        "transcript",
+        "gdd",
         "other",
     }

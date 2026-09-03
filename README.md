@@ -7,7 +7,9 @@
 [![Backend](https://img.shields.io/badge/FastAPI-Pydantic-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-GameCrafter is being rebuilt from an early architecture shell into a long-term product for independent game developers. It will organize game information into a traceable knowledge hub, connect that knowledge to real market signals, and help users create, evaluate, revise, and approve marketing scripts.
+GameCrafter is a complete local-first product for independent game developers. It organizes game
+information into a traceable knowledge hub, connects that knowledge to real public market signals,
+and helps users create, evaluate, revise, approve, and export marketing scripts.
 
 The first complete product slice focuses on marketing a real game to English-speaking TikTok audiences. The default validation case is **NTE: Neverness to Everness (《异环》)**.
 
@@ -16,12 +18,80 @@ For the current click-by-click flow and Agent responsibility boundaries, see
 
 ## Current status
 
-The repository has reached **M5 portfolio-ready local release**.
+The repository has reached **GameCrafter 1.0.0 / M14**, a reproducible, self-diagnosing mature local product release. The original NTE-to-English-
+TikTok workflow remains the primary validation path; later capabilities extend it without
+weakening evidence, privacy, human control, or the strict zero-paid-API boundary.
+
+The default Chinese workspace now keeps one current task above the fold. A first-time user can
+import the allowlisted NTE English homepage without typing a URL; optional article discovery and
+diagnostic metrics stay collapsed until they are needed. Mobile navigation remains a single
+horizontal rail instead of wrapping into an ambiguous second row.
+
+M14 turns the verified product into a reproducible release: Python production/development
+dependency graphs and artifact hashes are committed, Docker base images and GitHub Actions are
+pinned to immutable digests/commits, CI installs only the locked graph, and backend/frontend/API
+versions agree on `1.0.0`. See [`docs/security/reproducible-releases.md`](docs/security/reproducible-releases.md)
+for the controlled update procedure.
+Repository security reports and contributions follow [`SECURITY.md`](SECURITY.md) and
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Long-term update coverage and the intentional pnpm 11
+automation exception are recorded in
+[`docs/security/dependency-maintenance.md`](docs/security/dependency-maintenance.md).
+
+The production stack now defaults to the zero-cost local Ollama adapter and checks that the exact
+configured model is actually present before enabling Curator or Reviewer actions. The live NTE
+English homepage has been verified through four extraction chunks and the independent Reviewer:
+the Curator retained eight exact-quote candidates, while Reviewer 1.2 approved six and rejected two
+ambiguous name mentions. Internal entity keys are not sent to the model, and user-confirmed names
+remain scope hints rather than evidence.
+
+M13 closes the operational blind spot that previously let a healthy page hide a stopped worker:
+
+- the worker now persists a bounded liveness heartbeat, while the authenticated Account workspace
+  reports database connectivity, worker freshness, queued/leased/failed counts and expired leases;
+- missing and stale workers produce explicit attention guidance without making the API container
+  unavailable, so the user can still open the diagnostic and recovery interface;
+- every HTTP response carries a bounded request ID and server logs correlate method, safe path,
+  status and duration without logging query strings, credentials or private request bodies.
+
+The M9–M12 maturity pass adds:
+
+- versioned, restorable project backups with database-record and SHA-256 object verification,
+  bounded ZIP expansion, traversal/link/undeclared-object rejection and rollback on failure;
+- an Account recovery interface that works even when no project remains, assigns restored data to
+  the authenticated local owner, and applies the existing project quota;
+- owner-controlled team role changes and atomic team/project ownership transfer, with immediate
+  permission changes and durable security events;
+- persistent privacy-preserving login throttling, exact-Origin protection for authenticated
+  browser writes, CSP, framing/MIME/referrer/device-permission security headers and visible keyboard
+  focus;
+- a mature local-product acceptance matrix defining what is verified and what deliberately remains
+  outside the zero-cost local boundary.
+
+The M6–M8 completion release adds:
+
+- real public trend retrieval through no-key Google News RSS and GDELT DOC, with optional official
+  YouTube Data API free quota and a deliberately manual, verified TikTok path;
+- private TXT, Markdown, VTT transcript, JSON, and user-owned GDD evidence import, stored only in
+  content-addressed local object storage;
+- an eight-role constrained Agent topology, adding deterministic Source/Provenance Steward and GDD
+  Architect roles while keeping security policy outside model control;
+- optional local accounts with scrypt password hashing, opaque revocable sessions, project tenant
+  isolation, owner/editor/reviewer/viewer RBAC, expiring single-use invitations, revocation, and
+  local quotas;
+- complete project ZIP export/restore, typed-confirmation project deletion with unreferenced-object cleanup,
+  and guarded account deletion;
+- GDD Studio with exact source offsets, chapter hierarchy, separately reviewed assumptions, and
+  immutable canonical revisions;
+- deterministic multi-source synthesis over approved snapshots, explicitly separating corroborated
+  values from single-source facts without generating new claims;
+- an updated requirements matrix and architecture DAGs covering M1.1 and M6–M8 local behavior.
 
 M5 adds:
 
 - a beginner-oriented five-step journey from Sources to an approved export, with one visible next
-  action instead of requiring users to infer the tab order;
+  action instead of requiring users to infer the tab order. The M16 interface promotes this into a
+  persistent production route, automatically opens the server-recommended task, and moves GDD,
+  Runs, and Account into a clearly secondary tools layer;
 - a project overview API and UI metrics for evidence, Claims, verified trends, script versions,
   successful/active/attention runs, and the truthful zero-dollar API cost;
 - deterministic trend normalization, exact-duplicate detection, related-event clustering,
@@ -32,12 +102,16 @@ M5 adds:
 - a production-preview Docker stack with migration, API, worker, PostgreSQL, object storage, Nginx,
   dependency health checks, and a single local URL;
 - real Chromium desktop/mobile acceptance with horizontal-overflow and console-error checks.
+- a readable Campaign Strategist brief that turns the selected trend and frozen knowledge snapshot
+  into one explicit marketing direction, English video topic, core message, timed content plan,
+  usable proof facts, evidence link, risks, alternatives, and a direct handoff to script creation;
+  the brief is deterministic, versioned, auditable, and keeps paid API cost at zero.
 
 Implemented through M4:
 
-- a six-role, versioned specialist topology coordinated by the durable Harness: Knowledge Curator,
-  Knowledge Reviewer, Trend Analyst, Campaign Strategist, Script Writer, and Quality/Compliance
-  Critic;
+- an eight-role, versioned specialist topology coordinated by the durable Harness: Source and
+  Provenance Steward, Knowledge Curator, Knowledge Reviewer, Trend Analyst, Campaign Strategist,
+  Script Writer, Quality/Compliance Critic, and GDD Architect;
 - typed artifact handoffs instead of free-form Agent chat, with local-model versus deterministic
   execution disclosed per role through `GET /agents`;
 - an independent loopback-only Ollama knowledge Reviewer with strict structured decisions,
@@ -201,25 +275,25 @@ Implemented through M4:
 - a bilingual responsive Create workspace for preview, structured editing, evaluation, revision,
   final review, and local file download.
 
-Not implemented yet:
+Deliberately not implemented:
 
-- document ingestion or an installed browser runtime by default;
+- binary office-document OCR/import (the private path accepts bounded UTF-8 text formats);
 - a live NTE acceptance capture committed as product evidence;
 - embeddings or retrieval over approved knowledge snapshots;
-- automated live trend connectors (the release deliberately uses human-verified authorized-source
-  input and now processes it deterministically without claiming a TikTok API connection);
+- TikTok scraping or an unverified TikTok API connection;
 - cloud LLM calls, RAG, or model-generated marketing copy (local Ollama knowledge roles are live);
-- authentication, multi-tenancy, billing, or team collaboration.
+- payment processing or a “free forever” public cloud-hosting claim. Local account isolation,
+  resource quotas, and team collaboration are implemented; monetary billing would contradict the
+  confirmed strict zero-cost boundary and requires a later commercial deployment decision.
 
 The earlier README described several of these as if they already existed. They did not. The original placeholder modules remain traceable in Git history and are documented under [`legacy/`](legacy/README.md).
 
-## Product workflow (M1–M5)
+## Product workflow (M1–M8 local)
 
-This is the planned workflow. M1-A implements the durable project, run, job, and audit foundation.
-M1-B B1 adds source-evidence and object-storage contracts. B2 adds controlled access primitives
-and NTE adapters. B3 registers durable discovery/capture handlers and immutable persistence. B4
-exposes them through human-controlled product APIs, resumable run events, and the Sources/Runs
-workspace.
+This workflow is implemented end to end. It combines official and private evidence, reviewed
+knowledge, authorized public trend inputs, explainable topic fit, script creation, guarded export,
+optional local accounts and teams, and a source-bound GDD workspace. Durable runs, typed artifacts,
+immutable versions, audit events, and explicit failure states connect every stage.
 
 The M5 production preview remains local and costs nothing to run beyond the user's own computer:
 
@@ -228,7 +302,17 @@ The M5 production preview remains local and costs nothing to run beyond the user
 ```
 
 Open `http://127.0.0.1:8080`. Use `.\scripts\production.ps1 down` to stop it. This packaging is a
-repeatable deployment artifact, not a claim that a public hosted service or account system exists.
+repeatable deployment artifact, not a claim that a public hosted service or payment system exists.
+Optional local accounts and teams can be enabled through the documented environment switch.
+
+The interface opens the current server-recommended task automatically. Follow the five cards in
+**Your production route** rather than switching workspaces manually. A source or extraction job
+runs in the background and remains visible above the task without redirecting the user to technical
+logs. **GDD**, **Runs**, and **Account** are optional tools, not required steps in the first NTE
+validation journey. When no game entity exists, the Knowledge task offers a one-click NTE entity
+creation path with the prepared English alias. See
+[`docs/product/guided-workspace.md`](docs/product/guided-workspace.md) for the interaction contract
+and beginner acceptance route.
 
 ```mermaid
 flowchart LR
@@ -275,28 +359,18 @@ flowchart LR
 
 The graph is deliberately constrained. Specialized agent nodes operate inside a deterministic workflow; models do not form an unrestricted autonomous agent swarm. Human approval is required before topic selection and final export.
 
-For an existing game, approved public evidence becomes a sourced **Public Game Intelligence Profile**, not a claimed internal GDD. Future trend connectors must use authorized sources. TikTok Creative Center data is manually verified or imported in the first release rather than collected through unauthorized scraping.
+For an existing game, approved public evidence becomes a sourced **Public Game Intelligence
+Profile**, not a claimed internal GDD. The implemented live connectors use bounded public Google
+News RSS and GDELT endpoints; the official YouTube connector is optional. TikTok Creative Center
+data remains manually verified or imported rather than collected through unauthorized scraping.
 
-## Target software architecture
+## Implemented software architecture
 
-This is the target modular-monolith architecture. M1-A implements the API health/readiness
-boundary, PostgreSQL adapter, migration layer, durable job queue, worker shell, and audit
-foundation. M1-B B1 adds inward-facing source-evidence contracts and a local `ObjectStorage`
-adapter. B2 adds `PageFetcher` and `SiteAdapter` boundaries with HTTP, Playwright, and NTE
-implementations. B3 composes them into registered worker handlers and transactional source
-persistence. B4 adds validated delivery commands, project-scoped read models, SSE run events, and
-the bilingual human-control interface. M1-C C1 adds reviewable knowledge lineage and PostgreSQL
-guards. C2.1 adds the zero-cost model boundary; C2.2 adds deterministic chunking, sequential
-offline extraction orchestration, and the source-attributed NTE replay fixture. C2.3a generalizes
-the durable run/job substrate so later knowledge and marketing workflows reuse the same queue.
-C2.3b registers durable extraction, persists redacted invocation and exact-evidence lineage, and
-exposes project-scoped commands and read models under exact offline-replay preflight.
-C2.4a adds the stable delivery contracts required by the Knowledge interface: correctable entity
-labels with immutable history, source-version selection, honest replay capability, and enriched
-candidate/evidence reads. C2.4b composes those contracts into the bilingual, responsive Knowledge
-workspace while keeping human review and publication out of scope until their guarded commands
-exist. C2.5 proves the NTE fixture path against migrated PostgreSQL, the real leased queue, and the
-production persistence constraints; it is not represented as a current live-site capture.
+The modular monolith separates domain rules from FastAPI, model vendors, external source adapters,
+and PostgreSQL. The durable Harness coordinates eight bounded specialist roles through typed
+artifacts and checkpoints. Security, tenancy, quotas, destructive confirmations, and publication
+gates remain deterministic platform policy rather than model decisions. The detailed evolution is
+preserved in the migration notes; the diagram below reflects the active runtime.
 
 ```mermaid
 flowchart TB
@@ -362,10 +436,28 @@ scripts/                Setup, development, and verification helpers
 legacy/                 Notes about the original placeholder shell
 ```
 
-Future trend, campaign, script, and Agent-runtime packages are created only when their milestone
-adds executable behavior; the active tree does not keep empty capability placeholders.
+Trend, campaign, script, GDD, identity, and Agent-runtime packages are present only where they add
+executable behavior; the active tree does not keep empty capability placeholders.
 
 ## Quick start
+
+For ordinary use, start Docker Desktop and run this single command from PowerShell:
+
+```powershell
+.\scripts\production.ps1 up
+```
+
+When it reports that self-check passed, open `http://127.0.0.1:8080`. After a computer restart,
+run the same command again. To inspect the four required services without changing data, run:
+
+```powershell
+.\scripts\doctor.ps1
+```
+
+The doctor explains Docker, database, API, worker, web, version and queue problems in Simplified
+Chinese and exits without modifying project or user data.
+
+### Development setup
 
 Prerequisites:
 
@@ -396,10 +488,10 @@ The local services will be available at:
 - web: `http://localhost:5173`
 - API: `http://localhost:8000`
 
-If the computer has restarted, open Docker Desktop before using GameCrafter and then run
-`\.\scripts\database.ps1 up`. The web app now keeps source-discovery controls hidden until the
-project database is reachable, so a stopped database is reported as a connection problem instead
-of the misleading `Not Found` response.
+For development mode after a computer restart, open Docker Desktop and run
+`.\scripts\database.ps1 up` before starting the application. The web app keeps source-discovery
+controls hidden until the project database is reachable, so a stopped database is reported as a
+connection problem instead of the misleading `Not Found` response.
 - API health: `http://localhost:8000/health`
 - database readiness: `http://localhost:8000/ready`
 

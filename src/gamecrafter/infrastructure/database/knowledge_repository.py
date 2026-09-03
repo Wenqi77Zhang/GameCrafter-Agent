@@ -596,6 +596,7 @@ class DatabaseKnowledgeRepository:
             source_version_id=version.id,
             subject_entity_id=entity.id,
             subject_entity_key=entity.canonical_key,
+            subject_labels=_subject_labels(entity.display_name, entity.aliases),
             locale=source.locale,
             region=source.region,
             object_key=stored.object_key,
@@ -776,3 +777,20 @@ def _canonical_json(value: Any) -> str:
         separators=(",", ":"),
         sort_keys=True,
     )
+
+
+def _subject_labels(display_name: str, aliases: object) -> tuple[str, ...]:
+    """Return stable, de-duplicated human labels without trusting arbitrary JSON shapes."""
+
+    candidates = [display_name]
+    if isinstance(aliases, list):
+        candidates.extend(label for label in aliases if isinstance(label, str))
+    labels: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        label = candidate.strip()
+        key = label.casefold()
+        if label and key not in seen:
+            seen.add(key)
+            labels.append(label)
+    return tuple(labels)

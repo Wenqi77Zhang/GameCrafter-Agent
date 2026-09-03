@@ -10,7 +10,7 @@ from uuid import UUID
 
 from gamecrafter.domain.knowledge.claims import CandidateClaim
 
-CLAIM_PROMPT_VERSION = "knowledge-claim-v2"
+CLAIM_PROMPT_VERSION = "knowledge-claim-v5"
 CLAIM_SCHEMA_VERSION = "knowledge-claim-v1"
 
 
@@ -40,6 +40,7 @@ class ClaimExtractionRequest:
 
     source_version_id: UUID
     subject_entity_key: str
+    subject_labels: tuple[str, ...]
     text: str
     text_start_offset: int
     locale: str
@@ -61,6 +62,10 @@ class ClaimExtractionRequest:
             value = getattr(self, name)
             if not value.strip():
                 raise ValueError(f"{name} must not be blank")
+        if not self.subject_labels or any(
+            not isinstance(label, str) or not label.strip() for label in self.subject_labels
+        ):
+            raise ValueError("subject_labels must contain non-blank strings")
         if self.text_start_offset < 0:
             raise ValueError("text_start_offset must be nonnegative")
 
@@ -76,6 +81,7 @@ class ClaimExtractionRequest:
                 "schema_version": self.schema_version,
                 "source_version_id": str(self.source_version_id),
                 "subject_entity_key": self.subject_entity_key,
+                "subject_labels": list(self.subject_labels),
                 "text": self.text,
                 "text_start_offset": self.text_start_offset,
             },

@@ -90,6 +90,7 @@ def _seed_acceptance_target(
     rebound_request = ClaimExtractionRequest(
         source_version_id=source_version_id,
         subject_entity_key=str(entity["canonical_key"]),
+        subject_labels=("异环", "NTE: Neverness to Everness"),
         text=loaded.request.text,
         text_start_offset=loaded.request.text_start_offset,
         locale=loaded.request.locale,

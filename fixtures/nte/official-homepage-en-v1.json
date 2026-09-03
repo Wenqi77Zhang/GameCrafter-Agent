@@ -10,13 +10,14 @@
   "request": {
     "source_version_id": "00000000-0000-0000-0000-00000000c222",
     "subject_entity_key": "game:nte",
+    "subject_labels": ["异环", "NTE", "Neverness to Everness"],
     "text": "NTE is an supernatural urban open-world RPG developed by Hotta Studio, a subsidiary of Perfect World Games. In this Anomaly-filled city, you'll make a dazzling entrance, using your extraordinary Esper abilities to navigate freely and handle unexpected events. Beyond that, you can choose your own lifestyle, manage businesses, and experience a vibrant urban life.",
     "text_start_offset": 0,
     "locale": "en",
     "region": "global",
-    "prompt_version": "knowledge-claim-v2",
+    "prompt_version": "knowledge-claim-v5",
     "schema_version": "knowledge-claim-v1",
-    "fingerprint_sha256": "e858415035b81dee09ecc4c0661930ecaaa1b2675fb0d554f9539eafbd2988d1"
+    "fingerprint_sha256": "a7a3c7af71aab9f2c1b064df940c5ae50441079a59497c620b66fa5cab375c97"
   },
   "response": {
     "claims": [

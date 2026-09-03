@@ -16,6 +16,25 @@ RUN_ID = UUID("30000000-0000-0000-0000-000000000001")
 FIXTURE_PATH = Path("fixtures/nte/official-homepage-en-v1.json")
 
 
+def test_local_ollama_capability_probes_runtime_and_model(monkeypatch) -> None:
+    settings = Settings(_env_file=None, model_provider="ollama", ollama_model="qwen3.5:4b")
+    monkeypatch.setattr(
+        knowledge.OllamaLoopbackTransport,
+        "has_model",
+        lambda self, model: model == "qwen3.5:4b",
+    )
+    assert knowledge._ollama_capability(settings)["reason_code"] == "ollama_available"
+
+    monkeypatch.setattr(knowledge.OllamaLoopbackTransport, "has_model", lambda self, model: False)
+    assert knowledge._ollama_capability(settings)["reason_code"] == "ollama_model_missing"
+
+    def unavailable(self, model):
+        raise OSError("not running")
+
+    monkeypatch.setattr(knowledge.OllamaLoopbackTransport, "has_model", unavailable)
+    assert knowledge._ollama_capability(settings)["reason_code"] == "ollama_unreachable"
+
+
 class FakeKnowledgeRepository:
     def __init__(self) -> None:
         loaded = load_replay_fixture(FIXTURE_PATH)
@@ -25,6 +44,7 @@ class FakeKnowledgeRepository:
             source_version_id=loaded.document.source_version_id,
             subject_entity_id=ENTITY_ID,
             subject_entity_key=loaded.document.subject_entity_key,
+            subject_labels=loaded.document.subject_labels,
             locale=loaded.document.locale,
             region=loaded.document.region,
             object_key=f"sha256/{sha256(body).hexdigest()[:2]}/{sha256(body).hexdigest()}",

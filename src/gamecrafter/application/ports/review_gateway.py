@@ -10,7 +10,7 @@ from uuid import UUID
 
 from gamecrafter.application.ports.model_gateway import ModelTokenUsage
 
-REVIEW_PROMPT_VERSION = "knowledge-review-v2"
+REVIEW_PROMPT_VERSION = "knowledge-review-v3"
 REVIEW_SCHEMA_VERSION = "knowledge-review-v1"
 
 

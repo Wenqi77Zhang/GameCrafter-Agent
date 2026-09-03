@@ -84,7 +84,7 @@ class DatabaseWorkspaceService:
             return self._project(project), True
 
     def project_overview(self, project_id: UUID) -> dict[str, Any]:
-        """Return a compact, truthful progress and operations read model for M5."""
+        """Return a compact, truthful progress and operations read model."""
 
         with self._session_factory() as session:
             self._require_project(session, project_id)
@@ -189,7 +189,7 @@ class DatabaseWorkspaceService:
             )
             return {
                 "project_id": str(project_id),
-                "release": "M5",
+                "release": "M14-local",
                 "next_action": next_action,
                 "stages": stages,
                 "metrics": {

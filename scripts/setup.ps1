@@ -25,18 +25,23 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Failed to create the project environment." }
     }
 
-    & $venvPython -m pip install --upgrade pip
-    if ($LASTEXITCODE -ne 0) { throw "Failed to upgrade pip." }
-
-    & $venvPython -m pip install -e ".[dev]"
-    if ($LASTEXITCODE -ne 0) { throw "Failed to install Python dependencies." }
+    & $venvPython -m pip install --require-hashes -r requirements-dev.lock
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install locked Python dependencies." }
 
     $pnpm = Get-Command pnpm -ErrorAction SilentlyContinue
     if (-not $pnpm) {
         throw "pnpm 10+ was not found. Install pnpm and reopen PowerShell."
     }
-    & $pnpm.Source install
-    if ($LASTEXITCODE -ne 0) { throw "Failed to install frontend dependencies." }
+    $previousCI = $env:CI
+    try {
+        $env:CI = "true"
+        & $pnpm.Source install --frozen-lockfile
+        if ($LASTEXITCODE -ne 0) { throw "Failed to install locked frontend dependencies." }
+    }
+    finally {
+        if ($null -eq $previousCI) { Remove-Item Env:CI -ErrorAction SilentlyContinue }
+        else { $env:CI = $previousCI }
+    }
 
     $envPath = Join-Path $repoRoot ".env"
     if (-not (Test-Path -LiteralPath $envPath)) {

@@ -12,8 +12,19 @@ def test_health_endpoint_reports_current_foundation_status() -> None:
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["service"] == "gamecrafter-api"
-    assert payload["phase"] == "M5"
-    assert payload["version"] == "0.1.0"
+    assert payload["phase"] == "M14-local"
+    assert payload["version"] == "1.0.0"
+
+
+def test_request_id_is_echoed_only_when_safely_bounded() -> None:
+    client = TestClient(create_app())
+
+    supplied = client.get("/health", headers={"X-Request-ID": "release-check-123"})
+    replaced = client.get("/health", headers={"X-Request-ID": "unsafe request id value"})
+
+    assert supplied.headers["X-Request-ID"] == "release-check-123"
+    assert replaced.headers["X-Request-ID"] != "unsafe request id value"
+    assert len(replaced.headers["X-Request-ID"]) == 32
 
 
 def test_agent_catalog_discloses_all_roles_and_execution_modes() -> None:
@@ -21,12 +32,14 @@ def test_agent_catalog_discloses_all_roles_and_execution_modes() -> None:
 
     assert payload["orchestrator"] == "durable-harness-v1"
     assert [item["key"] for item in payload["items"]] == [
+        "knowledge.source_steward",
         "knowledge.curator",
         "knowledge.reviewer",
         "marketing.trend_analyst",
         "marketing.campaign_strategist",
         "creation.script_writer",
         "creation.quality_critic",
+        "design.gdd_architect",
     ]
     assert [item["mode"] for item in payload["items"]].count("local_model") == 2
-    assert [item["mode"] for item in payload["items"]].count("deterministic") == 4
+    assert [item["mode"] for item in payload["items"]].count("deterministic") == 6

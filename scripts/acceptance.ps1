@@ -31,9 +31,9 @@ try {
     $env:GAMECRAFTER_TEST_DATABASE_URL = $DatabaseUrl
     & $python -m alembic upgrade head
     if ($LASTEXITCODE -ne 0) { throw "Acceptance database migration failed." }
-    & $python -m pytest -q tests/postgres/test_nte_knowledge_acceptance.py --basetemp=$tempName
-    if ($LASTEXITCODE -ne 0) { throw "NTE PostgreSQL acceptance failed." }
-    Write-Host "NTE PostgreSQL acceptance passed with exact offline replay and zero token usage."
+    & $python -m pytest -q tests/postgres/test_nte_knowledge_acceptance.py tests/postgres/test_portability_recovery_acceptance.py --basetemp=$tempName
+    if ($LASTEXITCODE -ne 0) { throw "PostgreSQL knowledge/recovery acceptance failed." }
+    Write-Host "PostgreSQL acceptance passed: NTE exact offline replay used zero tokens and private evidence survived verified export/delete/restore."
 }
 finally {
     if ($null -eq $previousDatabaseUrl) {

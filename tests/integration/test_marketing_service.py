@@ -177,6 +177,16 @@ def test_manual_trend_to_explainable_human_approved_topic() -> None:
     assert candidates[0]["matched_snapshot_member_ids"]
     assert "No model was used" in candidates[0]["rationale"]
 
+    draft = service.get_strategy_brief(project_id=project_id, task_id=UUID(str(task["id"])))
+    assert draft["status"] == "draft"
+    assert draft["schema_version"] == "marketing-strategy-brief-v1"
+    assert draft["recommended_topic"] == candidates[0]["hook"]
+    assert draft["direction_key"] == "trend_led_discovery"
+    assert draft["proof_facts"][0]["value"] == "Neverness to Everness"
+    assert draft["trend_evidence"]["source_url"] == signal["source_url"]
+    assert len(draft["execution_plan"]) == 4
+    assert draft["agent"]["model_used"] is False
+
     review, review_created = service.review_topic(
         project_id=project_id,
         task_id=UUID(str(task["id"])),
@@ -189,6 +199,11 @@ def test_manual_trend_to_explainable_human_approved_topic() -> None:
     assert review_created is True and review["decision"] == "approve"
     updated = service.get_task(project_id=project_id, task_id=UUID(str(task["id"])))
     assert updated["approved_candidate_id"] == candidates[0]["id"]
+    approved = service.get_strategy_brief(project_id=project_id, task_id=UUID(str(task["id"])))
+    assert approved["status"] == "approved"
+    assert approved["human_decision"]["reason"] == (
+        "Strong current US signal with exact NTE knowledge overlap."
+    )
 
 
 def test_trend_read_model_normalizes_deduplicates_and_clusters_without_mutating_raw_rows() -> None:

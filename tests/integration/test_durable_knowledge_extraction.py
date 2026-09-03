@@ -89,6 +89,7 @@ def _seed_target(
             entity_type=EntityType.GAME.value,
             canonical_key="game:nte",
             display_name="异环",
+            aliases=["NTE", "Neverness to Everness"],
         )
         session.add_all([version, object_record, entity])
         session.flush()

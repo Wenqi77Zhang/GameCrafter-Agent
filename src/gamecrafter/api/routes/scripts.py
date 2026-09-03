@@ -6,9 +6,10 @@ from functools import lru_cache
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
 
+from gamecrafter.api.routes.identity import request_actor_id
 from gamecrafter.api.routes.workspace import IdempotencyKey
 from gamecrafter.infrastructure.database.script_service import (
     DatabaseScriptService,
@@ -69,13 +70,17 @@ def _created(response: Response, created: bool) -> None:
 
 @router.post("/projects/{project_id}/script-runs", status_code=status.HTTP_201_CREATED)
 def create_script_run(
-    project_id: UUID, command: ScriptRunCreate, idempotency_key: IdempotencyKey, response: Response
+    project_id: UUID,
+    command: ScriptRunCreate,
+    idempotency_key: IdempotencyKey,
+    response: Response,
+    request: Request,
 ) -> dict[str, object]:
     try:
         item, created = _service().create_run(
             project_id=project_id,
             **command.model_dump(),
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
             command_key=idempotency_key,
         )
     except (ScriptServiceNotFoundError, ScriptServiceConflictError) as error:
@@ -121,13 +126,14 @@ def edit_script(
     command: ScriptEditCreate,
     idempotency_key: IdempotencyKey,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     try:
         item, created = _service().edit(
             project_id=project_id,
             run_id=run_id,
             content=command.content,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
             command_key=idempotency_key,
         )
     except (ScriptServiceNotFoundError, ScriptServiceConflictError) as error:
@@ -186,6 +192,7 @@ def final_review(
     command: ScriptFinalReviewCreate,
     idempotency_key: IdempotencyKey,
     response: Response,
+    request: Request,
 ) -> dict[str, object]:
     try:
         item, created = _service().final_review(
@@ -194,7 +201,7 @@ def final_review(
             version_id=command.version_id,
             decision=command.decision,
             reason=command.reason,
-            actor_id="local-user",
+            actor_id=request_actor_id(request),
             command_key=idempotency_key,
         )
     except (ScriptServiceNotFoundError, ScriptServiceConflictError) as error:

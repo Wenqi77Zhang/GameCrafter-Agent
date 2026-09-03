@@ -29,6 +29,7 @@ from gamecrafter.infrastructure.database.models import (
 
 FIT_RULE_VERSION = "trend-fit-v1"
 TREND_PROCESSING_VERSION = "trend-processing-v1"
+STRATEGY_BRIEF_VERSION = "marketing-strategy-brief-v1"
 _TOKEN_PATTERN = re.compile(r"[\w#]+", re.UNICODE)
 
 
@@ -181,11 +182,14 @@ class DatabaseMarketingService:
         notes: str | None,
         actor_id: str,
         command_key: str,
+        actor_type: str = "human",
     ) -> tuple[dict[str, object], bool]:
         clean_url = self._https_url(source_url)
         clean_observed = self._aware_utc(observed_at)
         if signal_type not in {"hashtag", "sound", "topic", "search"}:
             raise MarketingServiceConflictError("unsupported trend signal type")
+        if actor_type not in {"human", "system", "model"}:
+            raise MarketingServiceConflictError("unsupported trend signal actor type")
         if metric_value is not None and (metric_value < 0 or metric_value > 10**15):
             raise MarketingServiceConflictError("trend metric must be between 0 and 10^15")
         clean_keywords = self._keywords(keywords)
@@ -268,7 +272,7 @@ class DatabaseMarketingService:
                     AuditEventRecord(
                         project_id=project_id,
                         event_type="trend.signal_recorded",
-                        actor_type="human",
+                        actor_type=actor_type,
                         actor_id=str(values["actor_id"]),
                         payload={
                             "trend_signal_id": str(signal.id),
@@ -404,6 +408,199 @@ class DatabaseMarketingService:
             for review in reviews:
                 history.setdefault(review.candidate_id, []).append(review)
             return [self._candidate(session, item, history.get(item.id, [])) for item in candidates]
+
+    def get_strategy_brief(self, *, project_id: UUID, task_id: UUID) -> dict[str, object]:
+        """Project the ranked evidence into one readable, deterministic campaign recommendation."""
+        with self._session_factory() as session:
+            task = self._require_task(session, project_id, task_id)
+            candidates = list(
+                session.scalars(
+                    select(TopicCandidateRecord)
+                    .where(TopicCandidateRecord.task_id == task.id)
+                    .order_by(TopicCandidateRecord.score.desc(), TopicCandidateRecord.id)
+                )
+            )
+            if not candidates:
+                raise MarketingServiceConflictError(
+                    "run topic analysis before requesting a strategy brief"
+                )
+            latest_reviews: dict[UUID, TopicReviewRecord] = {}
+            for review in session.scalars(
+                select(TopicReviewRecord)
+                .where(TopicReviewRecord.task_id == task.id)
+                .order_by(TopicReviewRecord.created_at, TopicReviewRecord.id)
+            ):
+                latest_reviews[review.candidate_id] = review
+            approved_id = next(
+                (
+                    candidate_id
+                    for candidate_id, review in latest_reviews.items()
+                    if review.decision == "approve"
+                ),
+                None,
+            )
+            chosen = next(
+                (candidate for candidate in candidates if candidate.id == approved_id),
+                candidates[0],
+            )
+            signal = session.get(TrendSignalRecord, chosen.trend_signal_id)
+            if signal is None:
+                raise MarketingServiceConflictError("strategy trend lineage is missing")
+            snapshot = session.get(KnowledgeSnapshotRecord, task.knowledge_snapshot_id)
+            if snapshot is None:
+                raise MarketingServiceConflictError("strategy snapshot lineage is missing")
+            matched_ids = set(chosen.matched_snapshot_member_ids)
+            facts: list[dict[str, object]] = []
+            for member in session.scalars(
+                select(KnowledgeSnapshotMemberRecord)
+                .where(KnowledgeSnapshotMemberRecord.snapshot_id == snapshot.id)
+                .order_by(KnowledgeSnapshotMemberRecord.id)
+            ):
+                claim = session.get(KnowledgeClaimRecord, member.claim_id)
+                review = session.get(ClaimReviewRecord, member.review_id)
+                if claim is None or review is None:
+                    raise MarketingServiceConflictError("strategy fact lineage is incomplete")
+                facts.append(
+                    {
+                        "snapshot_member_id": str(member.id),
+                        "predicate": claim.predicate,
+                        "value": review.approved_value
+                        if review.approved_value is not None
+                        else claim.value,
+                        "matched_to_trend": str(member.id) in matched_ids,
+                    }
+                )
+            facts.sort(
+                key=lambda item: (not bool(item["matched_to_trend"]), str(item["predicate"]))
+            )
+            proof_facts = facts[:3]
+            game_name = next(
+                (str(item["value"]) for item in facts if item["predicate"] == "game.name"),
+                "the game",
+            )
+            direction_key = self._direction_key([str(item["predicate"]) for item in proof_facts])
+            duration = task.duration_seconds
+            hook_end = max(2, round(duration * 0.13))
+            proof_end = max(hook_end + 1, round(duration * 0.67))
+            payoff_end = max(proof_end + 1, round(duration * 0.87))
+            chosen_payload = self._candidate(
+                session,
+                chosen,
+                [latest_reviews[chosen.id]] if chosen.id in latest_reviews else [],
+            )
+            review = latest_reviews.get(chosen.id)
+            return {
+                "schema_version": STRATEGY_BRIEF_VERSION,
+                "status": "approved" if approved_id == chosen.id else "draft",
+                "candidate_id": str(chosen.id),
+                "direction_key": direction_key,
+                "game_name": game_name,
+                "marketing_direction": chosen.angle,
+                "recommended_topic": chosen.hook,
+                "core_message": (
+                    f"Use the verified {signal.title} signal as the entry point, then earn "
+                    f"interest in {game_name} with approved knowledge instead of "
+                    "unsupported claims."
+                ),
+                "audience": task.audience,
+                "goal": task.goal,
+                "platform": task.platform,
+                "markets": list(task.markets),
+                "output_language": task.output_language,
+                "duration_seconds": duration,
+                "fit_score": chosen.score,
+                "why_this_direction": chosen.rationale,
+                "execution_plan": [
+                    {
+                        "key": "hook",
+                        "start_second": 0,
+                        "end_second": hook_end,
+                        "guidance": chosen.hook,
+                    },
+                    {
+                        "key": "proof",
+                        "start_second": hook_end,
+                        "end_second": proof_end,
+                        "guidance": (
+                            "Show one to three approved game facts that make the trend "
+                            "connection credible."
+                        ),
+                    },
+                    {
+                        "key": "payoff",
+                        "start_second": proof_end,
+                        "end_second": payoff_end,
+                        "guidance": (
+                            "Resolve the hook with the strongest visual or gameplay proof "
+                            "available."
+                        ),
+                    },
+                    {
+                        "key": "cta",
+                        "start_second": payoff_end,
+                        "end_second": duration,
+                        "guidance": (
+                            "Ask viewers which part of the game they want to discover next."
+                        ),
+                    },
+                ],
+                "proof_facts": proof_facts,
+                "trend_evidence": {
+                    "title": signal.title,
+                    "source_name": signal.source_name,
+                    "source_url": signal.source_url,
+                    "observed_at": self._stored_utc(signal.observed_at).isoformat(),
+                    "region": signal.region,
+                    "metric_name": signal.metric_name,
+                    "metric_value": (
+                        float(signal.metric_value) if signal.metric_value is not None else None
+                    ),
+                },
+                "knowledge_snapshot": {
+                    "id": str(snapshot.id),
+                    "version_number": snapshot.version_number,
+                    "proof_fact_count": len(proof_facts),
+                },
+                "risks": list(chosen.risks),
+                "human_decision": (
+                    {
+                        "decision": review.decision,
+                        "reason": review.reason,
+                        "reviewer_id": review.reviewer_id,
+                        "created_at": self._stored_utc(review.created_at).isoformat(),
+                    }
+                    if review is not None
+                    else None
+                ),
+                "alternatives": [
+                    {
+                        "candidate_id": str(candidate.id),
+                        "topic": candidate.hook,
+                        "direction": candidate.angle,
+                        "fit_score": candidate.score,
+                    }
+                    for candidate in candidates
+                    if candidate.id != chosen.id
+                ][:2],
+                "agent": {
+                    "key": CAMPAIGN_STRATEGIST.key,
+                    "version": CAMPAIGN_STRATEGIST.version,
+                    "mode": CAMPAIGN_STRATEGIST.mode.value,
+                    "model_used": False,
+                },
+                "candidate": chosen_payload,
+            }
+
+    @staticmethod
+    def _direction_key(predicates: list[str]) -> str:
+        joined = " ".join(predicates)
+        if "character." in joined:
+            return "character_trend_crossover"
+        if any(prefix in joined for prefix in ("gameplay.", "feature.", "system.")):
+            return "gameplay_proof"
+        if any(prefix in joined for prefix in ("world.", "lore.", "location.", "genre.")):
+            return "world_discovery"
+        return "trend_led_discovery"
 
     def review_topic(
         self,

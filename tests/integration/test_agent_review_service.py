@@ -5,7 +5,10 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
 from gamecrafter.application.ports.review_gateway import AgentClaimDecision
-from gamecrafter.infrastructure.database.agent_review_service import DatabaseAgentReviewService
+from gamecrafter.infrastructure.database.agent_review_service import (
+    DatabaseAgentReviewService,
+    _identity_is_direct_subject,
+)
 from gamecrafter.infrastructure.database.knowledge_workspace_service import (
     DatabaseKnowledgeWorkspaceService,
 )
@@ -16,6 +19,13 @@ from gamecrafter.infrastructure.database.models import (
     WorkflowRunRecord,
 )
 from gamecrafter.infrastructure.database.run_service import DatabaseRunService
+
+
+def test_character_identity_requires_the_name_as_direct_clause_subject() -> None:
+    assert _identity_is_direct_subject("Shinku", "Shinku can charge into danger")
+    assert _identity_is_direct_subject("Lacrimosa", "Lacrimosa may not be one for small talk")
+    assert not _identity_is_direct_subject("Inanna", "Inanna's adopted daughter")
+    assert not _identity_is_direct_subject("Sakiri", "according to Sakiri")
 
 
 def test_agent_governance_and_batch_confirmation_remain_separate() -> None:

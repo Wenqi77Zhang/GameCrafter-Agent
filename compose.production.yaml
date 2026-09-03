@@ -4,9 +4,14 @@ x-app-environment: &app-environment
   GAMECRAFTER_ENVIRONMENT: production
   GAMECRAFTER_DATABASE_URL: postgresql+psycopg://gamecrafter:${GAMECRAFTER_POSTGRES_PASSWORD:-gamecrafter_local_only_change_me}@postgres:5432/gamecrafter
   GAMECRAFTER_OBJECT_STORAGE_PATH: /app/data/objects
-  GAMECRAFTER_WEB_ORIGIN: http://localhost:8080
-  GAMECRAFTER_MODEL_PROVIDER: replay
+  GAMECRAFTER_WEB_ORIGIN: http://127.0.0.1:8080
+  GAMECRAFTER_AUTH_ENABLED: ${GAMECRAFTER_AUTH_ENABLED:-false}
+  GAMECRAFTER_AUTH_COOKIE_SECURE: ${GAMECRAFTER_AUTH_COOKIE_SECURE:-false}
+  GAMECRAFTER_MODEL_PROVIDER: ${GAMECRAFTER_MODEL_PROVIDER:-ollama}
   GAMECRAFTER_MODEL_REPLAY_FIXTURE_PATH: /app/fixtures/nte/official-homepage-en-v1.json
+  GAMECRAFTER_OLLAMA_BASE_URL: ${GAMECRAFTER_DOCKER_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+  GAMECRAFTER_OLLAMA_MODEL: ${GAMECRAFTER_OLLAMA_MODEL:-qwen3.5:4b}
+  GAMECRAFTER_OLLAMA_TIMEOUT_SECONDS: ${GAMECRAFTER_OLLAMA_TIMEOUT_SECONDS:-180}
 
 x-app: &app
   build:
@@ -15,11 +20,13 @@ x-app: &app
   environment: *app-environment
   volumes:
     - gamecrafter-objects:/app/data/objects
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
   restart: unless-stopped
 
 services:
   postgres:
-    image: pgvector/pgvector:0.8.2-pg17-bookworm
+    image: pgvector/pgvector:0.8.2-pg17-bookworm@sha256:feb68f4f15446397d8cac7f4fe48fe4586de83160d1fc48b46283312d1a33966
     environment:
       POSTGRES_DB: gamecrafter
       POSTGRES_USER: gamecrafter
@@ -81,4 +88,3 @@ services:
 volumes:
   gamecrafter-postgres-production:
   gamecrafter-objects:
-

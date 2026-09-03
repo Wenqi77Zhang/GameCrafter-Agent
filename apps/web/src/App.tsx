@@ -1,14 +1,17 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { AccountWorkspace } from "./AccountWorkspace";
+import type { AuthStatus } from "./AccountWorkspace";
 import { api, formatDate, idempotencyKey } from "./client";
 import type { Language } from "./client";
 import { KnowledgeWorkspace } from "./KnowledgeWorkspace";
+import { GddWorkspace } from "./GddWorkspace";
 import { MarketingWorkspace } from "./MarketingWorkspace";
 import { ProjectJourney } from "./ProjectJourney";
 import { ScriptWorkspace } from "./ScriptWorkspace";
 import type { WorkspaceAuditEvent, WorkspaceRun } from "./KnowledgeWorkspace";
 
-type Tab = "sources" | "knowledge" | "marketing" | "scripts" | "runs";
+type Tab = "sources" | "knowledge" | "gdd" | "marketing" | "scripts" | "runs" | "account";
 type Project = { id: string; slug: string; name: string; default_locale: Language };
 type Candidate = {
   id: string;
@@ -40,26 +43,47 @@ type AuditEvent = WorkspaceAuditEvent;
 
 const copy = {
   "zh-CN": {
+    brandSubtitle: "知识与营销工作台",
+    hubLabel: "游戏知识与营销",
+    footerPrinciples: "事实 · 证据 · 人工控制",
     sources: "来源",
     knowledge: "知识",
+    gdd: "GDD",
     marketing: "营销",
     scripts: "创作",
     runs: "运行记录",
+    account: "账户与团队",
+    accountShort: "账户",
     createNte: "创建《异环》项目",
     emptyProject: "先创建本地《异环》验证项目，再开始采集官方公开资料。",
+    workbenchTitle: "异环海外营销工作台",
     evidenceNotice: "公开官网资料是可追溯证据，不等同于游戏公司的内部 GDD。",
-    quick: "快速发现",
-    quickHint: "从一个明确的官方列表页提取候选，不会递归抓取整站。",
+    quick: "第一步：添加异环官方资料",
+    quickHint: "第一次使用建议直接导入英文官网首页。你明确点击后，系统只读取这一页，不会抓取整站。",
+    recommendedImport: "导入异环英文官网首页",
+    recommendedHint: "推荐 · 无需填写网址 · 适合首条验证链路",
+    discoverUpdates: "查找更多官网更新文章（可选）",
+    runDiscover: "来源发现",
+    advanced: "高级方式",
     targeted: "定向发现",
     direct: "直接导入官方页面",
+    local: "导入本地资料",
+    localHint: "文本、Markdown、字幕转录稿或你拥有的 GDD 只保存在本机，不会发送到外部模型。",
+    localKind: "资料类型",
+    localTitle: "资料标题",
+    localKey: "稳定标识",
+    localFile: "选择文件",
+    localContent: "文本内容",
+    localPrivate: "本地私有资料",
+    localImported: "本地资料已保存为不可变证据版本。",
     import: "导入",
     extract: "知识提取",
     discover: "开始发现",
     candidates: "待选候选",
     captured: "已保存来源",
     selectImport: "选择并导入",
-    noCandidates: "暂无待选候选。先运行一次来源发现。",
-    noSources: "尚未保存来源。候选必须经你确认后才会采集。",
+    noCandidates: "这里仅显示“官网更新发现”的候选；直接导入官网首页不会经过此区域。",
+    noSources: "尚未保存来源。点击左侧推荐按钮后，可在运行记录查看采集进度。",
     noRuns: "暂无运行记录。",
     timeline: "审计时间线",
     selectRun: "选择一条运行记录查看可恢复的实时进度。",
@@ -87,29 +111,56 @@ const copy = {
     status: "状态",
     checkpoint: "检查点",
     error: "需要人工关注",
-    privacy: "本地单用户 · 不上传私有文档",
+    privacy: "本地私有存储 · 零付费 API",
+    taskWorkspace: "当前任务工作区",
+    tools: "工具与记录",
+    completion: "完成标志",
+    backgroundWorking: "系统正在后台处理",
+    backgroundHint: "你可以留在当前页面。任务完成后，资料和制作进度会自动更新。",
+    viewDetails: "查看技术详情",
   },
   en: {
+    brandSubtitle: "Knowledge + Marketing Studio",
+    hubLabel: "GAME KNOWLEDGE + MARKETING",
+    footerPrinciples: "Facts · Evidence · Human control",
     sources: "Sources",
     knowledge: "Knowledge",
+    gdd: "GDD",
     marketing: "Marketing",
     scripts: "Create",
     runs: "Runs",
+    account: "Account & teams",
+    accountShort: "Account",
     createNte: "Create NTE project",
     emptyProject: "Create the local NTE validation project before collecting public official sources.",
+    workbenchTitle: "NTE overseas marketing workspace",
     evidenceNotice: "Public official material is traceable evidence, not the studio's internal GDD.",
-    quick: "Quick discovery",
-    quickHint: "Extract candidates from one explicit official listing page without crawling the site.",
+    quick: "Step 1: add an official NTE source",
+    quickHint: "For a first run, import the English homepage directly. The system reads only that page after your explicit click and never crawls the full site.",
+    recommendedImport: "Import the NTE English homepage",
+    recommendedHint: "Recommended · no URL entry · best for the first journey",
+    discoverUpdates: "Find more official updates (optional)",
+    runDiscover: "Source discovery",
+    advanced: "Advanced",
     targeted: "Targeted discovery",
     direct: "Import an official page",
+    local: "Import local material",
+    localHint: "Text, Markdown, transcript, or your own GDD stays on this machine and is never sent to an external model.",
+    localKind: "Material type",
+    localTitle: "Title",
+    localKey: "Stable key",
+    localFile: "Choose file",
+    localContent: "Text content",
+    localPrivate: "Private local material",
+    localImported: "Local material was saved as an immutable evidence version.",
     import: "Import",
     extract: "Knowledge extraction",
     discover: "Discover",
     candidates: "Candidates for review",
     captured: "Saved sources",
     selectImport: "Select and import",
-    noCandidates: "No candidates yet. Run source discovery first.",
-    noSources: "No saved sources. Capture starts only after your approval.",
+    noCandidates: "This area is only for optional update-discovery candidates; direct homepage import does not appear here.",
+    noSources: "No saved sources. Use the recommended action, then follow capture progress in Runs.",
     noRuns: "No runs yet.",
     timeline: "Audit timeline",
     selectRun: "Select a run to view its resumable live progress.",
@@ -137,29 +188,60 @@ const copy = {
     status: "Status",
     checkpoint: "Checkpoint",
     error: "Needs attention",
-    privacy: "Local single-user · no private document upload",
+    privacy: "Private local storage · zero paid APIs",
+    taskWorkspace: "Current task workspace",
+    tools: "Tools and records",
+    completion: "Completion signal",
+    backgroundWorking: "The system is working in the background",
+    backgroundHint: "Stay on this page. Material and production progress update automatically when the task finishes.",
+    viewDetails: "View technical details",
   },
 } as const;
+
+const workspaceGuide: Record<Language, Record<Tab, { title: string; why: string; done: string; kind: "task" | "tool" }>> = {
+  "zh-CN": {
+    sources: { title: "收集可信资料", why: "先给智能体可靠原料。官网与本地资料都会保留来源、版本和地区信息。", done: "至少保存 1 个包含证据版本的来源", kind: "task" },
+    knowledge: { title: "让审核 Agent 整理游戏知识", why: "系统提取事实并自动审核；只有歧义、冲突或低置信度内容才需要你决定。", done: "发布 1 个可供营销使用的知识快照", kind: "task" },
+    marketing: { title: "确定 TikTok 营销角度", why: "把经过审核的游戏事实与英语市场趋势匹配，避免只有热度、没有产品关联。", done: "确认 1 个有证据支撑的营销选题", kind: "task" },
+    scripts: { title: "生成、评价并交付脚本", why: "创作 Agent 生成英文脚本，评价 Agent 检查事实、节奏和平台适配，再由你最终确认。", done: "通过质量门并导出最终版本", kind: "task" },
+    gdd: { title: "整理自有 GDD", why: "这是可选的专业工具，只用于你有权使用的内部或自有资料，不影响首条官网验证链路。", done: "需要时建立可回溯章节结构", kind: "tool" },
+    runs: { title: "查看运行与故障详情", why: "这里面向排错与回溯。普通流程不需要盯着它，系统会在任务需要处理时提醒你。", done: "确认失败原因、审计事件或重试结果", kind: "tool" },
+    account: { title: "账户、团队与数据管理", why: "管理本地账户、协作成员、备份与数据生命周期。单人本地验证可以暂时忽略。", done: "按需要完成账户或数据操作", kind: "tool" },
+  },
+  en: {
+    sources: { title: "Collect trusted material", why: "Give the agents reliable inputs first. Official and private material retain source, version, and region metadata.", done: "Save at least one source with an evidence version", kind: "task" },
+    knowledge: { title: "Let the Review Agent build game knowledge", why: "Facts are extracted and reviewed automatically; you only decide ambiguous, conflicting, or low-confidence items.", done: "Publish one marketing-ready knowledge snapshot", kind: "task" },
+    marketing: { title: "Choose a TikTok marketing angle", why: "Match approved game facts with English-market trends so popularity stays relevant to the product.", done: "Approve one evidence-backed topic", kind: "task" },
+    scripts: { title: "Create, evaluate, and deliver a script", why: "The Creation Agent writes the English script, the Evaluation Agent checks it, and you make the final delivery decision.", done: "Pass the quality gate and export the final version", kind: "task" },
+    gdd: { title: "Structure your own GDD", why: "This optional professional tool is only for material you are entitled to use; the first official-site journey does not depend on it.", done: "Create a traceable chapter structure when needed", kind: "tool" },
+    runs: { title: "Inspect runs and failures", why: "This is for diagnosis and traceability. You do not need to watch it during a normal journey; the system surfaces attention items.", done: "Confirm a failure cause, audit event, or retry result", kind: "tool" },
+    account: { title: "Manage account, team, and data", why: "Manage local access, collaborators, backups, and data lifecycle. A solo local validation can ignore this for now.", done: "Complete account or data operations when needed", kind: "tool" },
+  },
+};
 
 const quickProfiles = [
   {
     id: "global-en",
-    label: "Global · EN",
+    labelZh: "异环国际服 · 英文（推荐）",
+    labelEn: "NTE Global · English (recommended)",
     url: "https://nte.perfectworld.com/en/article/news/index.html",
   },
   {
     id: "global-cn",
-    label: "Global · 中文",
+    labelZh: "异环国际服 · 中文",
+    labelEn: "NTE Global · Chinese",
     url: "https://nte.perfectworld.com/cn/article/news/index.html",
   },
   {
     id: "global-jp",
-    label: "Global · 日本語",
+    labelZh: "异环国际服 · 日文",
+    labelEn: "NTE Global · Japanese",
     url: "https://nte.perfectworld.com/jp/article/news/index.html",
   },
   {
     id: "mainland-cn",
-    label: "中国大陆 · 中文",
+    labelZh: "异环中国大陆服 · 中文",
+    labelEn: "NTE Mainland China · Chinese",
     url: "https://yh.wanmei.com/news/index.html",
   },
 ] as const;
@@ -191,6 +273,12 @@ export function App() {
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [directUrl, setDirectUrl] = useState("");
+  const [localKind, setLocalKind] = useState<"document" | "transcript" | "gdd">("document");
+  const [localTitle, setLocalTitle] = useState("");
+  const [localKey, setLocalKey] = useState("");
+  const [localFilename, setLocalFilename] = useState("notes.txt");
+  const [localContent, setLocalContent] = useState("");
+  const [localMediaType, setLocalMediaType] = useState<"text/plain" | "text/markdown" | "text/vtt" | "application/json">("text/plain");
   const [targetSite, setTargetSite] = useState("en");
   const [targetCategory, setTargetCategory] = useState("gamenews");
   const [targetPages, setTargetPages] = useState(1);
@@ -201,6 +289,7 @@ export function App() {
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [knowledgeRefreshToken, setKnowledgeRefreshToken] = useState(0);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const t = copy[language];
 
   const loadProjects = useCallback(async () => {
@@ -215,9 +304,21 @@ export function App() {
       );
       setConnected(true);
     } catch {
+      setAuthStatus({ enabled: false, bootstrap_required: false, user: null, zero_cost: true });
       setConnected(false);
     }
   }, []);
+
+  const refreshAuth = useCallback(async () => {
+    try {
+      const value = await api<AuthStatus>("/api/auth/status");
+      setAuthStatus(value);
+      if (!value.enabled || value.user) await loadProjects();
+    } catch {
+      setAuthStatus({ enabled: false, bootstrap_required: false, user: null, zero_cost: true });
+      setConnected(false);
+    }
+  }, [loadProjects]);
 
   const refreshWorkspace = useCallback(async () => {
     if (!projectId) return;
@@ -240,8 +341,8 @@ export function App() {
   }, [projectId, t.failed]);
 
   useEffect(() => {
-    void loadProjects();
-  }, [loadProjects]);
+    void refreshAuth();
+  }, [refreshAuth]);
 
   useEffect(() => {
     void refreshWorkspace();
@@ -292,6 +393,11 @@ export function App() {
     () => projects.find((project) => project.id === projectId) ?? null,
     [projects, projectId],
   );
+  const activeRun = useMemo(
+    () => runs.find((run) => ["queued", "running", "retry_wait"].includes(run.status)) ?? null,
+    [runs],
+  );
+  const guide = workspaceGuide[language][tab];
 
   const toggleLanguage = () => {
     const next = language === "zh-CN" ? "en" : "zh-CN";
@@ -335,7 +441,6 @@ export function App() {
       });
       setMessage({ kind: "ok", text: t.queued });
       setSelectedRun(run.id);
-      setTab("runs");
       await refreshWorkspace();
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
@@ -349,6 +454,13 @@ export function App() {
       `/api/projects/${projectId}/source-discoveries`,
       { mode: "quick", listing_urls: [profile.url], candidate_limit: 30, source_types: [] },
       `quick-${profile.id}`,
+    );
+
+  const importRecommendedHomepage = () =>
+    submitRun(
+      `/api/projects/${projectId}/source-imports`,
+      { url: "https://nte.perfectworld.com/en/main.html" },
+      "recommended-homepage",
     );
 
   const targetedDiscover = (event: FormEvent) => {
@@ -367,6 +479,61 @@ export function App() {
   const importDirect = (event: FormEvent) => {
     event.preventDefault();
     void submitRun(`/api/projects/${projectId}/source-imports`, { url: directUrl }, "direct");
+  };
+
+  const chooseLocalFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const mediaType = extension === "md" ? "text/markdown" : extension === "vtt" ? "text/vtt" : extension === "json" ? "application/json" : "text/plain";
+    setLocalFilename(file.name);
+    setLocalTitle((current) => current || file.name.replace(/\.[^.]+$/, ""));
+    setLocalKey(
+      (current) =>
+        current ||
+        file.name
+          .toLowerCase()
+          .replace(/\.[^.]+$/, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "") ||
+        `local-${Date.now()}`,
+    );
+    setLocalMediaType(mediaType);
+    if (extension === "vtt") setLocalKind("transcript");
+    setLocalContent(await file.text());
+  };
+
+  const importLocal = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy("local");
+    setMessage(null);
+    try {
+      await api(`/api/projects/${projectId}/local-sources`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey("local-source"),
+        },
+        body: JSON.stringify({
+          document_key: localKey,
+          kind: localKind,
+          title: localTitle,
+          filename: localFilename,
+          content: localContent,
+          media_type: localMediaType,
+          locale: "en",
+          region: "private",
+        }),
+      });
+      setLocalContent("");
+      await refreshWorkspace();
+      setKnowledgeRefreshToken((current) => current + 1);
+      setMessage({ kind: "ok", text: t.localImported });
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setBusy(null);
+    }
   };
 
   const importCandidate = (candidate: Candidate) =>
@@ -392,7 +559,7 @@ export function App() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">G</span>
-          <div><strong>GameCrafter</strong><small>Marketing Studio · M5</small></div>
+          <div><strong>GameCrafter</strong><small>{t.brandSubtitle}</small></div>
         </div>
         <div className="top-actions">
           <span className="privacy-note">{t.privacy}</span>
@@ -402,7 +569,14 @@ export function App() {
         </div>
       </header>
 
-      {connected === null ? (
+      {authStatus === null ? (
+        <section className="center-state" aria-live="polite">
+          <span className="status-dot" />
+          <h1>{t.loadingProject}</h1>
+        </section>
+      ) : authStatus.enabled && !authStatus.user ? (
+        <AccountWorkspace status={authStatus} language={language} gate onChanged={refreshAuth} />
+      ) : connected === null ? (
         <section className="center-state" aria-live="polite">
           <span className="status-dot" />
           <h1>{t.loadingProject}</h1>
@@ -419,8 +593,8 @@ export function App() {
         <>
           <section className="workspace-heading">
             <div>
-              <p className="eyebrow">Game Knowledge Hub</p>
-              <h1>{language === "zh-CN" ? "把公开资料变成可复核的游戏知识。" : "Turn public material into reviewable game knowledge."}</h1>
+              <p className="eyebrow">{t.hubLabel}</p>
+              <h1>{t.workbenchTitle}</h1>
               <p>{t.evidenceNotice}</p>
             </div>
             {projects.length > 0 && (
@@ -441,51 +615,67 @@ export function App() {
               </button>
             </section>
           ) : (
-            <>
+            <div className="guided-workspace">
               <ProjectJourney
                 projectId={projectId}
                 language={language}
                 refreshToken={knowledgeRefreshToken}
+                activeTab={tab}
                 onNavigate={setTab}
               />
-              <nav className="tabs" aria-label="Workspace">
-                <button className={tab === "sources" ? "active" : ""} type="button" onClick={() => setTab("sources")}>
-                  {t.sources}<span>{sources.length}</span>
-                </button>
-                <button className={tab === "knowledge" ? "active" : ""} type="button" onClick={() => setTab("knowledge")}>
-                  {t.knowledge}
-                </button>
-                <button className={tab === "marketing" ? "active" : ""} type="button" onClick={() => setTab("marketing")}>
-                  {t.marketing}
-                </button>
-                <button className={tab === "scripts" ? "active" : ""} type="button" onClick={() => setTab("scripts")}>
-                  {t.scripts}
-                </button>
-                <button className={tab === "runs" ? "active" : ""} type="button" onClick={() => setTab("runs")}>
-                  {t.runs}<span>{runs.length}</span>
-                </button>
-                <button className="refresh-button" type="button" onClick={refreshAll}>{t.refresh}</button>
-              </nav>
+              <section className="workflow-canvas">
+                <nav className="utility-nav" aria-label={t.tools}>
+                  <span>{guide.kind === "task" ? t.taskWorkspace : t.tools}</span>
+                  <div>
+                    <button aria-current={tab === "gdd" ? "page" : undefined} type="button" onClick={() => setTab("gdd")}>{t.gdd}</button>
+                    <button aria-current={tab === "runs" ? "page" : undefined} type="button" onClick={() => setTab("runs")}>{t.runs}<em>{runs.length}</em></button>
+                    <button aria-label={t.account} aria-current={tab === "account" ? "page" : undefined} type="button" onClick={() => setTab("account")}>{t.accountShort}</button>
+                    <button type="button" onClick={refreshAll}>{t.refresh}</button>
+                  </div>
+                </nav>
 
-              {message && <div className={`notice notice--${message.kind}`} role="status">{message.text}</div>}
+                <header className="workspace-guide">
+                  <span>{guide.kind === "task" ? t.taskWorkspace : t.tools}</span>
+                  <h2>{guide.title}</h2>
+                  <p>{guide.why}</p>
+                  <dl><dt>{t.completion}</dt><dd>{guide.done}</dd></dl>
+                </header>
+
+                {activeRun && (
+                  <section className="background-run" role="status" aria-live="polite">
+                    <span className="status-dot" />
+                    <div><strong>{t.backgroundWorking}</strong><p>{t.backgroundHint}</p></div>
+                    <button type="button" onClick={() => { setSelectedRun(activeRun.id); setTab("runs"); }}>{t.viewDetails}</button>
+                  </section>
+                )}
+
+                {message && <div className={`notice notice--${message.kind}`} role="status">{message.text}</div>}
 
               {tab === "sources" ? (
                 <div className="source-layout">
                   <aside className="control-stack">
                     <section className="panel">
                       <div className="panel-heading"><span>01</span><div><h2>{t.quick}</h2><p>{t.quickHint}</p></div></div>
-                      <div className="profile-grid">
-                        {quickProfiles.map((profile) => (
-                          <button key={profile.id} type="button" disabled={busy !== null} onClick={() => void quickDiscover(profile)}>
-                            <span>{profile.label}</span><small>{busy === `quick-${profile.id}` ? t.working : t.discover}</small>
-                          </button>
-                        ))}
-                      </div>
+                      <button className="recommended-source" type="button" disabled={busy !== null} onClick={() => void importRecommendedHomepage()}>
+                        <span><strong>{t.recommendedImport}</strong><small>{t.recommendedHint}</small></span>
+                        <em>{busy === "recommended-homepage" ? t.working : t.import}</em>
+                      </button>
+                      <details className="discovery-options">
+                        <summary>{t.discoverUpdates}</summary>
+                        <div className="profile-grid">
+                          {quickProfiles.map((profile) => (
+                            <button key={profile.id} type="button" disabled={busy !== null} onClick={() => void quickDiscover(profile)}>
+                              <span>{language === "zh-CN" ? profile.labelZh : profile.labelEn}</span><small>{busy === `quick-${profile.id}` ? t.working : t.discover}</small>
+                            </button>
+                          ))}
+                        </div>
+                      </details>
                     </section>
 
-                    <form className="panel" onSubmit={targetedDiscover}>
-                      <div className="panel-heading"><span>02</span><div><h2>{t.targeted}</h2></div></div>
-                      <div className="form-grid">
+                    <details className="panel advanced-panel">
+                      <summary><span>02</span><strong>{t.targeted}</strong><small>{t.advanced}</small></summary>
+                      <form className="advanced-form" onSubmit={targetedDiscover}>
+                        <div className="form-grid">
                         <label><span>{t.profile}</span><select value={targetSite} onChange={(e) => setTargetSite(e.target.value)}>
                           <option value="en">Global · EN</option><option value="cn">Global · 中文</option>
                           <option value="jp">Global · 日本語</option><option value="mainland-cn">中国大陆 · 中文</option>
@@ -497,15 +687,32 @@ export function App() {
                         <label><span>{t.limit}</span><input type="number" min="1" max="100" value={targetLimit} onChange={(e) => setTargetLimit(Number(e.target.value))} /></label>
                         <label><span>{t.dateFrom}</span><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
                         <label><span>{t.dateTo}</span><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
-                      </div>
-                      <button className="primary-button" type="submit" disabled={busy !== null}>{busy === "targeted" ? t.working : t.discover}</button>
-                    </form>
+                        </div>
+                        <button className="primary-button" type="submit" disabled={busy !== null}>{busy === "targeted" ? t.working : t.discover}</button>
+                      </form>
+                    </details>
 
-                    <form className="panel" onSubmit={importDirect}>
-                      <div className="panel-heading"><span>03</span><div><h2>{t.direct}</h2></div></div>
-                      <label className="url-field"><span>{t.url}</span><input required type="url" placeholder="https://nte.perfectworld.com/…" value={directUrl} onChange={(e) => setDirectUrl(e.target.value)} /></label>
-                      <button className="primary-button" type="submit" disabled={busy !== null}>{busy === "direct" ? t.working : t.import}</button>
-                    </form>
+                    <details className="panel advanced-panel">
+                      <summary><span>03</span><strong>{t.direct}</strong><small>{t.advanced}</small></summary>
+                      <form className="advanced-form" onSubmit={importDirect}>
+                        <label className="url-field"><span>{t.url}</span><input required type="url" placeholder="https://nte.perfectworld.com/…" value={directUrl} onChange={(e) => setDirectUrl(e.target.value)} /></label>
+                        <button className="primary-button" type="submit" disabled={busy !== null}>{busy === "direct" ? t.working : t.import}</button>
+                      </form>
+                    </details>
+                    <details className="panel advanced-panel">
+                      <summary><span>04</span><strong>{t.local}</strong><small>{t.advanced}</small></summary>
+                      <form className="advanced-form" onSubmit={importLocal}>
+                        <p>{t.localHint}</p>
+                        <div className="form-grid">
+                          <label><span>{t.localKind}</span><select value={localKind} onChange={(event) => setLocalKind(event.target.value as typeof localKind)}><option value="document">Document</option><option value="transcript">Transcript</option><option value="gdd">GDD</option></select></label>
+                          <label><span>{t.localFile}</span><input type="file" accept=".txt,.md,.vtt,.json,text/plain,text/markdown,text/vtt,application/json" onChange={(event) => void chooseLocalFile(event)} /></label>
+                          <label><span>{t.localTitle}</span><input required maxLength={500} value={localTitle} onChange={(event) => setLocalTitle(event.target.value)} /></label>
+                          <label><span>{t.localKey}</span><input required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxLength={100} value={localKey} onChange={(event) => setLocalKey(event.target.value.toLowerCase())} /></label>
+                          <label className="span-two"><span>{t.localContent}</span><textarea required maxLength={2000000} value={localContent} onChange={(event) => setLocalContent(event.target.value)} /></label>
+                        </div>
+                        <button className="primary-button" type="submit" disabled={busy !== null}>{busy === "local" ? t.working : t.import}</button>
+                      </form>
+                    </details>
                   </aside>
 
                   <div className="evidence-stack">
@@ -526,7 +733,7 @@ export function App() {
                       <div className="list-heading"><h2>{t.captured}</h2><span>{sources.length}</span></div>
                       {sources.length === 0 ? <div className="empty-state">{t.noSources}</div> : sources.map((source) => (
                         <article className="source-card" key={source.id}>
-                          <div><div className="card-meta"><span>{source.site}</span><span>{source.locale}</span><span>{source.source_type}</span></div><a href={source.url} target="_blank" rel="noreferrer">{source.url}</a></div>
+                          <div><div className="card-meta"><span>{source.site === "local-private" ? t.localPrivate : source.site}</span><span>{source.locale}</span><span>{source.source_type}</span></div>{source.url.startsWith("local://") ? <span>{t.localPrivate}</span> : <a href={source.url} target="_blank" rel="noreferrer">{source.url}</a>}</div>
                           <dl><div><dt>{t.versions}</dt><dd>{source.version_count}</dd></div><div><dt>{t.assets}</dt><dd>{source.asset_count}</dd></div><div><dt>{t.latest}</dt><dd>{source.latest_version ?? "—"}</dd></div></dl>
                         </article>
                       ))}
@@ -549,16 +756,25 @@ export function App() {
                   }}
                   onGoSources={() => setTab("sources")}
                 />
+              ) : tab === "gdd" && selectedProject ? (
+                <GddWorkspace projectId={projectId} language={language} />
               ) : tab === "marketing" && selectedProject ? (
-                <MarketingWorkspace projectId={projectId} language={language} />
+                <MarketingWorkspace projectId={projectId} language={language} onContinue={() => setTab("scripts")} />
               ) : tab === "scripts" && selectedProject ? (
                 <ScriptWorkspace projectId={projectId} language={language} />
+              ) : tab === "account" ? (
+                <AccountWorkspace
+                  status={authStatus}
+                  language={language}
+                  onChanged={refreshAuth}
+                  project={selectedProject}
+                />
               ) : (
                 <div className="runs-layout">
                   <section className="run-list">
                     {runs.length === 0 ? <div className="empty-state">{t.noRuns}</div> : runs.map((run) => (
                       <button className={selectedRun === run.id ? "run-card active" : "run-card"} key={run.id} type="button" onClick={() => setSelectedRun(run.id)}>
-                        <div><strong>{run.task_type === "source.discover" ? t.quick : run.task_type === "source.capture" ? t.import : run.task_type === "knowledge.extract" ? t.extract : run.task_type}</strong><small>{formatDate(run.created_at, language)}</small></div>
+                        <div><strong>{run.task_type === "source.discover" ? t.runDiscover : run.task_type === "source.capture" ? t.import : run.task_type === "knowledge.extract" ? t.extract : run.task_type}</strong><small>{formatDate(run.created_at, language)}</small></div>
                         <span className={`run-status run-status--${run.status}`}>{run.status}</span>
                         <p>{t.checkpoint}: {run.checkpoint}</p>
                         {run.last_error_code && <p className="run-error">{t.error}: {run.last_error_code}</p>}
@@ -588,11 +804,12 @@ export function App() {
                   </section>
                 </div>
               )}
-            </>
+              </section>
+            </div>
           )}
         </>
       )}
-      <footer><span>GameCrafter v2</span><span>Facts · Evidence · Human control</span></footer>
+      <footer><span>GameCrafter 1.0</span><span>{t.footerPrinciples}</span></footer>
     </main>
   );
 }

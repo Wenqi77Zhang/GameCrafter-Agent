@@ -14,8 +14,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // A non-JSON proxy error is still represented by its status.
     }
+    const requestId = response.headers.get("X-Request-ID");
+    if (requestId) detail = `${detail} · Request ID: ${requestId}`;
     throw new Error(detail);
   }
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
