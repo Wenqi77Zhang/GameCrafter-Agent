@@ -240,7 +240,7 @@ export function CreativeProgress({
         <p className="notice notice--error" role="alert">
           {zh
             ? assistant.readiness.message
-            : "This snapshot lacks game content beyond basic identity. Add reviewed gameplay, world, character, or update facts in Knowledge; publish a new snapshot and create a new marketing task."}
+            : "Name and genre alone are not enough. Add reviewed gameplay, world, character content, or update facts in Knowledge; publish a new snapshot and create a new marketing task."}
         </p>
       )}
       {item && (

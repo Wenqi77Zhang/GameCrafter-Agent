@@ -11,8 +11,10 @@ from gamecrafter.infrastructure.database.script_service import (
 )
 
 
-def _approved_task(sessions=None, *, story_fact=False):
-    sessions, project_id, snapshot_id = _seed(sessions, story_fact=story_fact)
+def _approved_task(sessions=None, *, story_fact=False, genre_only=False):
+    sessions, project_id, snapshot_id = _seed(
+        sessions, story_fact=story_fact, genre_only=genre_only
+    )
     marketing = DatabaseMarketingService(sessions)
     task, _ = marketing.create_task(
         project_id=project_id,

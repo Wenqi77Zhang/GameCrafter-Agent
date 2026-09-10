@@ -26,7 +26,9 @@ from gamecrafter.infrastructure.database.run_service import DatabaseRunService
 from gamecrafter.infrastructure.database.snapshot_service import DatabaseSnapshotService
 
 
-def _seed(sessions=None, *, story_fact=False) -> tuple[sessionmaker[Session], UUID, UUID]:
+def _seed(
+    sessions=None, *, story_fact=False, genre_only=False
+) -> tuple[sessionmaker[Session], UUID, UUID]:
     if sessions is None:
         engine = create_engine(
             "sqlite+pysqlite:///:memory:",
@@ -108,19 +110,27 @@ def _seed(sessions=None, *, story_fact=False) -> tuple[sessionmaker[Session], UU
         actor_id="local-user",
         command_key="marketing-review-title",
     )
-    if story_fact:
-        # Exact public homepage title, a controlled evidence fixture, NOT live ingestion.
-        quote = "Supernatural Urban Open World"
+    # Controlled public homepage quotes checked 2026-09-11; NOT live ingestion.
+    fixture_facts = [("genre.primary", "Supernatural Urban Open World")] if story_fact else []
+    if story_fact and not genre_only:
+        fixture_facts.append(
+            (
+                "world.location",
+                "The Tamamochi Market Street is packed with charming little shops "
+                "that are easy on the wallet",
+            )
+        )
+    for predicate, quote in fixture_facts:
         with sessions.begin() as session:
             claim = KnowledgeClaimRecord(
                 project_id=project_id,
                 subject_entity_id=UUID(str(entity["id"])),
-                predicate="genre.primary",
+                predicate=predicate,
                 value_kind="string",
                 value=quote,
                 normalized_value=quote.lower(),
                 value_fingerprint_sha256=sha256(quote.encode()).hexdigest(),
-                scope_fingerprint_sha256=sha256(b"genre-primary-fixture").hexdigest(),
+                scope_fingerprint_sha256=sha256(predicate.encode()).hexdigest(),
                 confidence=0.95,
                 locale="en",
                 region="global",
@@ -148,9 +158,9 @@ def _seed(sessions=None, *, story_fact=False) -> tuple[sessionmaker[Session], UU
             claim_id=story_claim_id,
             decision="approve",
             approved_value=None,
-            reason="Controlled fixture: exact official homepage title; not live capture.",
+            reason="Controlled fixture: official homepage quote; not live capture.",
             actor_id="acceptance-test",
-            command_key="marketing-review-genre",
+            command_key=f"marketing-review-{predicate}",
         )
     snapshot, _ = DatabaseSnapshotService(sessions).publish(
         project_id=project_id,

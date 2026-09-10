@@ -10,8 +10,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
-PROMPT_VERSION = "creative-evidence-v7"
-RULE_VERSION = "script-readiness-v3"
+PROMPT_VERSION = "creative-evidence-v9"
+RULE_VERSION = "script-readiness-v5"
 PURPOSES = ("hook", "setup", "proof", "payoff", "cta")
 CHINESE_TEXT = r"^[\s\S]*[\u4e00-\u9fff][\s\S]*$"
 
@@ -107,11 +107,9 @@ def check_critique_quotes(critique: Critique, draft: Any) -> None:
 def evidence_readiness(facts: list[dict[str, Any]]) -> dict[str, Any]:
     """A minimum material gate, not a promise that a particular story is supported."""
     story_predicates = {
-        "genre.primary",
         "world.setting",
         "world.location",
         "faction.description",
-        "character.identity",
         "character.affiliation",
         "character.ability",
         "gameplay.combat",
@@ -132,7 +130,7 @@ def evidence_readiness(facts: list[dict[str, Any]]) -> dict[str, Any]:
         "message": ""
         if count
         else (
-            "当前知识版本只有名称、厂商等基础资料，缺少可讲述的游戏内容。"
+            "当前知识版本只有名称、厂商或类型等基础资料，缺少可讲述的游戏内容。"
             "请到知识步骤补充玩法、世界、角色或更新内容，发布新的知识版本，再创建营销任务。"
         ),
     }

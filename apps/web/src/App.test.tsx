@@ -1204,15 +1204,14 @@ test("shows traceable deterministic topic fit and records the human gate", async
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: "营销" }));
 
-  expect(await screen.findByRole("heading", { name: "热点驱动的游戏认知" })).toBeInTheDocument();
-  expect(screen.getByText("规则匹配依据与当前选题")).toBeInTheDocument();
-  expect(screen.getByText("推荐英语视频话题")).toBeInTheDocument();
-  expect(screen.getByText("30 秒内容结构")).toBeInTheDocument();
+  expect(await screen.findByText("当前选题与支撑资料")).toBeInTheDocument();
+  expect(screen.queryByText("推荐英语视频话题")).not.toBeInTheDocument();
+  expect(screen.queryByText("30 秒内容结构")).not.toBeInTheDocument();
   expect(screen.getByText("可使用的已审核事实")).toBeInTheDocument();
   expect(screen.getByText("Neverness to Everness", { selector: ".strategy-proof strong" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "审核这个方向" })).toBeInTheDocument();
   expect(await screen.findByText("确定性规则 · 无模型调用")).toBeInTheDocument();
-  expect(screen.getAllByText("What if #NTE happened inside Neverness to Everness?").length).toBeGreaterThan(0);
+  expect(screen.queryByText("What if #NTE happened inside Neverness to Everness?")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "其他原因" }));
   fireEvent.change(screen.getByRole("textbox", { name: "决定理由" }), {
     target: { value: "趋势来源、市场与知识证据均符合本次目标。" },
@@ -1226,7 +1225,7 @@ test("shows traceable deterministic topic fit and records the human gate", async
   );
   expect(await screen.findByText("趋势来源、市场与知识证据均符合本次目标。")).toBeInTheDocument();
   expect(await screen.findByText("已确认 · 可直接生成脚本")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "按此方向生成脚本" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "前往脚本创作" })).toBeInTheDocument();
 });
 
 test("renders the zero-cost script evaluation and final human gate", async () => {

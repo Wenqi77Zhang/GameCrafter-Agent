@@ -41,6 +41,7 @@ type Evaluation = {
     word_count?: number;
     words_per_minute?: number;
     issues?: {
+      draft_quote?: string;
       section_index: number | null;
       severity: string;
       message: string;
@@ -644,6 +645,13 @@ export function ScriptWorkspace({
                         ? "未进行模型内容评审。"
                         : "No semantic model review.")}
                   </p>
+                  {evaluation.semantic_report?.mode === "local_model" && (
+                    <p className="muted">
+                      {zh
+                        ? "下方是模型判断，不是新的游戏事实。请对照原句与证据核实；怀疑误判时重新评审，不要直接照改游戏名称或设定。"
+                        : "These are model findings, not new game facts. Check the quoted draft and evidence. If a finding looks wrong, re-review instead of blindly changing names or lore."}
+                    </p>
+                  )}
                   {evaluation.semantic_report?.word_count !== undefined && (
                     <p>
                       {evaluation.semantic_report.word_count} words ·{" "}
@@ -682,17 +690,18 @@ export function ScriptWorkspace({
                       <strong>
                         {issue.severity === "blocking"
                           ? zh
-                            ? "需修复"
-                            : "Blocking"
+                            ? "模型发现风险"
+                            : "Model-flagged risk"
                           : zh
                             ? "建议"
                             : "Suggestion"}
                         {issue.section_index !== null &&
                           " · " + (issue.section_index + 1)}
                       </strong>
+                      {issue.draft_quote && <blockquote>{issue.draft_quote}</blockquote>}
                       <p>{issue.message}</p>
                       <p>
-                        {zh ? "怎么改：" : "Fix: "}
+                        {zh ? "修改建议：" : "Suggested fix: "}
                         {issue.fix}
                       </p>
                     </div>

@@ -8,6 +8,10 @@ decisions require an explicit preset selection, collapse after submission, and r
 an ordinary storyboard editor, version differences, and a visible re-review requirement after edits.
 Existing workflow setup is collapsed once a script exists. See the Chinese
 [acceptance walkthrough](real-creative-workflow.md#如何验收) for the current route.
+The repeated rule-generated campaign direction and canned shooting plan have been removed from
+the main page. The reference card now shows only the current topic, delivery constraints, and
+approved facts. Model findings show their exact draft quote and are explicitly labelled as advice,
+not new facts; current model quality limits are recorded in the acceptance walkthrough.
 
 ## Purpose
 

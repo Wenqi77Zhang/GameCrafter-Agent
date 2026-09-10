@@ -175,3 +175,30 @@ def test_semantic_review_splits_units_and_never_reads_rule_scores():
     assert len(requests) == 3 and len(usage["segments"]) == 3
     assert usage["input_tokens"] == 30 and usage["output_tokens"] == 18
     assert "mechanical_checks" not in json.dumps(requests) and not result.issues
+
+
+def test_validation_diagnostics_do_not_log_unknown_field_names_or_values():
+    response = {
+        "done": True,
+        "prompt_eval_count": 3,
+        "eval_count": 5,
+        "message": {
+            "content": json.dumps(
+                {
+                    "summary": "这是一份不合规范的评审",
+                    "issues": [],
+                    "strengths": [],
+                    "private-source-text": "another-private-value",
+                }
+            )
+        },
+    }
+    with pytest.raises(CreativeCallError) as error:
+        LocalCreativeGateway(model="fixture", transport=lambda _: response).call(
+            "critique", {}, Critique
+        )
+    encoded = json.dumps(error.value.provenance)
+    assert "private-source-text" not in encoded and "another-private-value" not in encoded
+    assert error.value.provenance["calls"][0]["validation_errors"] == [
+        {"field": ["<unknown_field>"], "type": "extra_forbidden"}
+    ]

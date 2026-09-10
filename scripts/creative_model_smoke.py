@@ -28,6 +28,17 @@ from gamecrafter.infrastructure.local_ai.creative import LocalCreativeGateway  #
 from gamecrafter.infrastructure.local_ai.ollama import OllamaLoopbackTransport  # noqa: E402
 
 
+def smoke_exit_code(operations, latest_review_passed):
+    """Transport completion is not content acceptance, and neither is human approval."""
+    if not operations or any(item["status"] != "succeeded" for item in operations):
+        return 1
+    strategy_passed = any(
+        item["operation"] == "strategy" and item["result"].get("passed") is True
+        for item in operations
+    )
+    return 0 if strategy_passed and latest_review_passed else 2
+
+
 def main():
     from uuid import UUID
 
@@ -77,7 +88,9 @@ def main():
         lease_seconds=60,
     )
     report = {
-        "evidence_mode": "controlled official name and genre quote fixtures; not live ingestion",
+        "evidence_mode": (
+            "controlled official name, genre and location quote fixtures; not live ingestion"
+        ),
         "model_mode": "real_loopback_ollama",
         "database": str(database.resolve()),
         "project_id": str(project),
@@ -123,6 +136,8 @@ def main():
         )
         save_report()
         if result["status"] != "succeeded":
+            report.update(exit_code=1, latest_review_passed=False, human_approval_granted=False)
+            save_report()
             return 1
     run = scripts.get_run(project_id=project, run_id=target)
     for index in range(args.revisions):
@@ -148,18 +163,23 @@ def main():
         if revised["status"] != "succeeded":
             break
     report["script"] = run
+    passed = bool(run["evaluations"] and run["evaluations"][-1]["passed"])
+    report["exit_code"] = smoke_exit_code(report["operations"], passed)
+    report["latest_review_passed"] = passed
+    report["human_approval_granted"] = False
     save_report()
     print("Live model results saved; final human approval was NOT granted.", flush=True)
     print(
         json.dumps(
             {
                 "versions": len(run["versions"]),
-                "latest_review_passed": run["evaluations"][-1]["passed"],
+                "latest_review_passed": passed,
+                "exit_code": report["exit_code"],
             }
         ),
         flush=True,
     )
-    return 0 if all(item["status"] == "succeeded" for item in report["operations"]) else 1
+    return report["exit_code"]
 
 
 if __name__ == "__main__":

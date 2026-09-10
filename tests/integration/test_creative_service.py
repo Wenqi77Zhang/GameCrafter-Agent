@@ -164,6 +164,15 @@ def test_title_only_material_is_explained_before_spending_model_tokens():
     assert not gateway.calls and not service.list(project, task)
 
 
+def test_genre_label_alone_cannot_support_an_automatic_campaign():
+    sessions, project, task = _approved_task(story_fact=True, genre_only=True)
+    gateway = FixtureGateway()
+    service = DatabaseCreativeService(sessions, Settings(_env_file=None), gateway)
+    with pytest.raises(CreativeError, match="类型等基础资料"):
+        enqueue(service, project, task, "strategy")
+    assert not gateway.calls
+
+
 def test_blocked_strategy_is_visible_but_not_used_as_writer_evidence():
     sessions, project, task, run, _, gateway, service, worker, _ = setup_creative()
     gateway.block = True

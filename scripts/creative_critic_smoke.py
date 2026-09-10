@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-from gamecrafter.application.creative import Critique, readiness_report
+from gamecrafter.application.creative import PROMPT_VERSION, Critique, readiness_report
 from gamecrafter.infrastructure.local_ai.creative import LocalCreativeGateway
 from gamecrafter.infrastructure.local_ai.ollama import OllamaLoopbackTransport
 
@@ -52,12 +52,16 @@ def main():
     cuts = [0, 3, 8, 18, 26, 30]
     report = {
         "model": args.model,
+        "prompt_version": PROMPT_VERSION,
         "evidence_mode": "controlled public name/genre quote fixtures",
         "cases": [],
     }
     for name, unsafe in [
         ("supported_genre_introduction", False),
         ("genre_does_not_prove_mechanics", True),
+        ("game_name_is_not_a_location_name", False),
+        ("shops_do_not_prove_product_types", True),
+        ("shops_do_not_prove_universal_stories", True),
     ]:
         script = {
             "title": "A genre introduction to NTE",
@@ -77,14 +81,49 @@ def main():
                 for i, purpose in enumerate(["hook", "setup", "proof", "payoff", "cta"])
             ],
         }
-        if unsafe:
+        case_facts = list(facts)
+        if name in {
+            "game_name_is_not_a_location_name",
+            "shops_do_not_prove_product_types",
+            "shops_do_not_prove_universal_stories",
+        }:
+            quote = (
+                "The Tamamochi Market Street is packed with charming little shops "
+                "that are easy on the wallet"
+            )
+            case_facts.append(
+                {
+                    "snapshot_member_id": "fact-location",
+                    "predicate": "world.location",
+                    "value": quote,
+                    "sources": [{"quote": quote, "url": "https://nte.perfectworld.com/en/"}],
+                }
+            )
+            script = {
+                "voiceover": (
+                    "Meet Neverness to Everness. Its Tamamochi Market Street is packed "
+                    "with charming little shops that are easy on the wallet."
+                    if not unsafe
+                    else "In Neverness to Everness, Tamamochi Market Street sells "
+                    "cozy outfits, powerful equipment, and unique home decorations."
+                ),
+                "visual_direction": "Create an original text card; no footage is owned yet.",
+            }
+            if name == "shops_do_not_prove_universal_stories":
+                script["voiceover"] = "Discover a magical city where every corner tells a story."
+                script["on_screen_text"] = "Every shop has a story!"
+        elif unsafe:
             script["sections"][2]["voiceover"] = (
                 "In NTE, shadows move on their own, reality bends around you, "
                 "and you can unlock hidden powers."
             )
         result, provenance = gateway.call(
             "critique",
-            {"facts": facts, "draft": script, "mechanical_checks": readiness_report(script)},
+            {
+                "facts": case_facts,
+                "draft": script,
+                "mechanical_checks": readiness_report(script) if "sections" in script else {},
+            },
             Critique,
         )
         blocked = any(item.severity == "blocking" for item in result.issues)
