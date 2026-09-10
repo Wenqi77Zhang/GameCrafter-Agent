@@ -9,10 +9,12 @@ from hashlib import sha256
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from gamecrafter.application.agent_catalog import QUALITY_CRITIC, SCRIPT_WRITER
+from gamecrafter.application.creative import RULE_VERSION, readiness_report
+from gamecrafter.infrastructure.database.creative_context import snapshot_facts
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
     ClaimReviewRecord,
@@ -31,7 +33,7 @@ from gamecrafter.infrastructure.database.models import (
 )
 
 GENERATOR_VERSION = "tiktok-template-v1"
-EVALUATOR_VERSION = "script-quality-v1"
+EVALUATOR_VERSION = RULE_VERSION
 SCHEMA_VERSION = "tiktok-script-v1"
 MAX_CONTENT_BYTES = 65_536
 
@@ -227,6 +229,16 @@ class DatabaseScriptService:
                     origin=origin,
                     content=normalized,
                     content_sha256=self._digest(normalized),
+                    generation_metadata=(
+                        {"mode": "human_edit", "requires_semantic_review": True}
+                        if origin == "human_edit"
+                        and latest
+                        and (
+                            latest.generation_metadata.get("mode") == "local_model"
+                            or latest.generation_metadata.get("requires_semantic_review")
+                        )
+                        else {"mode": "manual_scaffold" if origin == "generated" else "human_edit"}
+                    ),
                     created_by=actor,
                     command_key=key,
                 )
@@ -246,9 +258,7 @@ class DatabaseScriptService:
                         "agent_version": (
                             SCRIPT_WRITER.version if origin != "human_edit" else None
                         ),
-                        "agent_mode": (
-                            SCRIPT_WRITER.mode.value if origin != "human_edit" else None
-                        ),
+                        "agent_mode": ("deterministic" if origin != "human_edit" else None),
                     },
                 )
                 version_id, created = version.id, True
@@ -292,6 +302,12 @@ class DatabaseScriptService:
                     ScriptEvaluationRecord.command_key == key,
                 )
             )
+            if version.generation_metadata.get(
+                "mode"
+            ) == "local_model" or version.generation_metadata.get("requires_semantic_review"):
+                raise ScriptServiceConflictError(
+                    "本地模型脚本及其修订必须使用独立内容评审，不能用格式检查覆盖结论。"
+                )
             report = self._score(session, run, dict(version.content))
             if existing is not None:
                 if existing.script_version_id != version.id:
@@ -304,10 +320,16 @@ class DatabaseScriptService:
                     run_id=run.id,
                     script_version_id=version.id,
                     score=report["score"],
-                    passed=report["score"] >= run.score_threshold,
+                    passed=not report["issues"],
                     dimensions=report["dimensions"],
                     issues=report["issues"],
-                    rule_version=run.evaluator_version,
+                    rule_version=RULE_VERSION,
+                    semantic_report={
+                        "mode": "not_run",
+                        "summary": "仅完成规则检查；内容真实性与效果需人工核验。",
+                        "word_count": report["word_count"],
+                        "words_per_minute": report["words_per_minute"],
+                    },
                     command_key=key,
                 )
                 session.add(evaluation)
@@ -323,7 +345,7 @@ class DatabaseScriptService:
                         "score": evaluation.score,
                         "passed": evaluation.passed,
                         "agent_version": QUALITY_CRITIC.version,
-                        "agent_mode": QUALITY_CRITIC.mode.value,
+                        "agent_mode": "deterministic",
                     },
                 )
                 evaluation_id, created = evaluation.id, True
@@ -347,79 +369,11 @@ class DatabaseScriptService:
     def revise(
         self, *, project_id: UUID, run_id: UUID, actor_id: str, command_key: str
     ) -> tuple[dict[str, object], bool]:
-        actor = self._text(actor_id, "actor", 120)
-        key = self._key(command_key)
-        with self._session_factory.begin() as session:
-            self._lock_project(session, project_id)
-            run = self._require_run(session, project_id, run_id)
-            existing = session.scalar(
-                select(ScriptVersionRecord).where(
-                    ScriptVersionRecord.run_id == run.id,
-                    ScriptVersionRecord.command_key == key,
-                )
-            )
-            if existing is not None:
-                if existing.origin != "auto_revision":
-                    raise ScriptServiceConflictError("idempotency key belongs to another version")
-                version_id, created = existing.id, False
-            else:
-                latest = self._latest_version(session, run.id)
-                if latest is None:
-                    raise ScriptServiceConflictError("generate and evaluate a script first")
-                evaluation = session.scalar(
-                    select(ScriptEvaluationRecord)
-                    .where(ScriptEvaluationRecord.script_version_id == latest.id)
-                    .order_by(
-                        ScriptEvaluationRecord.created_at.desc(), ScriptEvaluationRecord.id.desc()
-                    )
-                )
-                if evaluation is None:
-                    raise ScriptServiceConflictError("evaluate the latest version before revision")
-                if evaluation.passed:
-                    raise ScriptServiceConflictError("latest version already passes evaluation")
-                used = (
-                    session.scalar(
-                        select(func.count())
-                        .select_from(ScriptVersionRecord)
-                        .where(
-                            ScriptVersionRecord.run_id == run.id,
-                            ScriptVersionRecord.origin == "auto_revision",
-                        )
-                    )
-                    or 0
-                )
-                if used >= run.revision_budget:
-                    raise ScriptServiceConflictError("automatic revision budget is exhausted")
-                content = self._validate_content(session, run, self._template(session, run))
-                version = ScriptVersionRecord(
-                    run_id=run.id,
-                    version_number=latest.version_number + 1,
-                    parent_version_id=latest.id,
-                    origin="auto_revision",
-                    content=content,
-                    content_sha256=self._digest(content),
-                    created_by=actor,
-                    command_key=key,
-                )
-                session.add(version)
-                session.flush()
-                self._audit(
-                    session,
-                    project_id,
-                    "script.auto_revised",
-                    SCRIPT_WRITER.key,
-                    {
-                        "script_run_id": str(run.id),
-                        "script_version_id": str(version.id),
-                        "budget_used": used + 1,
-                        "agent_version": SCRIPT_WRITER.version,
-                        "agent_mode": SCRIPT_WRITER.mode.value,
-                    },
-                )
-                version_id, created = version.id, True
-        return self.get_version(
-            project_id=project_id, run_id=run_id, version_id=version_id
-        ), created
+        # Kept as a compatibility endpoint; never regenerate a template as a "repair".
+        self.get_run(project_id=project_id, run_id=run_id)
+        raise ScriptServiceConflictError(
+            "自动修订已升级为后台模型任务，请在创作页选择按问题修订。无模型时请逐镜编辑。"
+        )
 
     def final_review(
         self,
@@ -450,7 +404,9 @@ class DatabaseScriptService:
             )
             if evaluation is None:
                 raise ScriptServiceConflictError("evaluate this exact version before final review")
-            if decision == "approve" and not evaluation.passed:
+            if decision == "approve" and (
+                not evaluation.passed or evaluation.rule_version != RULE_VERSION
+            ):
                 raise ScriptServiceConflictError("a failing script cannot receive final approval")
             existing = session.scalar(
                 select(ScriptFinalReviewRecord).where(
@@ -532,15 +488,46 @@ class DatabaseScriptService:
                 .where(
                     ScriptFinalReviewRecord.run_id == run.id,
                     ScriptFinalReviewRecord.script_version_id == version.id,
-                    ScriptFinalReviewRecord.decision == "approve",
                 )
                 .order_by(
                     ScriptFinalReviewRecord.created_at.desc(), ScriptFinalReviewRecord.id.desc()
                 )
             )
-            if review is None:
+            if review is None or review.decision != "approve":
                 raise ScriptServiceConflictError("final human approval is required before export")
+            evaluation = session.scalar(
+                select(ScriptEvaluationRecord)
+                .where(ScriptEvaluationRecord.script_version_id == version.id)
+                .order_by(
+                    ScriptEvaluationRecord.created_at.desc(), ScriptEvaluationRecord.id.desc()
+                )
+            )
+            if evaluation is None or not evaluation.passed or evaluation.id != review.evaluation_id:
+                raise ScriptServiceConflictError("approve the latest evaluation before export")
+            if evaluation.rule_version != RULE_VERSION:
+                raise ScriptServiceConflictError("请使用新版检查重新评审此脚本。")
             content = self._render(version, format)
+            if format == "markdown":
+                facts = snapshot_facts(session, run.knowledge_snapshot_id)
+                cited = {
+                    ref
+                    for beat in version.content["sections"]
+                    for ref in beat["knowledge_member_ids"]
+                }
+                content += "\n\n## Evidence and provenance\n"
+                for fact in facts:
+                    if fact["snapshot_member_id"] not in cited:
+                        continue
+                    content += (
+                        f"\n- {fact['snapshot_member_id']} — {fact['predicate']}: {fact['value']}\n"
+                    )
+                    for source in fact["sources"]:
+                        content += (
+                            f"  - Source: {source['url']} (version {source['source_version_id']})\n"
+                        )
+                        content += f"    Quote: {source['quote']}\n"
+                content += f"\nGeneration mode: {version.generation_metadata.get('mode', 'legacy_template')}\n"
+                content += "Footage rights and performance are not verified by this export.\n"
             digest = sha256(content.encode("utf-8")).hexdigest()
             existing = session.scalar(
                 select(ScriptExportRecord).where(
@@ -764,8 +751,9 @@ class DatabaseScriptService:
             if not isinstance(section, dict) or set(section) != section_fields:
                 raise ScriptServiceConflictError("each script section must use the v1 schema")
             if (
-                section["start_second"] != previous
-                or not isinstance(section["end_second"], int)
+                type(section["start_second"]) is not int
+                or section["start_second"] != previous
+                or type(section["end_second"]) is not int
                 or section["end_second"] <= previous
             ):
                 raise ScriptServiceConflictError(
@@ -779,15 +767,19 @@ class DatabaseScriptService:
                     or len(section[name]) > 2000
                 ):
                     raise ScriptServiceConflictError(f"section {name} is invalid")
-            if not isinstance(section["knowledge_member_ids"], list) or not set(
-                section["knowledge_member_ids"]
-            ).issubset(allowed_members):
+            if (
+                not isinstance(section["knowledge_member_ids"], list)
+                or any(not isinstance(item, str) for item in section["knowledge_member_ids"])
+                or not set(section["knowledge_member_ids"]).issubset(allowed_members)
+            ):
                 raise ScriptServiceConflictError(
                     "section references knowledge outside the frozen snapshot"
                 )
-            if not isinstance(section["trend_signal_ids"], list) or not set(
-                section["trend_signal_ids"]
-            ).issubset(allowed_signals):
+            if (
+                not isinstance(section["trend_signal_ids"], list)
+                or any(not isinstance(item, str) for item in section["trend_signal_ids"])
+                or not set(section["trend_signal_ids"]).issubset(allowed_signals)
+            ):
                 raise ScriptServiceConflictError("section references an unapproved trend signal")
         if previous != task.duration_seconds:
             raise ScriptServiceConflictError("script timeline must end at task duration")
@@ -796,58 +788,8 @@ class DatabaseScriptService:
     def _score(
         self, session: Session, run: ScriptRunRecord, content: dict[str, Any]
     ) -> dict[str, Any]:
-        issues: list[str] = []
-        sections = content.get("sections", [])
-        timeline_ok = (
-            bool(sections)
-            and sections[0].get("start_second") == 0
-            and sections[-1].get("end_second") == content.get("duration_seconds")
-        )
-        hook_ok = (
-            bool(sections)
-            and sections[0].get("purpose") == "hook"
-            and len(sections[0].get("voiceover", "").strip()) >= 12
-        )
-        cta_ok = any(
-            item.get("purpose") == "cta"
-            and any(
-                word in item.get("voiceover", "").casefold()
-                for word in ("follow", "save", "play", "comment")
-            )
-            for item in sections
-        )
-        evidence_ok = any(item.get("knowledge_member_ids") for item in sections) and any(
-            item.get("trend_signal_ids") for item in sections
-        )
-        purposes = {item.get("purpose") for item in sections}
-        structure_ok = {"hook", "setup", "proof", "payoff", "cta"}.issubset(purposes)
-        try:
-            self._validate_content(session, run, content)
-            safety_ok = True
-        except ScriptServiceConflictError:
-            safety_ok = False
-        dimensions = {
-            "duration_and_timeline": {"score": 20 if timeline_ok else 0, "max": 20},
-            "hook_strength": {"score": 20 if hook_ok else 0, "max": 20},
-            "evidence_lineage": {"score": 20 if evidence_ok else 0, "max": 20},
-            "call_to_action": {"score": 15 if cta_ok else 0, "max": 15},
-            "tiktok_structure": {"score": 15 if structure_ok else 0, "max": 15},
-            "schema_and_safety": {"score": 10 if safety_ok else 0, "max": 10},
-        }
-        labels = {
-            "duration_and_timeline": timeline_ok,
-            "hook_strength": hook_ok,
-            "evidence_lineage": evidence_ok,
-            "call_to_action": cta_ok,
-            "tiktok_structure": structure_ok,
-            "schema_and_safety": safety_ok,
-        }
-        issues.extend(f"{name}_failed" for name, passed in labels.items() if not passed)
-        return {
-            "score": sum(value["score"] for value in dimensions.values()),
-            "dimensions": dimensions,
-            "issues": issues,
-        }
+        self._validate_content(session, run, content)
+        return readiness_report(content)
 
     def _run(self, session: Session, item: ScriptRunRecord) -> dict[str, object]:
         versions = list(
@@ -879,11 +821,13 @@ class DatabaseScriptService:
             "topic_candidate_id": str(item.topic_candidate_id),
             "topic_review_id": str(item.topic_review_id),
             "knowledge_snapshot_id": str(item.knowledge_snapshot_id),
+            "evidence": snapshot_facts(session, item.knowledge_snapshot_id),
             "revision_budget": item.revision_budget,
             "revisions_used": used,
             "score_threshold": item.score_threshold,
             "generator_version": item.generator_version,
             "evaluator_version": item.evaluator_version,
+            "current_rule_version": RULE_VERSION,
             "versions": [self._version(v) for v in versions],
             "evaluations": [self._evaluation(v) for v in evaluations],
             "final_reviews": [self._final_review(v) for v in reviews],
@@ -901,6 +845,7 @@ class DatabaseScriptService:
             "origin": item.origin,
             "content": dict(item.content),
             "content_sha256": item.content_sha256,
+            "generation_metadata": item.generation_metadata,
             "created_by": item.created_by,
             "created_at": item.created_at.isoformat(),
         }
@@ -916,6 +861,7 @@ class DatabaseScriptService:
             "dimensions": dict(item.dimensions),
             "issues": list(item.issues),
             "rule_version": item.rule_version,
+            "semantic_report": item.semantic_report,
             "created_at": item.created_at.isoformat(),
         }
 

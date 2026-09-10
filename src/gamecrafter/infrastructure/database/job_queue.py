@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from gamecrafter.application.jobs import ClaimedJob
+from gamecrafter.application.jobs import ClaimedJob, JobOwnershipLostError
 from gamecrafter.domain.runs.state import JobStatus, RunStatus, WorkflowRun
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
@@ -17,7 +17,7 @@ from gamecrafter.infrastructure.database.models import (
 )
 
 
-class JobLeaseError(RuntimeError):
+class JobLeaseError(JobOwnershipLostError):
     """Raised when a worker no longer owns the job it tries to update."""
 
 
@@ -225,7 +225,7 @@ class DatabaseJobQueue:
 
             state = _run_state(run).transition(
                 next_state,
-                checkpoint=record.task_type,
+                checkpoint=run.checkpoint or record.task_type,
                 error_code=record.last_error_code,
                 error_detail=safe_detail,
                 at=now,
@@ -258,6 +258,7 @@ class DatabaseJobQueue:
             record is None
             or record.status != JobStatus.LEASED.value
             or record.lease_owner != worker_id
+            or record.attempts != job.attempts
         ):
             raise JobLeaseError(f"worker {worker_id} no longer owns job {job.id}")
 

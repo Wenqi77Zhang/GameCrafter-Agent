@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
@@ -90,6 +90,8 @@ function workspaceFetch(options?: {
   const auth = options?.auth ?? { enabled: false, bootstrap_required: false, user: null };
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const path = String(input);
+    if (path === "/api/creative-capability") return json({ available: false, model: "test-disabled" });
+    if (path.includes("/creative-operations")) return json({ items: [] });
     if (path === "/api/health") return json({ status: "ok" });
     if (path === "/api/auth/status") return json({ ...auth, zero_cost: true });
     if (path === "/api/auth/bootstrap" && init?.method === "POST") {
@@ -777,8 +779,93 @@ test("renders the server-stored exact quote and source lineage", async () => {
     "href",
     "https://nte.perfectworld.com/en/",
   );
-  expect(screen.getByText(/仅显示当前提取批次/)).toBeInTheDocument();
+  expect(screen.getByText(/汇总当前项目的全部候选/)).toBeInTheDocument();
   expect(screen.getByText("8–36")).toBeInTheDocument();
+});
+
+test("locates pending reviews, uses preset reasons, and marks submitted work complete", async () => {
+  const firstClaim = {
+    id: "claim-review-1",
+    subject_entity_id: "entity-1",
+    extraction_run_id: "knowledge-run-1",
+    predicate: "game.developer",
+    value_kind: "string",
+    value: "Hotta Studio",
+    confidence: 0.96,
+    locale: "en",
+    region: "global",
+    status: "candidate_unreviewed",
+    created_at: "2026-08-15T00:00:00Z",
+    reviews: [],
+    latest_review: null,
+    evidence: [{
+      source_version_id: "version-1", source_id: "source-1",
+      source_url: "https://nte.perfectworld.com/en/", source_title: "NTE official homepage",
+      source_version_number: 1, locale: "en", region: "global", fetched_at: "2026-08-15T00:00:00Z",
+      ordinal: 0, start_offset: 8, end_offset: 36, quote: "Developed by Hotta Studio.", quote_sha256: "b".repeat(64),
+    }],
+  };
+  const secondClaim = {
+    ...firstClaim,
+    id: "claim-review-2",
+    predicate: "game.publisher",
+    value: "Perfect World Games",
+    evidence: [{ ...firstClaim.evidence[0], ordinal: 1, quote: "Published by Perfect World Games." }],
+  };
+  const fetchMock = workspaceFetch({ entities: [entity], versions: [sourceVersion], claims: [firstClaim, secondClaim] });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "知识" }));
+
+  expect(await screen.findByRole("heading", { name: "本项目还有候选需要你决定" })).toBeInTheDocument();
+  expect(screen.getByText("项目待处理").parentElement).toHaveTextContent("2");
+  expect(screen.getAllByText("待你决定")).toHaveLength(2);
+  expect(screen.getByText("与引用的官方原文一致").closest("label")?.querySelector("input")).toBeChecked();
+  expect(screen.queryByRole("textbox", { name: "其他原因" })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "记录人工决定" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+    "/api/projects/project-1/knowledge-claims/claim-review-1/reviews",
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ decision: "approve", approved_value: null, reason: "与引用的官方原文一致" }),
+    }),
+  ));
+
+  expect(await screen.findByText("决定已提交，并已自动打开下一条待处理候选。")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Perfect World Games.*正在处理这一条/ })).toBeInTheDocument();
+  expect(screen.getByText(/已处理（无需再操作）/)).toHaveTextContent("1");
+  fireEvent.click(screen.getByText(/已处理（无需再操作）/));
+  fireEvent.click(screen.getByRole("button", { name: /Hotta Studio.*已提交/ }));
+  expect(await screen.findByText("这条决定已经提交成功，不需要再次处理。")).toBeInTheDocument();
+  expect(screen.getByText("需要修改？重新提交一条决定").closest("details")).not.toHaveAttribute("open");
+});
+
+test("opens a hidden pending candidate from another game entity", async () => {
+  const approval = {
+    id: "review-complete", decision: "approve", approved_value_kind: "string", approved_value: "异环",
+    reason: "与引用的官方原文一致", reviewer_id: "local-user", created_at: "2026-08-15T01:00:00Z",
+  };
+  const reviewedClaim = {
+    id: "claim-complete", subject_entity_id: "entity-1", extraction_run_id: "knowledge-run-1",
+    predicate: "game.name", value_kind: "string", value: "异环", confidence: 0.99, locale: "zh-CN", region: "cn",
+    status: "human_approved", created_at: "2026-08-15T00:00:00Z", reviews: [approval], latest_review: approval,
+    evidence: [{ source_version_id: "version-1", source_id: "source-1", source_url: "https://nte.perfectworld.com/",
+      source_title: "NTE official homepage", source_version_number: 1, locale: "zh-CN", region: "cn",
+      fetched_at: "2026-08-15T00:00:00Z", ordinal: 0, start_offset: 0, end_offset: 2, quote: "异环", quote_sha256: "b".repeat(64) }],
+  };
+  const secondEntity = { ...entity, id: "entity-2", canonical_key: "game:other", display_name: "另一游戏" };
+  const pendingClaim = {
+    ...reviewedClaim, id: "claim-other", subject_entity_id: "entity-2", value: "Another Game",
+    status: "candidate_unreviewed", reviews: [], latest_review: null,
+  };
+  workspaceFetch({ entities: [entity, secondEntity], versions: [sourceVersion], claims: [reviewedClaim, pendingClaim] });
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "知识" }));
+
+  const locate = await screen.findByRole("button", { name: "前往其他实体的下一条候选" });
+  fireEvent.click(locate);
+  await waitFor(() => expect(screen.getByLabelText("游戏实体")).toHaveValue("entity-2"));
+  expect(screen.getByRole("button", { name: /Another Game.*正在处理这一条/ })).toBeInTheDocument();
 });
 
 test("creates and corrects a generic game entity through auditable forms", async () => {
@@ -809,13 +896,19 @@ test("creates and corrects a generic game entity through auditable forms", async
   fireEvent.change(screen.getByLabelText("游戏名称"), {
     target: { value: "异环（Neverness to Everness）" },
   });
-  fireEvent.change(screen.getByLabelText("修改原因"), { target: { value: "修正输入错误" } });
   fireEvent.click(screen.getByRole("button", { name: "保存纠正" }));
 
   await waitFor(() =>
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/projects/project-1/knowledge-entities/entity-1",
-      expect.objectContaining({ method: "PUT" }),
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({
+          display_name: "异环（Neverness to Everness）",
+          aliases: ["NTE", "Neverness to Everness"],
+          change_reason: "修正输入错误",
+        }),
+      }),
     ),
   );
 });
@@ -932,7 +1025,8 @@ test("shows deterministic conflict relations and preserves evidence navigation",
   fireEvent.click(screen.getAllByRole("button", { name: /Neverness to Everness/ }).at(-1)!);
   expect(screen.getByText("0–21")).toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText("决定理由"), {
+  fireEvent.click(screen.getByText("其他原因"));
+  fireEvent.change(screen.getByPlaceholderText("说明你依据哪条证据作出决定"), {
     target: { value: "与官网标题及精确证据一致。" },
   });
   fireEvent.click(screen.getByRole("button", { name: "记录人工决定" }));
@@ -945,12 +1039,14 @@ test("shows deterministic conflict relations and preserves evidence navigation",
       }),
     ),
   );
-  expect(await screen.findByText(/人工决定已追加/)).toBeInTheDocument();
+  expect(await screen.findByText(/所有候选都已处理/)).toBeInTheDocument();
   expect(screen.getByText("与官网标题及精确证据一致。")).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "关闭冲突组" }));
   fireEvent.change(screen.getByLabelText("关闭冲突组"), { target: { value: "dismissed" } });
-  fireEvent.change(screen.getByLabelText("关闭理由"), {
+  const closureForm = screen.getByRole("button", { name: "确认关闭" }).closest("form")!;
+  fireEvent.click(within(closureForm).getByText("其他原因"));
+  fireEvent.change(within(closureForm).getByPlaceholderText("说明为何可以解决或忽略该冲突组"), {
     target: { value: "人工确认该组无需继续处理。" },
   });
   fireEvent.click(screen.getByRole("button", { name: "确认关闭" }));
@@ -1109,7 +1205,7 @@ test("shows traceable deterministic topic fit and records the human gate", async
   fireEvent.click(await screen.findByRole("button", { name: "营销" }));
 
   expect(await screen.findByRole("heading", { name: "热点驱动的游戏认知" })).toBeInTheDocument();
-  expect(screen.getByText("营销策略结论")).toBeInTheDocument();
+  expect(screen.getByText("规则匹配依据与当前选题")).toBeInTheDocument();
   expect(screen.getByText("推荐英语视频话题")).toBeInTheDocument();
   expect(screen.getByText("30 秒内容结构")).toBeInTheDocument();
   expect(screen.getByText("可使用的已审核事实")).toBeInTheDocument();
@@ -1117,7 +1213,8 @@ test("shows traceable deterministic topic fit and records the human gate", async
   expect(screen.getByRole("button", { name: "审核这个方向" })).toBeInTheDocument();
   expect(await screen.findByText("确定性规则 · 无模型调用")).toBeInTheDocument();
   expect(screen.getAllByText("What if #NTE happened inside Neverness to Everness?").length).toBeGreaterThan(0);
-  fireEvent.change(screen.getByLabelText("决定理由"), {
+  fireEvent.click(screen.getByRole("button", { name: "其他原因" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "决定理由" }), {
     target: { value: "趋势来源、市场与知识证据均符合本次目标。" },
   });
   fireEvent.click(screen.getByRole("button", { name: "记录人工决定" }));
@@ -1169,7 +1266,8 @@ test("renders the zero-cost script evaluation and final human gate", async () =>
   fireEvent.click(await screen.findByRole("button", { name: "创作" }));
 
   expect(await screen.findByRole("heading", { name: "证据约束的 TikTok 脚本" })).toBeInTheDocument();
-  expect(screen.getByText("确定性模板 + 确定性评测 · 零模型费用")).toBeInTheDocument();
+  expect(screen.getByText("本地模型创作 + 独立评审 · 无付费 API")).toBeInTheDocument();
+  expect(screen.getByText("旧版检查已过期，请重新检查。")).toBeInTheDocument();
   expect(screen.getByText("100/100")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "导出 Markdown" })).toBeDisabled();
   expect(screen.getByRole("heading", { name: "人工终审" })).toBeInTheDocument();

@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from gamecrafter import __version__
+from gamecrafter.api.routes.creative import router as creative_router
 from gamecrafter.api.routes.gdd import router as gdd_router
 from gamecrafter.api.routes.health import router as health_router
 from gamecrafter.api.routes.identity import SESSION_COOKIE, identity_service
@@ -155,6 +156,7 @@ def create_app() -> FastAPI:
     application.include_router(marketing_router)
     application.include_router(operations_router)
     application.include_router(scripts_router)
+    application.include_router(creative_router)
     return application
 
 

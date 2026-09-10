@@ -1,6 +1,7 @@
 # GameCrafter constrained multi-Agent v1
 
-Status: implemented and live-NTE acceptance-tested on 2026-08-30.
+Historical M15 record, with M19 execution classification corrected on 2026-09-11.
+For current verification, see [real creative workflow](real-creative-workflow.md).
 
 GameCrafter uses eight versioned specialist roles coordinated by the durable Harness. Agents exchange
 typed, persisted artifacts rather than free-form conversations. Deterministic validation remains
@@ -12,25 +13,26 @@ publication gates.
 | `knowledge.source_steward` | bounded source validation and provenance capture | deterministic |
 | `knowledge.curator` | evidence-bound candidate extraction | local Ollama |
 | `knowledge.reviewer` | independent semantic review and risk routing | local Ollama |
-| `marketing.trend_analyst` | verified trend evidence analysis | deterministic |
-| `marketing.campaign_strategist` | frozen knowledge/trend strategy brief and creation handoff | deterministic |
-| `creation.script_writer` | structured TikTok script generation | deterministic |
-| `creation.quality_critic` | quality, evidence, format, and compliance evaluation | deterministic |
+| `marketing.trend_analyst` | provenance-preserving trend normalization and fit | deterministic tool |
+| `marketing.campaign_strategist` | frozen evidence to a readable Chinese proposal and English hooks | local Ollama |
+| `creation.script_writer` | English storyboard writing and bounded actual revision | local Ollama |
+| `creation.quality_critic` | independent evidence/clarity review | local Ollama plus deterministic delivery gates |
 | `design.gdd_architect` | exact-offset GDD chapters and explicit assumption separation | deterministic |
 
-The first release is strictly zero API cost. A deterministic role is still an explicit specialist
-node with typed inputs, outputs, version, trace, and responsibility; it is not presented as a model
-call. Later model upgrades must retain the same contracts and pass offline evaluation before release.
+There are five model roles and three deterministic tools, not eight conversational LLM agents.
+They retain typed inputs, outputs, versions and traces. Model choice is evaluated with real local
+calls and negative examples; a model saying "passed" is not proof that the claims are true.
 
 Knowledge review produces `agent_approved`, `agent_rejected`, or `needs_human`. Deterministic gates
 run before the reviewer. A human confirms the reviewed knowledge pack once; only unresolved claims
 require individual attention. Topic selection and final script export remain human gates.
 
-Campaign Strategist 1.1 emits the versioned `marketing-strategy-brief-v1` read model. The user sees
+The historical Campaign Strategist 1.1 emitted `marketing-strategy-brief-v1`. It remains a rule-only
+reference, visibly separate from the M19 model recommendation. The older UI displayed
 one explicit direction, recommended English topic, core message, timed content structure, approved
 proof facts, trend provenance, risks, and up to two alternatives. A draft remains reviewable; an
-approved brief exposes a direct transition to Script Writer. This closes the gap between technical
-fit scoring and a marketing conclusion a domestic studio user can actually read and execute.
+approved brief exposes a direct transition to Script Writer. This projection alone did not close
+the creative-quality gap; M19 adds actual model writing, independent checking and editable outputs.
 
 Curator v5 receives a controlled subject type and user-confirmed display labels, but never the
 internal entity key. Labels identify the review scope and cannot substitute for a public-source

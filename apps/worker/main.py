@@ -7,6 +7,10 @@ import time
 
 from gamecrafter.application.jobs import Worker
 from gamecrafter.config.settings import get_settings
+from gamecrafter.infrastructure.database.creative_service import (
+    CREATIVE_TASK,
+    DatabaseCreativeService,
+)
 from gamecrafter.infrastructure.database.job_queue import DatabaseJobQueue
 from gamecrafter.infrastructure.database.operations_service import DatabaseOperationsService
 from gamecrafter.infrastructure.database.session import get_session_factory
@@ -31,6 +35,7 @@ def create_worker() -> Worker:
             session_factory=session_factory,
         )
     )
+    handlers[CREATIVE_TASK] = DatabaseCreativeService(session_factory, settings).execute
     return Worker(
         queue=DatabaseJobQueue(session_factory),
         handlers=handlers,
