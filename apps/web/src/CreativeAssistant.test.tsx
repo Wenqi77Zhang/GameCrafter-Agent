@@ -102,11 +102,15 @@ test("persists and resumes a queued operation, then presents a concrete strategy
       taskId="task-1"
       candidateId="candidate-1"
       language="zh-CN"
+      topicApproved
     />,
   );
   expect(await screen.findByText("从城市探索切入")).toBeInTheDocument();
   expect(screen.getByText("A city with a secret?")).toBeInTheDocument();
   expect(screen.getByText("比较两个开场的留存和评论。")).toBeInTheDocument();
+  expect(screen.getByText("模型初审通过 · 选题已确认，无需重复提交")).toBeInTheDocument();
+  expect(screen.queryByText("模型初审通过 · 仍需你确认选题")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "重新生成建议（保留历史）" })).toBeInTheDocument();
 });
 
 test("failure remains visible and cannot pretend to be a completed script", async () => {

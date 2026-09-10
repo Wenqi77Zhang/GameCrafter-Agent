@@ -622,6 +622,7 @@ export function MarketingWorkspace({
           taskId={taskId}
           candidateId={strategy.candidate_id}
           language={language}
+          topicApproved={strategy.status === "approved"}
         />
       )}
       {strategy && (

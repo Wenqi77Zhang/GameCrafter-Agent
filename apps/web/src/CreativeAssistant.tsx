@@ -307,11 +307,13 @@ export function StrategyAssistant({
   taskId,
   candidateId,
   language,
+  topicApproved = false,
 }: {
   projectId: string;
   taskId: string;
   candidateId: string;
   language: Language;
+  topicApproved?: boolean;
 }) {
   const assistant = useCreativeAssistant(projectId, taskId);
   const zh = language === "zh-CN";
@@ -340,7 +342,7 @@ export function StrategyAssistant({
       </p>
       <button
         type="button"
-        className="primary-button"
+        className={reviewPassed ? "ghost-button" : "primary-button"}
         disabled={
           assistant.busy ||
           !assistant.capability?.available ||
@@ -352,6 +354,10 @@ export function StrategyAssistant({
           ? zh
             ? "正在生成并评审建议…"
             : "Developing and reviewing recommendation…"
+          : reviewPassed
+            ? zh
+              ? "重新生成建议（保留历史）"
+              : "Regenerate recommendation (keep history)"
           : zh
             ? "生成具体营销建议"
             : "Develop marketing recommendation"}
@@ -382,8 +388,12 @@ export function StrategyAssistant({
                 ? (zh ? "旧建议需要重新生成并评审，不会直接交给脚本写作" : "Regenerate and re-review this legacy recommendation before writing")
                 : reviewPassed
                 ? zh
-                  ? "模型初审通过 · 仍需你确认选题"
-                  : "Model review passed · your topic approval is still required"
+                  ? topicApproved
+                    ? "模型初审通过 · 选题已确认，无需重复提交"
+                    : "模型初审通过 · 仍需你确认选题"
+                  : topicApproved
+                    ? "Model review passed · topic already approved, no repeat submission needed"
+                    : "Model review passed · your topic approval is still required"
                 : zh
                   ? "建议未通过初审 · 不会用于脚本生成"
                   : "Review blocked · this suggestion will not be used by the writer"}
