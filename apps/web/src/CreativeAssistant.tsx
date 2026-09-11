@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, idempotencyKey, type Language } from "./client";
+import { EvidenceReview, type FactCheck } from "./EvidenceReview";
 
 export type CreativeOperation = {
   id: string;
@@ -17,6 +18,7 @@ export type CreativeOperation = {
     passed?: boolean;
     strategy?: ModelStrategy;
     review?: {
+      fact_checks?: FactCheck[];
       summary: string;
       issues: { severity: string; message: string; fix: string }[];
     };
@@ -292,7 +294,13 @@ export function CreativeProgress({
                 disabled={item.review_current === false}
                 onClick={() => void assistant.retry()}
               >
-                {item.review_current === false ? (zh ? "提示版本已更新，请重新发起操作" : "Prompt changed; start a new operation") : (zh ? "重试未完成步骤" : "Retry unfinished steps")}
+                {item.review_current === false
+                  ? zh
+                    ? "提示版本已更新，请重新发起操作"
+                    : "Prompt changed; start a new operation"
+                  : zh
+                    ? "重试未完成步骤"
+                    : "Retry unfinished steps"}
               </button>
             </>
           )}
@@ -321,7 +329,8 @@ export function StrategyAssistant({
     (item) => item.candidate_id === candidateId && item.result.strategy,
   );
   const strategy = latest?.result.strategy;
-  const reviewPassed = latest?.result.passed === true && latest?.review_current !== false;
+  const reviewPassed =
+    latest?.result.passed === true && latest?.review_current !== false;
   return (
     <section
       className="panel model-strategy"
@@ -358,9 +367,9 @@ export function StrategyAssistant({
             ? zh
               ? "重新生成建议（保留历史）"
               : "Regenerate recommendation (keep history)"
-          : zh
-            ? "生成具体营销建议"
-            : "Develop marketing recommendation"}
+            : zh
+              ? "生成具体营销建议"
+              : "Develop marketing recommendation"}
       </button>
       {!assistant.capability?.available && (
         <p>
@@ -385,26 +394,36 @@ export function StrategyAssistant({
           >
             <strong>
               {latest?.review_current === false
-                ? (zh ? "旧建议需要重新生成并评审，不会直接交给脚本写作" : "Regenerate and re-review this legacy recommendation before writing")
-                : reviewPassed
                 ? zh
-                  ? topicApproved
-                    ? "模型初审通过 · 选题已确认，无需重复提交"
-                    : "模型初审通过 · 仍需你确认选题"
-                  : topicApproved
-                    ? "Model review passed · topic already approved, no repeat submission needed"
-                    : "Model review passed · your topic approval is still required"
-                : zh
-                  ? "建议未通过初审 · 不会用于脚本生成"
-                  : "Review blocked · this suggestion will not be used by the writer"}
+                  ? "旧建议需要重新生成并评审，不会直接交给脚本写作"
+                  : "Regenerate and re-review this legacy recommendation before writing"
+                : reviewPassed
+                  ? zh
+                    ? topicApproved
+                      ? "模型初审通过 · 选题已确认，无需重复提交"
+                      : "模型初审通过 · 仍需你确认选题"
+                    : topicApproved
+                      ? "Model review passed · topic already approved, no repeat submission needed"
+                      : "Model review passed · your topic approval is still required"
+                  : zh
+                    ? "建议未通过初审 · 不会用于脚本生成"
+                    : "Review blocked · this suggestion will not be used by the writer"}
             </strong>
             <p>{latest?.result.review?.summary}</p>
-            {latest?.result.review?.issues.map((issue, index) => (
-              <p key={index}>
-                {issue.message} → {issue.fix}
-              </p>
-            ))}
+            {!latest?.result.review?.fact_checks?.length &&
+              latest?.result.review?.issues.map((issue, index) => (
+                <p key={index}>
+                  {issue.message} → {issue.fix}
+                </p>
+              ))}
           </div>
+          {!!latest?.result.review?.fact_checks?.length && (
+            <EvidenceReview
+              key={latest.id}
+              checks={latest.result.review.fact_checks}
+              language={language}
+            />
+          )}
           <details open={reviewPassed}>
             <summary>
               {reviewPassed

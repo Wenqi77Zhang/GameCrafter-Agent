@@ -154,6 +154,36 @@ def enqueue(service, project, target, operation="write", key=None):
     )[0]
 
 
+def test_creative_evidence_keeps_the_snapshot_entity_revision_after_later_name_changes():
+    from gamecrafter.infrastructure.database.creative_context import snapshot_facts
+    from gamecrafter.infrastructure.database.models import (
+        KnowledgeEntityRevisionRecord,
+        MarketingTaskRecord,
+    )
+
+    sessions, _, task, *_ = setup_creative()
+    with sessions.begin() as session:
+        snapshot_id = session.get(MarketingTaskRecord, task).knowledge_snapshot_id
+        before = snapshot_facts(session, snapshot_id)
+        subject = before[0]["subject"]
+        assert subject["revision_id"] and subject["display_name"]
+        original = session.get(KnowledgeEntityRevisionRecord, UUID(subject["revision_id"]))
+        session.add(
+            KnowledgeEntityRevisionRecord(
+                entity_id=original.entity_id,
+                project_id=original.project_id,
+                revision_number=original.revision_number + 1,
+                display_name="A later corrected name",
+                aliases=["Another alias"],
+                status="active",
+                change_reason="Test correction",
+                actor_id="tester",
+            )
+        )
+    with sessions() as session:
+        assert snapshot_facts(session, snapshot_id) == before
+
+
 def test_title_only_material_is_explained_before_spending_model_tokens():
     sessions, project, task = _approved_task()
     gateway = FixtureGateway()

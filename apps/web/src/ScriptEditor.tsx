@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Language } from "./client";
 
 export type Section = {
@@ -25,8 +25,26 @@ export type Evidence = {
   snapshot_member_id: string;
   predicate: string;
   value: unknown;
+  subject?: { display_name: string; entity_type: string; aliases: string[] };
+  locale?: string | null;
+  region?: string | null;
+  game_version?: string | null;
   sources: { url: string | null; quote: string; source_version_id: string }[];
 };
+
+export type EditTarget = { field: string; text: string; request: number };
+
+function readableValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (
+    value &&
+    typeof value === "object" &&
+    "text" in value &&
+    typeof value.text === "string"
+  )
+    return value.text;
+  return JSON.stringify(value) ?? "";
+}
 
 export function StoryboardEditor({
   content,
@@ -34,19 +52,43 @@ export function StoryboardEditor({
   language,
   disabled,
   onSave,
+  focusTarget,
 }: {
   content: ScriptContent;
   evidence: Evidence[];
   language: Language;
   disabled: boolean;
   onSave: (value: ScriptContent) => void;
+  focusTarget?: EditTarget;
 }) {
+  const editor = useRef<HTMLDetailsElement>(null);
   const [draft, setDraft] = useState(content);
   const [hashtagText, setHashtagText] = useState(content.hashtags.join(" "));
-  const savedDraft = { ...draft, hashtags: hashtagText.split(/\s+/).filter(Boolean) };
+  const savedDraft = {
+    ...draft,
+    hashtags: hashtagText.split(/\s+/).filter(Boolean),
+  };
   const changed = JSON.stringify(savedDraft) !== JSON.stringify(content);
   // The parent keys this component by immutable version ID; refreshes must not erase unsaved edits.
   const zh = language === "zh-CN";
+  useEffect(() => {
+    if (!focusTarget || !editor.current) return;
+    const field = focusTarget.field.startsWith("hashtags.")
+      ? "hashtags"
+      : focusTarget.field;
+    const input = Array.from(
+      editor.current.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+        "[data-script-field]",
+      ),
+    ).find((element) => element.dataset.scriptField === field);
+    if (!input) return;
+    editor.current.open = true;
+    input.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    input.focus({ preventScroll: true });
+    const start = input.value.indexOf(focusTarget.text);
+    if (start >= 0)
+      input.setSelectionRange(start, start + focusTarget.text.length);
+  }, [focusTarget]);
   const update = (
     index: number,
     key: keyof Section,
@@ -59,7 +101,7 @@ export function StoryboardEditor({
       ),
     }));
   return (
-    <details className="panel script-editor">
+    <details className="panel script-editor" ref={editor}>
       <summary>
         {zh
           ? "逐镜编辑（无需填写 JSON）"
@@ -68,6 +110,7 @@ export function StoryboardEditor({
       <label>
         {zh ? "标题" : "Title"}
         <input
+          data-script-field="title"
           maxLength={200}
           value={draft.title}
           onChange={(e) => setDraft({ ...draft, title: e.target.value })}
@@ -76,6 +119,7 @@ export function StoryboardEditor({
       <label>
         {zh ? "发布文案" : "Caption"}
         <textarea
+          data-script-field="caption"
           maxLength={500}
           value={draft.caption}
           onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
@@ -84,6 +128,7 @@ export function StoryboardEditor({
       <label>
         {zh ? "标签（空格分隔）" : "Hashtags (space separated)"}
         <input
+          data-script-field="hashtags"
           maxLength={360}
           value={hashtagText}
           onChange={(e) => setHashtagText(e.target.value)}
@@ -104,6 +149,7 @@ export function StoryboardEditor({
                     : ["Voiceover", "On-screen text", "Visual direction"])[k]
                 }
                 <textarea
+                  data-script-field={`sections.${index}.${key}`}
                   maxLength={1200}
                   value={beat[key]}
                   onChange={(e) => update(index, key, e.target.value)}
@@ -133,7 +179,10 @@ export function StoryboardEditor({
                   )
                 }
               />
-              {String(fact.value)}
+              {fact.subject?.display_name
+                ? `${fact.subject.display_name} · `
+                : ""}
+              {readableValue(fact.value)}
             </label>
           ))}
         </fieldset>
@@ -191,7 +240,21 @@ export function EvidenceNotes({
         const fact = evidence.find((item) => item.snapshot_member_id === id);
         return (
           <div key={id}>
-            <strong>{fact ? String(fact.value) : id}</strong>
+            <strong>
+              {fact
+                ? readableValue(fact.value)
+                : language === "zh-CN"
+                  ? "引用事实暂不可用"
+                  : "Referenced fact unavailable"}
+            </strong>
+            {fact?.subject && <p>{fact.subject.display_name}</p>}
+            {fact && (
+              <small>
+                {[fact.locale, fact.region, fact.game_version]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </small>
+            )}
             {fact?.sources.map((source, i) => (
               <div key={i}>
                 <blockquote>{source.quote}</blockquote>

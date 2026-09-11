@@ -10,8 +10,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
-PROMPT_VERSION = "creative-evidence-v9"
-RULE_VERSION = "script-readiness-v5"
+PROMPT_VERSION = "creative-evidence-v10"
+RULE_VERSION = "script-readiness-v6"
 PURPOSES = ("hook", "setup", "proof", "payoff", "cta")
 CHINESE_TEXT = r"^[\s\S]*[\u4e00-\u9fff][\s\S]*$"
 
@@ -82,26 +82,22 @@ class CriticIssue(StrictOutput):
     fix: str = Field(min_length=3, max_length=600)
 
 
+class FactCheck(StrictOutput):
+    text_id: str
+    field: str
+    section_index: StrictInt | None = Field(ge=0, le=11)
+    text: str = Field(min_length=1, max_length=600)
+    verdict: Literal["SUPPORTED", "UNSUPPORTED", "NOT_A_FACT"]
+    knowledge_member_ids: list[str] = Field(max_length=8)
+    reason: str = Field(min_length=1, max_length=400)
+    evidence_quotes: list[str] = Field(default_factory=list, max_length=8)
+
+
 class Critique(StrictOutput):
     summary: str = Field(min_length=5, max_length=1000)
     issues: list[CriticIssue] = Field(max_length=12)
     strengths: list[str] = Field(max_length=5)
-
-
-def check_critique_quotes(critique: Critique, draft: Any) -> None:
-    def strings(value):
-        if isinstance(value, str):
-            yield value
-        elif isinstance(value, dict):
-            for child in value.values():
-                yield from strings(child)
-        elif isinstance(value, list):
-            for child in value:
-                yield from strings(child)
-
-    texts = list(strings(draft))
-    if any(not any(issue.draft_quote in text for text in texts) for issue in critique.issues):
-        raise CreativeError("评审指出了草稿中不存在的原句，未采用这份评审。")
+    fact_checks: list[FactCheck] = Field(default_factory=list, max_length=96)
 
 
 def evidence_readiness(facts: list[dict[str, Any]]) -> dict[str, Any]:

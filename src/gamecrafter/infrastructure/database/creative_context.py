@@ -10,6 +10,8 @@ from gamecrafter.infrastructure.database.models import (
     ClaimEvidenceSpanRecord,
     ClaimReviewRecord,
     KnowledgeClaimRecord,
+    KnowledgeEntityRecord,
+    KnowledgeEntityRevisionRecord,
     KnowledgeSnapshotMemberRecord,
     SourceRecord,
     SourceVersionRecord,
@@ -32,6 +34,19 @@ def snapshot_facts(session: Session, snapshot_id: UUID) -> list[dict]:
         review = session.get(ClaimReviewRecord, member.review_id)
         if not claim or not review or review.decision not in {"approve", "approve_with_edit"}:
             raise CreativeError("知识快照缺少有效的审核证据。")
+        entity = session.get(KnowledgeEntityRecord, claim.subject_entity_id)
+        revision = (
+            session.get(KnowledgeEntityRevisionRecord, member.entity_revision_id)
+            if member.entity_revision_id
+            else None
+        )
+        if (
+            not entity
+            or entity.project_id != claim.project_id
+            or review.claim_id != claim.id
+            or (member.entity_revision_id and (not revision or revision.entity_id != entity.id))
+        ):
+            raise CreativeError("知识快照的实体或审核关联不完整。")
         sources = []
         for span in session.scalars(
             select(ClaimEvidenceSpanRecord)
@@ -54,6 +69,14 @@ def snapshot_facts(session: Session, snapshot_id: UUID) -> list[dict]:
                 "snapshot_member_id": str(member.id),
                 "predicate": claim.predicate,
                 "value": review.approved_value,
+                "subject": {
+                    "entity_id": str(entity.id),
+                    "entity_type": entity.entity_type,
+                    "revision_id": str(revision.id) if revision else None,
+                    # Never resolve the current revision of an immutable older snapshot.
+                    "display_name": revision.display_name if revision else entity.display_name,
+                    "aliases": revision.aliases if revision else entity.aliases,
+                },
                 "locale": claim.locale,
                 "region": claim.region,
                 "game_version": claim.game_version,

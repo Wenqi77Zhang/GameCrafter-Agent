@@ -2,6 +2,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { api, formatDate, idempotencyKey } from "./client";
 import type { Language } from "./client";
+import { EvidenceReview, type FactCheck } from "./EvidenceReview";
+import type { EditTarget } from "./ScriptEditor";
 import {
   CreativeProgress,
   ReasonChoices,
@@ -36,6 +38,7 @@ type Version = {
 };
 type Evaluation = {
   semantic_report?: {
+    fact_checks?: FactCheck[];
     mode: string;
     summary?: string;
     word_count?: number;
@@ -169,6 +172,7 @@ export function ScriptWorkspace({
   const t = copy[language];
   const zh = language === "zh-CN";
   const [changeReview, setChangeReview] = useState(false);
+  const [editTarget, setEditTarget] = useState<EditTarget>();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [runs, setRuns] = useState<ScriptRun[]>([]);
   const [taskId, setTaskId] = useState("");
@@ -182,27 +186,40 @@ export function ScriptWorkspace({
     text: string;
   } | null>(null);
 
-  const load = useCallback(async () => {
-    const [taskPayload, runPayload] = await Promise.all([
-      api<{ items: Task[] }>(`/api/projects/${projectId}/marketing-tasks`),
-      api<{ items: ScriptRun[] }>(`/api/projects/${projectId}/script-runs`),
-    ]);
-    const eligible = taskPayload.items.filter(
-      (item) => item.approved_candidate_id,
-    );
-    setTasks(eligible);
-    setRuns(runPayload.items);
-    setTaskId((current) =>
-      eligible.some((item) => item.id === current)
-        ? current
-        : (eligible[0]?.id ?? ""),
-    );
-    setRunId((current) =>
-      runPayload.items.some((item) => item.id === current)
-        ? current
-        : (runPayload.items[0]?.id ?? ""),
-    );
-  }, [projectId]);
+  const load = useCallback(
+    async (completedVersionId?: string) => {
+      const [taskPayload, runPayload] = await Promise.all([
+        api<{ items: Task[] }>(`/api/projects/${projectId}/marketing-tasks`),
+        api<{ items: ScriptRun[] }>(`/api/projects/${projectId}/script-runs`),
+      ]);
+      const eligible = taskPayload.items.filter(
+        (item) => item.approved_candidate_id,
+      );
+      setTasks(eligible);
+      setRuns(runPayload.items);
+      // A saved human edit can be newer than the last successful model operation.
+      // Restoring that operation must never select its stale version on page load.
+      if (
+        completedVersionId &&
+        runPayload.items.some(
+          (item) => item.versions.at(-1)?.id === completedVersionId,
+        )
+      ) {
+        setVersionId(completedVersionId);
+      }
+      setTaskId((current) =>
+        eligible.some((item) => item.id === current)
+          ? current
+          : (eligible[0]?.id ?? ""),
+      );
+      setRunId((current) =>
+        runPayload.items.some((item) => item.id === current)
+          ? current
+          : (runPayload.items[0]?.id ?? ""),
+      );
+    },
+    [projectId],
+  );
   useEffect(() => {
     void load().catch((error: unknown) =>
       setNotice({
@@ -234,15 +251,17 @@ export function ScriptWorkspace({
     setVersionId(version?.id ?? "");
     setReason("");
     setChangeReview(false);
+    setEditTarget(undefined);
   }, [version?.id]);
   const assistant = useCreativeAssistant(projectId, runId, (item) => {
-    if (item.result.version_id) setVersionId(item.result.version_id);
-    void load().catch((e: Error) =>
+    void load(item.result.version_id).catch((e: Error) =>
       setNotice({ kind: "error", text: e.message }),
     );
   });
   const locked = busy !== null || assistant.busy;
-  const currentEvaluation = !!run?.current_rule_version && evaluation?.rule_version === run.current_rule_version;
+  const currentEvaluation =
+    !!run?.current_rule_version &&
+    evaluation?.rule_version === run.current_rule_version;
   const exportReady =
     currentEvaluation &&
     evaluation?.passed &&
@@ -575,14 +594,34 @@ export function ScriptWorkspace({
                     ? "与上一版本相比改了什么"
                     : "Changes from previous version"}
                 </summary>
-                {(["title", "caption", "hashtags"] as const).map((key, index) =>
-                  JSON.stringify(version.content[key]) !== JSON.stringify(parent.content[key]) && (
-                    <div key={key}>
-                      <strong>{(zh ? ["标题", "发布文案", "标签"] : ["Title", "Caption", "Hashtags"])[index]}</strong>
-                      <p><del>{Array.isArray(parent.content[key]) ? parent.content[key].join(" ") : parent.content[key]}</del></p>
-                      <p><ins>{Array.isArray(version.content[key]) ? version.content[key].join(" ") : version.content[key]}</ins></p>
-                    </div>
-                  )
+                {(["title", "caption", "hashtags"] as const).map(
+                  (key, index) =>
+                    JSON.stringify(version.content[key]) !==
+                      JSON.stringify(parent.content[key]) && (
+                      <div key={key}>
+                        <strong>
+                          {
+                            (zh
+                              ? ["标题", "发布文案", "标签"]
+                              : ["Title", "Caption", "Hashtags"])[index]
+                          }
+                        </strong>
+                        <p>
+                          <del>
+                            {Array.isArray(parent.content[key])
+                              ? parent.content[key].join(" ")
+                              : parent.content[key]}
+                          </del>
+                        </p>
+                        <p>
+                          <ins>
+                            {Array.isArray(version.content[key])
+                              ? version.content[key].join(" ")
+                              : version.content[key]}
+                          </ins>
+                        </p>
+                      </div>
+                    ),
                 )}
                 {version.content.sections.map(
                   (beat, i) =>
@@ -685,27 +724,48 @@ export function ScriptWorkspace({
                         </li>
                       ))}
                   </ul>
-                  {evaluation.semantic_report?.issues?.map((issue, i) => (
-                    <div className="critic-issue" key={i}>
-                      <strong>
-                        {issue.severity === "blocking"
-                          ? zh
-                            ? "模型发现风险"
-                            : "Model-flagged risk"
-                          : zh
-                            ? "建议"
-                            : "Suggestion"}
-                        {issue.section_index !== null &&
-                          " · " + (issue.section_index + 1)}
-                      </strong>
-                      {issue.draft_quote && <blockquote>{issue.draft_quote}</blockquote>}
-                      <p>{issue.message}</p>
-                      <p>
-                        {zh ? "修改建议：" : "Suggested fix: "}
-                        {issue.fix}
-                      </p>
-                    </div>
-                  ))}
+                  {!!evaluation.semantic_report?.fact_checks?.length && (
+                    <EvidenceReview
+                      key={evaluation.id}
+                      checks={evaluation.semantic_report.fact_checks}
+                      evidence={run.evidence ?? []}
+                      language={language}
+                      onEdit={
+                        locked
+                          ? undefined
+                          : (check) =>
+                              setEditTarget({
+                                field: check.field,
+                                text: check.text,
+                                request: Date.now(),
+                              })
+                      }
+                    />
+                  )}
+                  {!evaluation.semantic_report?.fact_checks?.length &&
+                    evaluation.semantic_report?.issues?.map((issue, i) => (
+                      <div className="critic-issue" key={i}>
+                        <strong>
+                          {issue.severity === "blocking"
+                            ? zh
+                              ? "模型发现风险"
+                              : "Model-flagged risk"
+                            : zh
+                              ? "建议"
+                              : "Suggestion"}
+                          {issue.section_index !== null &&
+                            " · " + (issue.section_index + 1)}
+                        </strong>
+                        {issue.draft_quote && (
+                          <blockquote>{issue.draft_quote}</blockquote>
+                        )}
+                        <p>{issue.message}</p>
+                        <p>
+                          {zh ? "修改建议：" : "Suggested fix: "}
+                          {issue.fix}
+                        </p>
+                      </div>
+                    ))}
                 </>
               ) : (
                 <p>{t.blocked}</p>
@@ -759,6 +819,7 @@ export function ScriptWorkspace({
                 )}
             </section>
             <StoryboardEditor
+              focusTarget={editTarget}
               key={version.id}
               content={version.content}
               evidence={run.evidence ?? []}
