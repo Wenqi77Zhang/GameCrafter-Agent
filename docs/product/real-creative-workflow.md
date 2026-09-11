@@ -104,7 +104,7 @@ PostgreSQL 17/pgvector 的完整测试、迁移升级/回退/再升级在 GitHub
 本分支的最新提交状态见 [PR #23 检查项](https://github.com/Wenqi77Zhang/GameCrafter-Agent/pull/23/checks)。
 不能把 CI 数据库验证写成本机 Docker 验收，也不能用旧提交的绿灯代替新提交。
 
-依赖审计未发现已知漏洞；已将 Vitest 修补至 4.1.11，消除当前分支受到
+前端 `pnpm audit` 未发现已知漏洞；这不代表所有语言和依赖均完成安全审计。已将 Vitest 修补至 4.1.11，消除当前分支受到
 [开发服务器路径遍历问题](https://github.com/vitest-dev/vitest/security/advisories/GHSA-82fw-gwwq-j7x9)
 影响的版本。Nano ID 已是修补版 3.3.18。未合并前不宣称默认分支告警已经关闭。
 
@@ -163,9 +163,13 @@ Playwright 技能驱动真实 Edge + 独立 SQLite API 的浏览器验收：点�
 通过截图检查修正了表单标签挤在同一行的问题。没有改动个人数据库或提交人工批准。
 
 最终本地检查：后端 255 项收集，240 通过、15 项 PostgreSQL 专属测试明确跳过；前端 39 项
-通过，类型检查、生产构建、Ruff 与依赖审计通过。完整 PostgreSQL CI 结果以本分支最新提交
+通过，类型检查、生产构建、Ruff 与前端依赖审计通过。完整 PostgreSQL CI 结果以本分支最新提交
 检查为准；本机测试使用独立临时目录，
 不删除历史 `.pytest-local` 或重置生产数据库。
+
+代码提交 `5d2368a` 的 [GitHub CI 记录](https://github.com/Wenqi77Zhang/GameCrafter-Agent/actions/runs/34546781563)
+已完成：PostgreSQL 环境后端 **255 项通过**、前端 **39 项通过**，迁移升级/回退/再升级与构建通过。
+这些是工程检查结果，不覆盖上文记录的模型内容质量失败，也不等于生产部署验收。
 
 早期烟测使用名称/类型，暴露了空泛和过度推演问题，不能算作合格交付。当前完整链路烟测补充
 官网地点描述；单独的评审反例仍保留原来的名称/类型对照，并未删除失败记录。
