@@ -1,5 +1,18 @@
 # Guided production workspace
 
+## M19 additions
+
+Marketing now separates actual model suggestions from rule-fit references. Topic and final-script
+decisions require an explicit preset selection, collapse after submission, and reopen only with
+"Change decision". Creation has an inline durable progress panel, real evidence beside each beat,
+an ordinary storyboard editor, version differences, and a visible re-review requirement after edits.
+Existing workflow setup is collapsed once a script exists. See the Chinese
+[acceptance walkthrough](real-creative-workflow.md#如何验收) for the current route.
+The repeated rule-generated campaign direction and canned shooting plan have been removed from
+the main page. The reference card now shows only the current topic, delivery constraints, and
+approved facts. Model findings show their exact draft quote and are explicitly labelled as advice,
+not new facts; current model quality limits are recorded in the acceptance walkthrough.
+
 ## Purpose
 
 M16 changes GameCrafter from a collection of workspaces into a guided production experience for a
@@ -36,11 +49,18 @@ observable result completes the step.
    and extraction capability is checked.
 4. Start extraction. Confirm that the page stays in Knowledge and shows background progress; open
    Runs only if technical detail is desired.
-5. Complete automatic pre-review and the remaining human decisions. Publish the immutable snapshot.
-   Confirm that the route advances to Marketing.
-6. Approve one TikTok topic, create and evaluate the English script, then complete final approval
+5. Complete automatic pre-review. In **Human review tasks**, confirm that project and current-entity
+   remaining counts are visible. Select **Review the next pending candidate**; the exact evidence and
+   required decision must open without searching through batches. Choose a decision and preset reason.
+   Free text appears only after choosing **Other reason**.
+6. Submit the decision. Confirm that the candidate moves into collapsed **Completed (no action
+   needed)**, receives a submitted check mark, and the next pending candidate opens automatically.
+   If a blocker belongs to another game entity, its action switches the entity and opens that Claim.
+7. Publish the immutable snapshot after all review and conflict blockers are closed. Confirm that the
+   route advances to Marketing.
+8. Approve one TikTok topic, create and evaluate the English script, then complete final approval
    and export. Confirm that all five route cards are complete.
-7. Switch to English and back to Simplified Chinese. Resize to a narrow phone view and confirm the
+9. Switch to English and back to Simplified Chinese. Resize to a narrow phone view and confirm the
    current route card, current-task button, and task content remain usable without page-level
    horizontal overflow.
 

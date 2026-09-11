@@ -26,14 +26,17 @@ from gamecrafter.infrastructure.database.run_service import DatabaseRunService
 from gamecrafter.infrastructure.database.snapshot_service import DatabaseSnapshotService
 
 
-def _seed() -> tuple[sessionmaker[Session], UUID, UUID]:
-    engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+def _seed(
+    sessions=None, *, story_fact=False, genre_only=False
+) -> tuple[sessionmaker[Session], UUID, UUID]:
+    if sessions is None:
+        engine = create_engine(
+            "sqlite+pysqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(engine)
+        sessions = sessionmaker(bind=engine, expire_on_commit=False)
     project_id = DatabaseRunService(sessions).create_project(
         slug=f"marketing-{uuid4().hex}", name="异环 marketing"
     )
@@ -107,6 +110,58 @@ def _seed() -> tuple[sessionmaker[Session], UUID, UUID]:
         actor_id="local-user",
         command_key="marketing-review-title",
     )
+    # Controlled public homepage quotes checked 2026-09-11; NOT live ingestion.
+    fixture_facts = [("genre.primary", "Supernatural Urban Open World")] if story_fact else []
+    if story_fact and not genre_only:
+        fixture_facts.append(
+            (
+                "world.location",
+                "The Tamamochi Market Street is packed with charming little shops "
+                "that are easy on the wallet",
+            )
+        )
+    for predicate, quote in fixture_facts:
+        with sessions.begin() as session:
+            claim = KnowledgeClaimRecord(
+                project_id=project_id,
+                subject_entity_id=UUID(str(entity["id"])),
+                predicate=predicate,
+                value_kind="string",
+                value=quote,
+                normalized_value=quote.lower(),
+                value_fingerprint_sha256=sha256(quote.encode()).hexdigest(),
+                scope_fingerprint_sha256=sha256(predicate.encode()).hexdigest(),
+                confidence=0.95,
+                locale="en",
+                region="global",
+                model_provider="replay",
+                model_name="fixture",
+                prompt_version="claim-v1",
+                schema_version="claim-v1",
+            )
+            session.add(claim)
+            session.flush()
+            story_claim_id = claim.id
+            session.add(
+                ClaimEvidenceSpanRecord(
+                    claim_id=claim.id,
+                    source_version_id=version.id,
+                    ordinal=0,
+                    start_offset=0,
+                    end_offset=len(quote),
+                    quote=quote,
+                    quote_sha256=sha256(quote.encode()).hexdigest(),
+                )
+            )
+        DatabaseReviewService(sessions).review_claim(
+            project_id=project_id,
+            claim_id=story_claim_id,
+            decision="approve",
+            approved_value=None,
+            reason="Controlled fixture: official homepage quote; not live capture.",
+            actor_id="acceptance-test",
+            command_key=f"marketing-review-{predicate}",
+        )
     snapshot, _ = DatabaseSnapshotService(sessions).publish(
         project_id=project_id,
         notes="Marketing knowledge baseline.",

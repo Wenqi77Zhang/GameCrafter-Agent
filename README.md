@@ -1,569 +1,122 @@
 # GameCrafter
 
-> An evidence-aware game knowledge and marketing workspace for independent game developers.
+> 将可追溯的游戏资料，变成可审核、可拍摄的海外短视频营销方案。
 
-[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Frontend](https://img.shields.io/badge/React-TypeScript-149ECA?logo=react&logoColor=white)](https://react.dev/)
-[![Backend](https://img.shields.io/badge/FastAPI-Pydantic-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+GameCrafter 是面向游戏开发者和营销人员的个人开源 AI 应用。默认简体中文界面，
+支持切换英文；首个验证场景为《异环》（NTE）面向英语地区的 TikTok 营销。
 
-GameCrafter is a complete local-first product for independent game developers. It organizes game
-information into a traceable knowledge hub, connects that knowledge to real public market signals,
-and helps users create, evaluate, revise, approve, and export marketing scripts.
+项目当前处于 **M19 真实创作链路质量验证阶段**，不是已完成商业验证的成熟 SaaS。
+部署工作暂缓。代码检查、真实模型输出质量、真实用户验收和线上运行是四个独立状态；
+具体结果见 [本轮实现与验收记录](docs/product/real-creative-workflow.md)。
 
-The first complete product slice focuses on marketing a real game to English-speaking TikTok audiences. The default validation case is **NTE: Neverness to Everness (《异环》)**.
+当前已确认的质量缺口：本地模型仍会漏报和误报。最新 **14 例 × 2 轮，20/28 次符合预期**；
+16 次负例判断中漏报 6 次，12 次正例判断中误报 2 次。这是开发回归集，不是总体准确率。
+接口成功、规则满分或模型初审通过都不代表文案已合格；不应无人值守交付或照搬模型修改意见。
 
-For the current click-by-click flow and Agent responsibility boundaries, see
-[`docs/product/multi-agent-v1.md`](docs/product/multi-agent-v1.md).
+## 用户最终得到什么
 
-## Current status
+1. **可追溯知识**：官方网页或明确导入的本地资料 → 精确引文 → 候选事实 → 审核后的知识版本。
+2. **可读营销建议**：一个具体方向、话题、理由、英语开场 A/B、拍摄步骤、风险和验证计划。
+3. **可编辑的英语分镜稿**：逐镜口播、字幕、画面要求、时间段和事实引用。
+4. **可检查的交付**：独立模型评审、规则检查、真实版本修订与差异、人工终审、Markdown/JSON 导出。
 
-The repository has reached **GameCrafter 1.0.0 / M14**, a reproducible, self-diagnosing mature local product release. The original NTE-to-English-
-TikTok workflow remains the primary validation path; later capabilities extend it without
-weakening evidence, privacy, human control, or the strict zero-paid-API boundary.
+生成的是**营销方案和脚本**，不是成片。不会自动发布 TikTok，不保证播放量或转化率；
+官网公开资料也不等同于厂商内部 GDD。
 
-The default Chinese workspace now keeps one current task above the fold. A first-time user can
-import the allowlisted NTE English homepage without typing a URL; optional article discovery and
-diagnostic metrics stay collapsed until they are needed. Mobile navigation remains a single
-horizontal rail instead of wrapping into an ambiguous second row.
+## 当前能力和诚实边界
 
-M14 turns the verified product into a reproducible release: Python production/development
-dependency graphs and artifact hashes are committed, Docker base images and GitHub Actions are
-pinned to immutable digests/commits, CI installs only the locked graph, and backend/frontend/API
-versions agree on `1.0.0`. See [`docs/security/reproducible-releases.md`](docs/security/reproducible-releases.md)
-for the controlled update procedure.
-Repository security reports and contributions follow [`SECURITY.md`](SECURITY.md) and
-[`CONTRIBUTING.md`](CONTRIBUTING.md). Long-term update coverage and the intentional pnpm 11
-automation exception are recorded in
-[`docs/security/dependency-maintenance.md`](docs/security/dependency-maintenance.md).
+| 模块 | 实际实现 | 不能据此宣称 |
+|---|---|---|
+| 来源与知识 | NTE 白名单网页采集、局部浏览器回退、版本与对象存储、本地文档导入、模型提取与独立预审 | 任意游戏全网抓取、自动获得素材版权 |
+| 趋势与选题 | 新闻 RSS/GDELT、可选 YouTube 免费配额接口、人工录入 TikTok 观察、可解释匹配与人工选择 | 新闻等于 TikTok 实时热度；匹配分等于营销效果 |
+| 营销策划 | 本地模型生成具体建议，另一次模型调用独立检查 | 模型建议是已验证的市场结论 |
+| 脚本与评审 | 本地模型写作 → 独立语义评审 + 确定性规则 → 限次修订；逐镜人工编辑 | 填满模板就完成创作；模型自批发布 |
+| 恢复与审计 | 数据库任务、租约续期、取消、幂等、分阶段缓存、来源/版本/用量追踪 | 用日志代替业务结论；进程停止后仍继续执行 |
+| 辅助工作区 | GDD 结构整理、账户/RBAC、备份恢复、诊断 | 已具备计费、平台投放归因或商业 SLA |
 
-The production stack now defaults to the zero-cost local Ollama adapter and checks that the exact
-configured model is actually present before enabling Curator or Reviewer actions. The live NTE
-English homepage has been verified through four extraction chunks and the independent Reviewer:
-the Curator retained eight exact-quote candidates, while Reviewer 1.2 approved six and rejected two
-ambiguous name mentions. Internal entity keys are not sent to the model, and user-confirmed names
-remain scope hints rather than evidence.
+只有名称、厂商或类型标签时，会提示补充游戏内容，不会硬编玩法卖点。
+旧“生成”接口保留为**手动脚手架**，界面明确标注；旧“自动修订”模板重置逻辑已停用。
+旧版规则评测不能直接授权新版交付，需重新检查当前版本。
 
-M13 closes the operational blind spot that previously let a healthy page hide a stopped worker:
+知识审核保留 M18 的项目级待办定位、下一条跳转、已提交折叠区和中英预设理由。
+营销审核与脚本终审也显示明确的提交状态；只有主动更改决定才重新展开。
+策划和脚本现在逐段列出模型判断、原句、引用事实；脚本可一键定位并选中待修改字段。
+知识事实保留冻结实体名称和地区/版本范围；保存人工修改后，刷新不会再被旧模型任务带回旧稿。
+GDD、运行记录和账户继续放在辅助工具层，不增加主创作步骤。
 
-- the worker now persists a bounded liveness heartbeat, while the authenticated Account workspace
-  reports database connectivity, worker freshness, queued/leased/failed counts and expired leases;
-- missing and stale workers produce explicit attention guidance without making the API container
-  unavailable, so the user can still open the diagnostic and recovery interface;
-- every HTTP response carries a bounded request ID and server logs correlate method, safe path,
-  status and duration without logging query strings, credentials or private request bodies.
+## 架构：5 个模型角色，3 个确定性工具角色
 
-The M9–M12 maturity pass adds:
+- 模型角色：Knowledge Curator、Knowledge Reviewer、Campaign Strategist、Script Writer、Quality Critic。
+- 工具角色：来源与溯源、趋势清洗匹配、GDD 结构整理。
+- Harness（工作流控制层）管理队列、权限、预算、重试、版本和人工关口，不是另一个聊天 Agent。
+- 用结构化产物交接，不让多个 Agent 无限制互聊。创作采用有界“生成—检查—修订”，
+  不把它包装成 ReAct、自学习或自主投放。
 
-- versioned, restorable project backups with database-record and SHA-256 object verification,
-  bounded ZIP expansion, traversal/link/undeclared-object rejection and rollback on failure;
-- an Account recovery interface that works even when no project remains, assigns restored data to
-  the authenticated local owner, and applies the existing project quota;
-- owner-controlled team role changes and atomic team/project ownership transfer, with immediate
-  permission changes and durable security events;
-- persistent privacy-preserving login throttling, exact-Origin protection for authenticated
-  browser writes, CSP, framing/MIME/referrer/device-permission security headers and visible keyboard
-  focus;
-- a mature local-product acceptance matrix defining what is verified and what deliberately remains
-  outside the zero-cost local boundary.
+后端：Python/FastAPI/Pydantic、SQLAlchemy/Alembic、PostgreSQL 17/pgvector。
+前端：React/TypeScript/Vite。模型：本机 Ollama，仅允许受控的本机地址，
+**没有付费模型自动回退**。SQLite 只用于隔离测试，不是正式数据库替代方案。
 
-The M6–M8 completion release adds:
+详见 [系统架构与 DAG](docs/architecture/system-architecture.md)、
+[产品基线](docs/product/baseline-v2.md)、[工作流说明](docs/product/real-creative-workflow.md)。
 
-- real public trend retrieval through no-key Google News RSS and GDELT DOC, with optional official
-  YouTube Data API free quota and a deliberately manual, verified TikTok path;
-- private TXT, Markdown, VTT transcript, JSON, and user-owned GDD evidence import, stored only in
-  content-addressed local object storage;
-- an eight-role constrained Agent topology, adding deterministic Source/Provenance Steward and GDD
-  Architect roles while keeping security policy outside model control;
-- optional local accounts with scrypt password hashing, opaque revocable sessions, project tenant
-  isolation, owner/editor/reviewer/viewer RBAC, expiring single-use invitations, revocation, and
-  local quotas;
-- complete project ZIP export/restore, typed-confirmation project deletion with unreferenced-object cleanup,
-  and guarded account deletion;
-- GDD Studio with exact source offsets, chapter hierarchy, separately reviewed assumptions, and
-  immutable canonical revisions;
-- deterministic multi-source synthesis over approved snapshots, explicitly separating corroborated
-  values from single-source facts without generating new claims;
-- an updated requirements matrix and architecture DAGs covering M1.1 and M6–M8 local behavior.
+## 本地运行
 
-M5 adds:
-
-- a beginner-oriented five-step journey from Sources to an approved export, with one visible next
-  action instead of requiring users to infer the tab order. The M16 interface promotes this into a
-  persistent production route, automatically opens the server-recommended task, and moves GDD,
-  Runs, and Account into a clearly secondary tools layer;
-- a project overview API and UI metrics for evidence, Claims, verified trends, script versions,
-  successful/active/attention runs, and the truthful zero-dollar API cost;
-- deterministic trend normalization, exact-duplicate detection, related-event clustering,
-  freshness labels, fingerprints, and disclosed processing-rule versions over immutable raw
-  observations;
-- an explicit human retry command for terminal workflow failures, preserving the original run and
-  adding an audit event instead of silently restarting work;
-- a production-preview Docker stack with migration, API, worker, PostgreSQL, object storage, Nginx,
-  dependency health checks, and a single local URL;
-- real Chromium desktop/mobile acceptance with horizontal-overflow and console-error checks.
-- a readable Campaign Strategist brief that turns the selected trend and frozen knowledge snapshot
-  into one explicit marketing direction, English video topic, core message, timed content plan,
-  usable proof facts, evidence link, risks, alternatives, and a direct handoff to script creation;
-  the brief is deterministic, versioned, auditable, and keeps paid API cost at zero.
-
-Implemented through M4:
-
-- an eight-role, versioned specialist topology coordinated by the durable Harness: Source and
-  Provenance Steward, Knowledge Curator, Knowledge Reviewer, Trend Analyst, Campaign Strategist,
-  Script Writer, Quality/Compliance Critic, and GDD Architect;
-- typed artifact handoffs instead of free-form Agent chat, with local-model versus deterministic
-  execution disclosed per role through `GET /agents`;
-- an independent loopback-only Ollama knowledge Reviewer with strict structured decisions,
-  exact claim-ID coverage, redacted failures, risk codes, bounded rationales, and token accounting;
-- extraction reuse for the same evidence/entity/prompt/schema target, per-batch Claim display,
-  deterministic duplicate handling, taxonomy-risk routing, and a maximum 15-fact proposed pack;
-- separate immutable Agent-review and human-review ledgers, plus one-command human confirmation of
-  clear keep/remove suggestions while unresolved candidates retain individual controls;
-- a bilingual pre-review interface with keep/remove/needs-human counts, filtered low-value items,
-  evidence-linked rationale, durable run progress, and unchanged human publication gates;
-
-- a modular-monolith project layout;
-- a FastAPI health endpoint;
-- a React health/status page;
-- project-local Python environment and repeatable scripts;
-- baseline tests and continuous integration;
-- product, architecture, migration, and roadmap documentation.
-- PostgreSQL 17 plus pgvector Docker Compose configuration;
-- Alembic migrations for projects, generic workflow runs, leased jobs, and audit events;
-- a bounded-retry Python worker shell with durable checkpoints and idempotent run creation;
-- API liveness and database-readiness endpoints;
-- PostgreSQL migration and queue verification in CI;
-- canonical source, multilingual family, discovery-candidate, immutable-version, and evidence-asset
-  contracts;
-- content-addressed local object storage with atomic writes, deduplication, limits, and traversal
-  protection;
-- M1-B migration upgrade and downgrade verification in CI.
-- exact official-host and path allowlists for the NTE global and mainland sites;
-- HTTPS URL normalization, redirect revalidation, public-DNS checks, response limits, and
-  per-run access-budget contracts;
-- a bounded HTTP page fetcher plus an isolated Playwright fallback restricted to approved
-  homepage paths;
-- deterministic NTE metadata adapters for English, Simplified Chinese, Japanese, and mainland
-  Chinese pages;
-- direct homepage/article adaptation and bounded listing-page candidate discovery.
-- registered `source.discover` and `source.capture` durable worker handlers;
-- per-job robots enforcement, request budgets, host spacing, and in-process concurrency gates;
-- quick/targeted candidate filtering with explicit listing-page and candidate limits;
-- direct official-URL import and same-project capture of human-selected candidates;
-- deterministic visible-text extraction that excludes executable page sections;
-- bounded same-host PNG, JPEG, WebP, and GIF capture with byte and signature checks;
-- content-addressed raw HTML, normalized text, and image storage;
-- transactional source creation, immutable version lineage, conditional HTTP reuse, and
-  fingerprint-based no-change detection;
-- source audit events and explicit retry/terminal failure classification.
-- project-scoped source, candidate, and run APIs with bounded command schemas;
-- atomic human candidate selection and capture enqueue with strict idempotency conflict checks;
-- resumable SSE audit streams with durable event cursors and terminal closure;
-- responsive Sources/Runs product interfaces, default Simplified Chinese, and remembered English
-  switching;
-- four NTE official-site quick profiles, filtered targeted discovery, and direct official-URL
-  import;
-- visible candidate provenance, evidence counts, checkpoints, and actionable terminal failures.
-- controlled game-knowledge entity types, predicates, and typed candidate values;
-- immutable model claims with exact source-version evidence spans and complete extraction
-  provenance;
-- append-only human reviews that preserve original and approved edited values separately;
-- deterministic conflict-group and immutable knowledge-snapshot contracts;
-- PostgreSQL guards for evidence-required approval, unresolved-conflict publication blocking, and
-  immutable review/snapshot lineage.
-- a provider-neutral `ModelGateway` with disabled, exact offline-replay, loopback-only local
-  Ollama, and dependency-injected OpenAI Responses adapters;
-- strict structured claim output, exact quote/range validation, request fingerprints, redacted
-  provider errors, and token-usage contracts;
-- bounded local-model output (up to eight high-value claims per chunk) with deterministic exact-quote
-  offset repair and per-candidate rejection when a small model returns unsupported evidence;
-- a zero-API-cost runtime boundary: cloud execution remains uncomposed, while optional local
-  Ollama traffic is restricted to loopback and uses an injected transport.
-- a paragraph/sentence-aware deterministic Unicode chunker with exact source offsets, stable chunk
-  IDs, a 4,000-character limit, and 400-character overlap;
-- a sequential fail-closed extraction Harness with request/result fingerprint checks, exact
-  overlap deduplication, aggregate usage, and a replayable invocation manifest;
-- a strict offline-fixture loader plus a source-attributed English NTE homepage replay whose tests
-  actively block network access and report zero token usage.
-- a data-preserving `ingestion_runs`/`ingestion_jobs` to `workflow_runs`/`workflow_jobs` migration;
-- a nonblank `workflow_kind` discriminator backfilled from each legacy run's initial task;
-- reusable PostgreSQL-leased workflow execution for source, knowledge, and later marketing jobs
-  without adding a second queue stack;
-- upgrade/downgrade coverage that preserves run, job, audit, and knowledge-claim lineage while the
-  existing `/runs` source experience remains compatible.
-- a registered `knowledge.extract` worker handler on the shared PostgreSQL lease queue;
-- verified normalized-text loading with byte, SHA-256, UTF-8, project, source-version, and subject
-  integrity gates;
-- durable redacted per-chunk invocation lifecycles and an immutable whole-document result marker;
-- atomic candidate-claim, exact-evidence, extraction-result, and audit persistence with idempotent
-  retry behavior;
-- project-scoped extraction command/result/claim APIs with zero-cost provider preflight;
-- disabled-by-default execution with exact offline replay and loopback-only local Ollama as the
-  runnable zero-API-cost modes.
-- project-scoped game-entity create/list APIs with server-owned stable keys and duplicate-safe
-  identity handling;
-- append-only entity correction and terminal archival history without rewriting claims or evidence;
-- latest-first immutable source-version read models with normalized-text availability;
-- a non-mutating extraction-capability preflight that distinguishes disabled, local Ollama,
-  missing, invalid, mismatched, incomplete, and exact offline replay states;
-- filterable unreviewed-claim reads with server-returned evidence quotes and source/version metadata.
-- a responsive Knowledge workspace that keeps entity identity, immutable evidence-version choice,
-  exact-replay capability, extraction progress, candidate claims, and exact evidence in one flow;
-- SSE progress updates with a two-second polling fallback while a run remains active, preventing a
-  completed or failed background job from appearing permanently stuck;
-- beginner-safe game-entity creation plus append-only correction and archival controls;
-- explicit zero-cost disabled/mismatch states, Knowledge-to-Runs trace navigation, and a Sources
-  shortcut when no evidence exists;
-- grouped candidate claims and a server-rendered evidence inspector that never re-slices Unicode
-  offsets in the browser;
-- default Simplified Chinese, remembered English switching, and desktop/mobile browser coverage.
-- a real PostgreSQL acceptance that binds the reviewed public NTE snapshot to a unique immutable
-  source version and runs it through the leased `knowledge.extract` worker;
-- acceptance assertions for command idempotence, zero-token exact replay, atomic Claim/evidence
-  persistence, source lineage, audit completion, and redacted result reads;
-- a safety-gated PowerShell acceptance command that only accepts disposable localhost databases
-  whose names contain `test` or `acceptance`.
-- a versioned deterministic conflict policy that compares only immutable Claims sharing the same
-  subject, controlled predicate, and exact locale/region/time/game-version scope;
-- conservative cardinality rules: only game name, release status/date, and primary genre are
-  treated as single-valued; every other differing value is marked `possibly_coexisting`;
-- serialized, idempotent conflict reconciliation with explainable member basis, safe handling of
-  human-closed groups, project-scoped reads, and append-only reconciliation audit events;
-- conflict reconcile/list APIs returning unreviewed candidates with their existing exact-evidence
-  read models, without model calls, confidence ranking, or automatic resolution.
-- an explicit conflict-check control embedded in the bilingual Knowledge workspace;
-- responsive conflict and possible-coexistence cards that expose values, candidate counts, status,
-  policy version, and deterministic classification basis;
-- one-click navigation from every conflict member to its exact source evidence, while leaving all
-  selection, approval, and resolution decisions to the later human-review workflow.
-- append-only approve, approve-with-edit, reject, and defer commands whose exact retries are
-  idempotent and whose conflicting key reuse is rejected;
-- shared typed-value normalization for model candidates and human edits, evidence-required
-  approval, visible latest status, and complete review history without rewriting any Claim;
-- guarded conflict closure: resolution requires a final decision for every member, at least one
-  approval, and exactly one retained normalized value for a single-valued conflict;
-- explicit dismissal with a human reason, complete resolution metadata, causal audit events, and
-  PostgreSQL-enforced command lineage;
-- responsive bilingual review/closure controls beside the exact evidence, with desktop and mobile
-  browser verification.
-- a project-wide publication-readiness service that reports every unreviewed, deferred, conflicted,
-  archived, or incomplete-lineage blocker before attempting a write;
-- serialized and idempotent knowledge publication with deterministic content digests, monotonically
-  increasing versions, and exact approving-review/evidence lineage;
-- immutable snapshot history and member reads, enforced by PostgreSQL triggers and covered by real
-  PostgreSQL publication, retry, audit, and mutation-rejection tests;
-- responsive bilingual publication controls and version history in the Knowledge workspace, with
-  desktop and mobile browser verification.
-- immutable manual trend observations with source URL, observation time, market, type, keywords,
-  optional metric, verification notes, strict HTTPS validation, and idempotent retry;
-- immutable marketing tasks that freeze one published knowledge snapshot plus TikTok platform,
-  English-market audience, objective, output language, and duration;
-- deterministic four-dimension topic-fit analysis covering freshness, market alignment, source
-  completeness, and approved-knowledge relevance without a model call;
-- explicit risk disclosures, exact trend/snapshot lineage, append-only topic decisions, and a
-  single-current-approved-topic human gate;
-- a bilingual responsive Marketing workspace verified on Chinese desktop and English mobile.
-- immutable script runs that freeze the exact marketing task, approved topic decision, and
-  published knowledge snapshot;
-- deterministic English TikTok generation with section timelines, voiceover, on-screen text,
-  visual direction, hashtags, and exact knowledge/trend references at zero model cost;
-- a versioned 100-point evaluator covering timeline, hook, evidence, CTA, TikTok structure, and
-  schema safety, plus a configurable revision threshold and a hard automatic-revision budget;
-- append-only generated, human-edited, and auto-revised versions with canonical SHA-256 digests;
-- mandatory final human approval before Markdown or JSON export, with immutable export receipts;
-- a bilingual responsive Create workspace for preview, structured editing, evaluation, revision,
-  final review, and local file download.
-
-Deliberately not implemented:
-
-- binary office-document OCR/import (the private path accepts bounded UTF-8 text formats);
-- a live NTE acceptance capture committed as product evidence;
-- embeddings or retrieval over approved knowledge snapshots;
-- TikTok scraping or an unverified TikTok API connection;
-- cloud LLM calls, RAG, or model-generated marketing copy (local Ollama knowledge roles are live);
-- payment processing or a “free forever” public cloud-hosting claim. Local account isolation,
-  resource quotas, and team collaboration are implemented; monetary billing would contradict the
-  confirmed strict zero-cost boundary and requires a later commercial deployment decision.
-
-The earlier README described several of these as if they already existed. They did not. The original placeholder modules remain traceable in Git history and are documented under [`legacy/`](legacy/README.md).
-
-## Product workflow (M1–M8 local)
-
-This workflow is implemented end to end. It combines official and private evidence, reviewed
-knowledge, authorized public trend inputs, explainable topic fit, script creation, guarded export,
-optional local accounts and teams, and a source-bound GDD workspace. Durable runs, typed artifacts,
-immutable versions, audit events, and explicit failure states connect every stage.
-
-The M5 production preview remains local and costs nothing to run beyond the user's own computer:
-
-```powershell
-.\scripts\production.ps1 up
-```
-
-Open `http://127.0.0.1:8080`. Use `.\scripts\production.ps1 down` to stop it. This packaging is a
-repeatable deployment artifact, not a claim that a public hosted service or payment system exists.
-Optional local accounts and teams can be enabled through the documented environment switch.
-
-The interface opens the current server-recommended task automatically. Follow the five cards in
-**Your production route** rather than switching workspaces manually. A source or extraction job
-runs in the background and remains visible above the task without redirecting the user to technical
-logs. **GDD**, **Runs**, and **Account** are optional tools, not required steps in the first NTE
-validation journey. When no game entity exists, the Knowledge task offers a one-click NTE entity
-creation path with the prepared English alias. See
-[`docs/product/guided-workspace.md`](docs/product/guided-workspace.md) for the interaction contract
-and beginner acceptance route.
-
-```mermaid
-flowchart LR
-    subgraph Sources["Evidence sources"]
-        A1["Official websites"]
-        A2["Official news and patch notes"]
-        A3["Official video transcripts"]
-        A4["Official store pages"]
-        A5["User-owned documents"]
-    end
-
-    subgraph Knowledge["Game Knowledge Hub"]
-        B1["Capture source snapshots"]
-        B2["Extract entities and claims"]
-        B3["Detect versions and conflicts"]
-        B4{"Human fact review"}
-        B5["Publish knowledge snapshot"]
-    end
-
-    subgraph Marketing["Marketing Studio"]
-        C1["Fetch real trend signals"]
-        C2["Normalize, deduplicate, cluster"]
-        C3["Rank candidates and explain fit"]
-        C4{"Human topic approval"}
-        C5["Create marketing brief"]
-        C6["Generate structured script"]
-        C7["Evaluate and revise low-score sections"]
-        C8{"Human final approval"}
-        C9["Export reusable deliverables"]
-    end
-
-    Sources --> B1
-    B1 --> B2 --> B3 --> B4
-    B4 -->|"approve"| B5
-    B4 -->|"edit or reject"| B2
-    B5 --> C3
-    C1 --> C2 --> C3 --> C4
-    C4 -->|"approve"| C5 --> C6 --> C7 --> C8
-    C4 -->|"choose another"| C3
-    C4 -->|"refresh signals"| C1
-    C8 -->|"revise"| C6
-    C8 -->|"approve"| C9
-```
-
-The graph is deliberately constrained. Specialized agent nodes operate inside a deterministic workflow; models do not form an unrestricted autonomous agent swarm. Human approval is required before topic selection and final export.
-
-For an existing game, approved public evidence becomes a sourced **Public Game Intelligence
-Profile**, not a claimed internal GDD. The implemented live connectors use bounded public Google
-News RSS and GDELT endpoints; the official YouTube connector is optional. TikTok Creative Center
-data remains manually verified or imported rather than collected through unauthorized scraping.
-
-## Implemented software architecture
-
-The modular monolith separates domain rules from FastAPI, model vendors, external source adapters,
-and PostgreSQL. The durable Harness coordinates eight bounded specialist roles through typed
-artifacts and checkpoints. Security, tenancy, quotas, destructive confirmations, and publication
-gates remain deterministic platform policy rather than model decisions. The detailed evolution is
-preserved in the migration notes; the diagram below reflects the active runtime.
-
-```mermaid
-flowchart TB
-    UI["React + TypeScript web app"]
-    API["FastAPI HTTP and SSE API"]
-    APP["Application commands and queries"]
-
-    subgraph Domain["Domain modules"]
-        DP["Projects"]
-        DK["Knowledge"]
-        DT["Trends"]
-        DC["Campaigns"]
-        DS["Scripts"]
-        DR["Runs and audit"]
-    end
-
-    subgraph AgentRuntime["Agent runtime"]
-        KG["Knowledge ingestion graph"]
-        MG["Marketing workflow graph"]
-        SK["Versioned skills and prompts"]
-        HG["Human approval gates"]
-    end
-
-    subgraph Adapters["Infrastructure adapters"]
-        MODELS["ModelGateway"]
-        TOOLS["ToolProvider"]
-        SOURCES["Source connectors"]
-        SEARCH["Full-text and vector search"]
-        STORAGE["Object storage"]
-        TRACE["Tracing and metrics"]
-    end
-
-    DB[("PostgreSQL + pgvector")]
-
-    UI --> API --> APP
-    APP --> Domain
-    APP --> AgentRuntime
-    AgentRuntime --> Adapters
-    Domain --> DB
-    Adapters --> DB
-    API -. "SSE status events" .-> UI
-```
-
-See [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md) for the knowledge-ingestion and marketing state graphs, data trust boundaries, and design rationale.
-See [`docs/migration/m1c-knowledge-workspace.md`](docs/migration/m1c-knowledge-workspace.md) for the C2.4b interface boundary and verification evidence.
-
-## Repository layout
-
-```text
-apps/
-  api/                  FastAPI application entrypoint
-  worker/               Background worker entrypoint
-  web/                  React and TypeScript frontend
-src/gamecrafter/
-  api/                  HTTP application factory and routes
-  domain/               Implemented knowledge and run business rules
-  application/          Commands, queries, and orchestration services
-  infrastructure/       Database, source, model, storage, and tracing adapters
-  config/               Validated settings
-tests/                  Unit, integration, contract, and PostgreSQL tests
-docs/                   Product, architecture, security, migration, and roadmap
-scripts/                Setup, development, and verification helpers
-legacy/                 Notes about the original placeholder shell
-```
-
-Trend, campaign, script, GDD, identity, and Agent-runtime packages are present only where they add
-executable behavior; the active tree does not keep empty capability placeholders.
-
-## Quick start
-
-For ordinary use, start Docker Desktop and run this single command from PowerShell:
-
-```powershell
-.\scripts\production.ps1 up
-```
-
-When it reports that self-check passed, open `http://127.0.0.1:8080`. After a computer restart,
-run the same command again. To inspect the four required services without changing data, run:
-
-```powershell
-.\scripts\doctor.ps1
-```
-
-The doctor explains Docker, database, API, worker, web, version and queue problems in Simplified
-Chinese and exits without modifying project or user data.
-
-### Development setup
-
-Prerequisites:
-
-- Python 3.12 or newer;
-- Node.js 22 or newer;
-- pnpm 10 or newer;
-- Docker Desktop with Linux containers.
-
-From PowerShell:
+前置环境：Python 3.12+、Node.js 22+、项目锁定版本的 pnpm、可运行 Linux 容器的 Docker。
+在项目根目录打开 PowerShell：
 
 ```powershell
 .\scripts\setup.ps1
 .\scripts\database.ps1 up
+.\.venv\Scripts\python.exe -m alembic upgrade head
 .\scripts\start.ps1
 ```
 
-`start.ps1` is the foreground development launcher: keep that terminal open and
-press Ctrl+C when you want to stop. On Windows, the services can instead be
-detached from the terminal and managed explicitly:
+开发入口默认是 [http://localhost:5173](http://localhost:5173)，API 默认是
+[http://localhost:8000/health](http://localhost:8000/health)。
+启动终端需要保持运行。重启后应先恢复数据库，再启动 API、worker 和前端。
 
 ```powershell
-.\scripts\start-background.ps1
-.\scripts\stop-background.ps1
-```
-
-The local services will be available at:
-
-- web: `http://localhost:5173`
-- API: `http://localhost:8000`
-
-For development mode after a computer restart, open Docker Desktop and run
-`.\scripts\database.ps1 up` before starting the application. The web app keeps source-discovery
-controls hidden until the project database is reachable, so a stopped database is reported as a
-connection problem instead of the misleading `Not Found` response.
-- API health: `http://localhost:8000/health`
-- database readiness: `http://localhost:8000/ready`
-
-The development launcher honors `GAMECRAFTER_API_HOST`, `GAMECRAFTER_API_PORT`, and
-`GAMECRAFTER_LOG_LEVEL`; the URLs above are the defaults from `.env.example`.
-
-Run all locally available checks:
-
-```powershell
+.\scripts\doctor.ps1
 .\scripts\verify.ps1
 ```
 
-Run the isolated NTE PostgreSQL acceptance only against a disposable localhost database. Its name
-must contain `test` or `acceptance`:
+模型名称与超时在 [.env.example](.env.example) 中说明。模型缺失或不可用时会禁用相应操作，
+保留阅读、手动编辑和可解释规则，不会伪装成成功。模型选择必须做实际质量验证，
+不能仅凭模型能下载或接口返回成功判断可用。
+
+## 可重复验证
 
 ```powershell
-$env:GAMECRAFTER_TEST_DATABASE_URL = "postgresql+psycopg://USER:PASSWORD@127.0.0.1:5432/gamecrafter_test"
-.\scripts\acceptance.ps1
+# 常规检查；未配置 PostgreSQL 时，数据库专属测试会明确跳过
+.\scripts\verify.ps1
+
+# 可选：真实本地模型烟测。只用独立 SQLite 和标明来源的测试材料，不改个人项目
+.\.venv\Scripts\python.exe scripts/creative_model_smoke.py --model qwen3.5:4b --revisions 2
+
+# 重复评审正反例；逐次保留失败，任何误判或运行错误均非零退出
+.\.venv\Scripts\python.exe scripts/creative_critic_smoke.py --model qwen3.5:9b --repeats 2
 ```
 
-The command migrates that disposable database, executes the zero-cost NTE extraction acceptance,
-and never prints the connection URL. Acceptance rows are intentionally auditable, so do not point
-the command at a personal product database.
+模型烟测记录实际模型、输入输出摘要、用量、耗时、评审和版本，但**不授予人工终审**。
+退出码 `1` 表示任务失败，`2` 表示任务执行完但模型/规则质量门未通过；`0` 也只表示这些
+自动检查通过，**仍需复读实际内容**，不代表通过人工内容验收。报告在被 Git 忽略的 `data/qa/` 中。
 
-Static HTTP capture does not require a browser download. Before a later JavaScript-rendered
-acceptance test, inspect or install the isolated Chromium headless shell explicitly:
+PostgreSQL 测试只可指向**独立测试库**；不能将生产或个人项目库设为测试 URL。
+CI 使用带 pgvector 的 PostgreSQL，验证迁移、业务约束和前后端测试。
 
-```powershell
-.\scripts\browser.ps1 status
-.\scripts\browser.ps1 install
-```
+## 文档与边界
 
-Configuration names and safe placeholders are documented in [`.env.example`](.env.example). Never commit real API keys.
-The PostgreSQL volume and raw local data are not stored in Git.
+- [M19 实现、自查、验收步骤](docs/product/real-creative-workflow.md)
+- [前端引导工作区](docs/product/guided-workspace.md)
+- [完整本地能力验收矩阵](docs/product/acceptance-matrix-complete-local.md)
+- [路线图](docs/roadmap.md)
+- [安全说明](SECURITY.md) · [本地隐私边界](docs/security/local-development.md)
+- [依赖锁定与更新](docs/security/reproducible-releases.md)
+- [历史里程碑能力记录](docs/migration/m0-m18-feature-history.md)
 
-## Documentation
-
-- [Product baseline](docs/product/baseline-v2.md)
-- [System architecture and DAGs](docs/architecture/system-architecture.md)
-- [Architecture decisions](docs/architecture/adr/)
-- [Long-term roadmap](docs/roadmap.md)
-- [M0 migration record](docs/migration/m0-restructure.md)
-- [M1-A implementation record](docs/migration/m1a-persistence-foundation.md)
-- [M1-B B1 evidence-contract record](docs/migration/m1b-source-evidence-contracts.md)
-- [M1-B B2 source-access and adapter record](docs/migration/m1b-source-access-adapters.md)
-- [M1-B B3 ingestion-handler record](docs/migration/m1b-source-ingestion-handlers.md)
-- [M1-B B4 source-workspace record](docs/migration/m1b-source-workspace.md)
-- [M1-C C1 knowledge-contract record](docs/migration/m1c-knowledge-review-contracts.md)
-- [M1-C C2.1 model-gateway record](docs/migration/m1c-model-gateway.md)
-- [M1-C C2.2 extraction-Harness record](docs/migration/m1c-extraction-harness.md)
-- [M1-C C2.3a workflow-foundation record](docs/migration/m1c-workflow-foundation.md)
-- [M1-C C2.3b durable-extraction record](docs/migration/m1c-durable-extraction.md)
-- [M1-C C2.4a Knowledge-delivery API record](docs/migration/m1c-knowledge-delivery-api.md)
-- [M1-C C2.4b Knowledge-workspace record](docs/migration/m1c-knowledge-workspace.md)
-- [M1-C C2.5 NTE PostgreSQL acceptance](docs/migration/m1c-nte-postgres-acceptance.md)
-- [M1-C C3a deterministic-conflict service](docs/migration/m1c-deterministic-conflicts.md)
-- [M1-C C3b conflict-workspace record](docs/migration/m1c-conflict-workspace.md)
-- [M1-C C4 human-review record](docs/migration/m1c-human-review.md)
-- [M1-C C5 snapshot-publication record](docs/migration/m1c-snapshot-publication.md)
-- [M2/M3 trend-fit and topic-approval record](docs/migration/m2-trend-topic.md)
-- [M4 script-delivery record](docs/migration/m4-script-delivery.md)
-- [Security baseline](docs/security/local-development.md)
-
-## Development principles
-
-- Build one real vertical slice before adding broad feature surface.
-- Keep facts, model judgments, and human decisions visually and structurally distinct.
-- Preserve source, time, version, region, and human-review evidence.
-- Treat external content as untrusted input.
-- Describe only capabilities that have actually been implemented and verified.
-- Keep the core as a modular monolith until real scaling or isolation needs justify a service split.
+账号、模型权重、原始资料、数据库、备份文件和密钥不上传 Git。
+第三方素材使用权、活动规则、投放合规与最终创作判断仍需内容负责人确认。
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+[MIT](LICENSE)。第三方模型和素材遵循各自许可。

@@ -40,3 +40,5 @@ coverage/
 playwright-report/
 test-results/
 .artifacts/
+output/playwright/
+.playwright-cli/

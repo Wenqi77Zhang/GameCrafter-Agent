@@ -1,5 +1,10 @@
 # Complete local-product acceptance matrix
 
+M19 audit correction (2026-09-11): this is a requirements matrix, **not a blanket statement that
+every environment or model has passed**. The old script template and reset-based revision did not
+meet the creative outcome. Current evidence and remaining limits are recorded in
+[real-creative-workflow.md](real-creative-workflow.md); production deployment is deferred.
+
 This matrix is the change-control source for the post-M5 completion pass. A row is complete only
 when the implementation, automated evidence, failure behavior, privacy boundary, and user-facing
 status all agree. “Zero cost” means no paid API or hosted-service dependency; it does not claim
@@ -14,10 +19,12 @@ that public Internet hosting, electricity, or optional hardware has no cost.
 | Multi-source synthesis | approved snapshot facts are grouped across exact source identities, disclosing corroborated and single-source claims | display-only deterministic rule creates no new fact and never hides single-source risk | snapshot UI test and `multi-source-synthesis-v1` disclosure |
 | Marketing | normalized/deduplicated trends, snapshot-bound fit, risks, topic decision, and one readable strategy brief with direction/topic/message/timed plan/proof facts | source/time/region remain visible; draft versus approved is explicit; no unsupported game fact or paid model call | marketing service/API/UI tests and browser strategy-brief smoke |
 | Creation | evidence-bound English TikTok script, evaluation, bounded revision, versions, final approval, Markdown/JSON export | no export before approval; automatic loops are capped | script service/API/UI tests |
+| Real creative inference | Chinese strategy and English five-beat script from frozen reviewed facts; separately invoked reviewer; actual revisions | one schema repair, capped revisions, no paid/template fallback; semantic review is fallible | creative gateway/service tests, opt-in real-model positive and negative cases |
+| Creative recovery | durable operation, stage cache, heartbeats, cancel and monotonic fencing | late output cannot replace human edits or a newer worker attempt; old checks cannot authorize export | cancellation/race/stage-resume/export-revocation tests |
 | Individual workspace | local identity, project isolation, private storage, verified export/restore, explicit deletion, bounded usage | passwords are memory-hard hashed and persistently throttled; opaque sessions; archive corruption fails before restore; destructive action requires typed confirmation | security/API isolation and recovery tests |
 | Team workspace | owner/editor/reviewer/viewer roles, invitation, role change, ownership transfer, revocation, approval authority and audit | default deny; role/revocation changes apply immediately; team projects transfer atomically; no payment processor is implied | RBAC matrix, governance and revocation tests |
 | GDD Studio | source-version-bound chapters, exact offsets, explicit assumptions, immutable revisions, shared approved knowledge | assumptions never masquerade as sourced facts; history is append-only | parser/service/API/UI tests |
-| Product UX | Simplified Chinese default, English switch, persistent five-step route, automatic current-task opening, one visible next action, secondary expert tools, responsive desktop/mobile | background jobs never strand users in logs; errors are actionable; unavailable capabilities are not rendered as healthy | TypeScript, Vitest and Playwright desktop/mobile acceptance |
+| Product UX | Simplified Chinese default, English switch, persistent five-step route, automatic current-task opening, project-wide review locator, explicit pending/submitted states, preset reasons, secondary expert tools, responsive desktop/mobile | background jobs never strand users in logs; review blockers identify their exact next action; completed decisions cannot masquerade as unfinished; unavailable capabilities are not rendered as healthy | TypeScript, Vitest and Playwright desktop/mobile acceptance |
 | Operations | one-command local production stack, migrations, health/readiness, worker observability, redacted logs | readiness distinguishes database/model/data availability; secrets and private content are not logged | full verify, production smoke and security review |
 
 ## Intentional non-features

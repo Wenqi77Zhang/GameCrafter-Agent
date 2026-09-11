@@ -1,1039 +1,156 @@
-# System architecture and workflow DAGs
+# 系统架构与工作流 DAG
 
-GameCrafter v2 uses a modular monolith with explicit domain and adapter boundaries. The design prioritizes traceability, local development, testability, and a path to future multi-tenant operation without prematurely creating distributed services.
+本页描述 M19 当前实现；旧里程碑图移至 [历史 DAG](../migration/architecture-through-m18.md)，
+不再将“未来设计”“规则工具”和“真实模型调用”混在同一张当前架构图中。
 
-## Implemented constrained multi-Agent topology
+## 1. 产品主链路
+
+```mermaid
+flowchart TD
+    S["来源工具：白名单采集 / 明确本地导入"] --> E["版本化证据 + 精确引文"]
+    E --> K["Knowledge Curator：本地模型提取"]
+    K --> R["Knowledge Reviewer：独立模型预审"]
+    R --> H1{"人工知识确认 / 冲突处理"}
+    H1 --> SNAP[("冻结知识版本")]
+    SNAP --> MATCH["趋势工具：清洗、去重、时间/地区与关键词匹配"]
+    NEWS["RSS / GDELT / 可选 YouTube / 手动 TikTok 观察"] --> MATCH
+    MATCH --> GATE{"具备可讲述的游戏事实？"}
+    GATE -->|否| MORE["补充资料 → 审核 → 新知识版本 / 营销任务"]
+    GATE -->|是| PLAN["Campaign Strategist：具体营销建议"]
+    PLAN --> PC["Quality Critic：独立策划检查"]
+    PC -->|阻断| PD["保留草稿和问题，不输入 Writer"]
+    PC -->|通过| SUGGEST["方向 / 话题 / 英语开场 / 执行与验证计划"]
+    MATCH --> H2{"人工选题"}
+    SUGGEST --> H2
+    H2 --> WRITER["Script Writer：英语分镜"]
+    WRITER --> CHECK["Quality Critic + 独立确定性规则"]
+    CHECK -->|需修改且预算剩余| REV["根据问题修订真实版本"]
+    REV --> CHECK
+    CHECK -->|需人工编辑| EDIT["逐镜编辑 / 引用选择"]
+    EDIT --> CHECK
+    CHECK -->|无阻断且全部规则通过| H3{"人工终审当前版本"}
+    H3 -->|批准| EXPORT["导出脚本与精确证据"]
+```
+
+策划是有评审状态的建议，不是自动批准的选题。Writer 只使用同一候选、通过初审的策划结果；
+没有合格策划时仍可根据已经人工批准的选题与事实写作，但不能借用被阻断的建议。
+模型初审是辅助质量关口，不能保证绝无幻觉，也不能替代最终内容负责人。
+
+## 2. 运行时结构
 
 ```mermaid
 flowchart LR
-    HUMAN["Chinese studio user"]
-    HARNESS["Durable Harness: typed jobs, gates, retries, audit"]
-    SOURCE["Source and Provenance Steward v1: deterministic"]
-    CURATOR["Knowledge Curator v2: local Ollama"]
-    REVIEWER["Knowledge Reviewer v1: independent local Ollama"]
-    TREND["Trend Analyst v1: deterministic"]
-    STRATEGY["Campaign Strategist v1.1: deterministic strategy brief"]
-    BRIEF[("Versioned marketing strategy brief")]
-    WRITER["Script Writer v1: deterministic"]
-    CRITIC["Quality and Compliance Critic v1: deterministic"]
-    GDD["GDD Architect v1: deterministic"]
-    PACK{"Human knowledge-pack confirmation"}
-    TOPIC{"Human topic choice"}
-    FINAL{"Human final export approval"}
-    STORE[("Typed immutable artifacts and audit events")]
-
-    HUMAN --> HARNESS --> SOURCE --> CURATOR --> REVIEWER --> PACK --> STORE
-    STORE --> TREND --> STRATEGY --> BRIEF --> TOPIC --> WRITER --> CRITIC --> FINAL
-    CURATOR --> STORE
-    REVIEWER --> STORE
-    TREND --> STORE
-    STRATEGY --> STORE
-    WRITER --> STORE
-    CRITIC --> STORE
-    SOURCE --> STORE
-    STORE --> GDD --> STORE
+    UI["React：默认中文 / 英文切换"] --> API["FastAPI：身份、RBAC、输入校验"]
+    API --> COMMAND["冻结上下文 + 幂等提交"]
+    COMMAND --> DB[("PostgreSQL：任务 / 创作阶段 / 版本 / 审核 / 审计")]
+    DB --> WORKER["Python Worker：租约、心跳、尝试编号"]
+    WORKER --> SOURCE["受控来源适配器"]
+    WORKER --> MODEL["本机 Ollama"]
+    SOURCE --> OBJECTS[("本地内容寻址对象存储")]
+    MODEL --> VALIDATE["Schema / 引用集合 / 时间与版本校验"]
+    VALIDATE --> DB
+    DB --> API --> UI
 ```
 
-The Harness is the orchestrator, not another Agent. Eight specialists do not hold an unconstrained
-conversation: each receives a bounded, versioned input and emits a typed artifact. The two
-knowledge roles use the loopback-only local model; the four downstream roles expose their existing
-deterministic rules as versioned specialists and never pretend that a model was called. This is a
-workflow/DAG with independent evaluator stages, not ReAct, ReWOO, or a self-modifying swarm.
+API 请求只提交创作任务，不占用一个长时间模型 HTTP 响应。
+创作进度通过有界轮询恢复；原有来源/知识审计 SSE 仍保留。
+错误保持可见，不用空白候选列表或绿色“已入队”代替完成状态。
 
-The Source Steward owns bounded collection and provenance contracts; the GDD Architect performs
-exact-offset structural parsing and keeps design assumptions outside factual knowledge. Identity,
-RBAC, quotas, hashing, deletion, and integrity checks remain deterministic platform policy rather
-than being delegated to an Agent that could improvise a security decision.
+## 3. 谁是 Agent，谁不是
 
-The reviewer writes `agent_approved`, `agent_rejected`, or `needs_human` into a ledger separate
-from human reviews. Suggested predicate changes always route to a person. Deterministic governance
-removes exact duplicates and caps the proposed pack at 15 approved facts after all review batches.
-One explicit human command may confirm the clear keep/remove suggestions; ambiguous items, topic
-selection, and final export remain individual human gates.
+| 角色 | 当前方式 | 输出或职责 |
+|---|---|---|
+| Knowledge Curator | 模型 | 候选事实与精确证据位置 |
+| Knowledge Reviewer | 独立模型调用 | 保留 / 排除 / 待人工建议，不写人工批准 |
+| Campaign Strategist | 模型 | 有证据约束的营销方案 |
+| Script Writer | 模型 | 五镜英语脚本，或按评审问题修订 |
+| Quality Critic | 独立模型调用 | 逐段支持性判断、理由、证据原句；控制层生成问题定位和安全修改提示 |
+| 来源与溯源 | 确定性工具 | URL / DNS / robots / 采集预算 / 版本 |
+| 趋势分析 | 确定性工具 | 清洗、去重、时效和匹配解释 |
+| GDD 整理 | 确定性工具 | 结构解析、章节和人工假设管理 |
 
-Campaign Strategist 1.1 projects the highest-ranked or approved topic into
-`marketing-strategy-brief-v1`. The read model combines only frozen task constraints, ranked trend
-evidence, and approved snapshot facts. It exposes a direction, topic, message, timed execution plan,
-proof facts, alternatives, risks, human decision, and direct Script Writer handoff without adding a
-model call or inventing new game facts.
+这意味着 **5 个模型角色 + 3 个工具角色**，不是 8 个大模型相互聊天。
+同一个本地模型可以承担多个角色，角色独立指输入与调用独立，不代表多个独立模型
+就能消除共同偏差。审核结果仍可能错误。
 
-## System context
+Harness 是模型之外的 Python 控制逻辑：身份、权限、执行次数、I/O 范围、幂等、取消、
+来源完整性、版本比较与发布许可均不能被模型修改。
+现有知识图工作流与创作任务共用持久化基座；没有为了使用框架而另起一套分布式队列。
+
+### 创作审核内部 DAG（v10）
 
 ```mermaid
-flowchart LR
-    USER["Independent game developer"]
-    WEB["GameCrafter web workspace"]
-    API["GameCrafter API"]
-    MODEL["Configured model provider"]
-    OFFICIAL["Official game sources"]
-    TREND["Public trend sources"]
-    FILES["User-owned local documents"]
-    EGRESS{"Model egress policy gate"}
-    DB[("Local PostgreSQL and object storage")]
-
-    USER --> WEB --> API
-    API --> OFFICIAL
-    API --> TREND
-    FILES -->|"explicit local import"| API
-    API --> EGRESS --> MODEL
-    API --> DB
-    API -. "progress and evidence" .-> WEB
+flowchart TD
+    D["实际文案字段：标题 / 字幕 / 口播 / 画面 / 策划"] --> T["确定性枚举：最长 600 字符，最多 96 段"]
+    F["冻结事实 + 实体修订 + 地区/语言/版本"] --> B["每批最多 8 段，独立模型核查"]
+    T --> B
+    B --> V{"所有 text_id 覆盖且引文逐字属于指定已审核值？"}
+    V -->|失败| REPAIR["最多一次格式修复，仍失败则保留原稿并报错"]
+    V -->|通过| RESULT["SUPPORTED / UNSUPPORTED / NOT_A_FACT + 理由"]
+    RESULT --> UI["需核对 / 全部；原句、证据与范围；定位编辑"]
+    RESULT --> G["汇总阻断问题 + 独立格式/语速规则"]
+    G --> H["有界修订或人工编辑 → 重新检查 → 人工终审"]
 ```
 
-External pages, trend responses, model responses, and imported documents cross a trust boundary. They are treated as untrusted data, validated, versioned, and prevented from directly controlling tools. Before any model call, the egress gate shows which data will leave the machine, applies provider policy, and redacts secrets or unnecessary private content.
+覆盖检查是确定性的，事实蕴涵判断仍来自模型：逐字引用存在不代表文案确实被引用支持。
+不显示“事实准确率”，也不把 `NOT_A_FACT` 当作已核实事实。长句按字段/长度切段，
+尚未实现逐个原子断言拆分；复合句、泛化和地区迁移仍有实测漏报。
+实体名称取知识快照绑定的实体修订，不读取后来更名后的当前名称；旧快照继续保留旧语义。
 
-## Implemented M1-A to M13-local runtime
-
-```mermaid
-flowchart LR
-    USER["Local user"]
-    WEB["React Sources, Knowledge, GDD, Marketing, Create, Runs, and Account workspace"]
-    API["FastAPI"]
-    COMMAND["Validated workspace commands and queries"]
-    RUNS[("workflow_runs")]
-    JOBS[("workflow_jobs")]
-    AUDIT[("audit_events")]
-    WORKER["Python worker"]
-    HANDLER["Registered source and knowledge handlers"]
-    IDENTITY["Opaque sessions and owner/editor/reviewer/viewer RBAC"]
-    HEARTBEAT[("runtime_heartbeats")]
-    OPERATIONS["Privacy-safe operations status"]
-
-    USER --> WEB --> API
-    API -->|"sources, candidates, runs"| WEB
-    API -->|"entities, versions, capability, claims"| COMMAND
-    API -. "resumable SSE audit events" .-> WEB
-    API -->|"database readiness"| RUNS
-    API --> COMMAND
-    WEB --> IDENTITY --> API
-    COMMAND -->|"atomic idempotent enqueue"| RUNS
-    COMMAND --> JOBS
-    JOBS -->|"lease with bounded retry"| WORKER
-    WORKER -->|"registered discovery and capture jobs"| HANDLER
-    WORKER -->|"checkpoint and terminal state"| RUNS
-    WORKER -->|"append-only event"| AUDIT
-    WORKER -->|"bounded latest liveness"| HEARTBEAT
-    HEARTBEAT --> OPERATIONS --> WEB
-    JOBS -->|"aggregate counts and expired leases"| OPERATIONS
-```
-
-The worker-to-handler arrow is implemented in M1-B B3; the commands, queries, and event delivery are
-implemented in B4. C2.3a renames the substrate without replacing rows and adds `workflow_kind` to
-make each run's business purpose explicit. PostgreSQL owns project, candidate, run, job, and audit
-consistency. The worker never claims a website or model capability until its typed handler is
-implemented and registered. C2.4a adds Knowledge delivery queries and correction commands; C2.4b
-connects them to a bilingual, responsive interface without weakening the human-review boundary.
-
-## Historical M1-B B1 evidence-contract stage
+## 4. 失败与恢复
 
 ```mermaid
-flowchart LR
-    PROJECT["Project"]
-    RUN["Workflow run: source ingestion kind"]
-    CANDIDATE["Discovery candidate"]
-    FAMILY["Multilingual content family"]
-    SOURCE["Canonical source"]
-    VERSION["Immutable source version"]
-    ASSET["Evidence asset link"]
-    OBJECT["Content-addressed stored object"]
-    PORT["ObjectStorage port"]
-    LOCAL["Private local filesystem adapter"]
-
-    PROJECT --> RUN --> CANDIDATE
-    PROJECT --> FAMILY
-    PROJECT --> SOURCE
-    FAMILY -->|"optional grouping"| SOURCE
-    CANDIDATE -. "implemented later by B3/B4" .-> SOURCE
-    SOURCE --> VERSION --> ASSET --> OBJECT
-    PORT --> LOCAL
-    OBJECT -. "physical capture implemented later by B3" .-> PORT
-```
-
-This diagram records the original B1 contract-only stage; B3/B4 and M6 now implement the dotted
-capabilities. PostgreSQL prevents updates to stored-object metadata, source versions, and evidence
-links; a meaningful change must create a new version. Project deletion removes only unreferenced
-objects after dependency-aware database deletion.
-
-## Implemented M1-B B2 controlled source boundary
-
-```mermaid
-flowchart LR
-    INPUT["User URL or approved listing URL"]
-    CANON["Canonicalize HTTPS URL"]
-    ALLOW{"Exact host and path allowlist"}
-    DNS{"All resolved IPs are public"}
-    ROBOTS["robots.txt policy port"]
-    BUDGET["Request budget and scheduling settings"]
-    HTTP["Bounded HTTP fetcher"]
-    REDIRECT{"Revalidate every redirect"}
-    RESPONSE{"Status, media type, and byte limits"}
-    FALLBACK{"Approved homepage fallback?"}
-    BROWSER["Isolated Playwright context"]
-    ADAPTER["Deterministic NTE adapter"]
-    RESULT["Adapted source or discovery candidates"]
-    REJECT["Reject without capture"]
-
-    INPUT --> CANON --> ALLOW
-    ALLOW -->|"no"| REJECT
-    ALLOW -->|"yes"| DNS
-    DNS -->|"unsafe"| REJECT
-    DNS -->|"safe"| ROBOTS
-    ROBOTS -->|"enforced by B3 handler"| BUDGET
-    BUDGET -->|"scheduled by B3 worker"| HTTP
-    HTTP --> REDIRECT --> RESPONSE
-    RESPONSE -->|"valid HTML"| ADAPTER --> RESULT
-    RESPONSE -->|"static page insufficient"| FALLBACK
-    FALLBACK -->|"no"| REJECT
-    FALLBACK -->|"yes"| BROWSER --> RESPONSE
-```
-
-All access-flow arrows are wired by B3. HTTP is the default. Browser rendering is allowed only for
-explicitly listed NTE homepage paths, runs in a fresh context, blocks downloads, popups, service
-workers, and cross-host requests, and still applies the same final-URL and response-size boundary.
-
-The first adapters accept only `nte.perfectworld.com` global pages under `en`, `cn`, or `jp`, plus
-`yh.wanmei.com` mainland pages. Listing pages can produce reviewable candidates but cannot be
-directly imported as evidence. Homepage and article URLs are assigned deterministic locale, region,
-source type, raw category, and classification-basis metadata. A date segment in an article URL is
-kept only as a family-grouping signal; it is not asserted as the publication date.
-
-## Implemented M2-M4 marketing and script DAG
-
-```mermaid
-flowchart LR
-    SNAPSHOT["Immutable approved knowledge snapshot"]
-    SIGNAL["Human-verified public trend observation"]
-    FIT["trend-fit-v1 deterministic scoring"]
-    TOPIC{"Human topic gate"}
-    RUN["Frozen script run inputs and rule versions"]
-    GENERATE["tiktok-template-v1 generator"]
-    VERSION[("Append-only script version + SHA-256")]
-    EVALUATE["script-quality-v1 evaluator"]
-    PASS{"Score reaches frozen threshold?"}
-    BUDGET{"Revision budget remains?"}
-    REVISE["User-triggered deterministic revision"]
-    EDIT["Validated human edit"]
-    FINAL{"Final human gate"}
-    EXPORT[("Markdown or JSON + digest receipt")]
-    STOP["Stop and retain trace"]
-
-    SNAPSHOT --> FIT
-    SIGNAL --> FIT --> TOPIC
-    TOPIC -->|"approve exact candidate"| RUN --> GENERATE --> VERSION --> EVALUATE --> PASS
-    TOPIC -->|"reject or defer"| STOP
-    VERSION --> EDIT --> VERSION
-    PASS -->|"no"| BUDGET
-    BUDGET -->|"yes and user requests"| REVISE --> VERSION
-    BUDGET -->|"no"| STOP
-    PASS -->|"yes"| FINAL
-    FINAL -->|"reject"| EDIT
-    FINAL -->|"approve exact version"| EXPORT
-```
-
-This is a constrained perceive-reason-action pattern, not a conversational Agent swarm. Perception
-is the immutable knowledge/trend input, reasoning is deterministic fit and evaluation, action is a
-versioned script command, and learning is deliberately limited to append-only human feedback and
-future offline rule improvement. Runtime rules do not self-modify. PostgreSQL verifies cross-row
-lineage and immutability even if an API or UI client is bypassed.
-
-## Implemented M5 experience and operations layer
-
-```mermaid
-flowchart LR
-    USER["Beginner user"]
-    JOURNEY["Five-step guided journey"]
-    OVERVIEW["Project overview read model"]
-    METRICS["Evidence, trend, version, run, and cost metrics"]
-    RUNS["Durable run timeline"]
-    RETRY{"Human fixes visible cause and retries?"}
-    QUEUE["Same bounded PostgreSQL queue"]
-    RAW["Immutable verified trend observations"]
-    PROCESS["trend-processing-v1 normalize, dedupe, cluster, freshness"]
-    PROD["Nginx + API + worker + PostgreSQL production preview"]
-
-    USER --> JOURNEY --> OVERVIEW --> METRICS
-    JOURNEY --> RUNS --> RETRY
-    RETRY -->|"explicit command + audit event"| QUEUE
-    RAW --> PROCESS --> JOURNEY
-    PROD --> JOURNEY
-```
-
-The overview is a read model, not a second workflow engine. It derives stage completion from real
-persisted artifacts. Trend processing never rewrites the raw observation and discloses its rule
-version, fingerprint, duplicate lineage, cluster key/size, and current freshness label. Manual
-retry resets only failed jobs after a terminal state, is idempotent by command key, and appends
-`run.retried`; it cannot retry successful, running, or cancelled work.
-
-## Implemented M6-M8 local product layer
-
-```mermaid
-flowchart LR
-    ACCOUNT["Local account: scrypt password + opaque session"]
-    TEAM["Team RBAC and revocable invitations"]
-    PROJECT["Tenant-isolated project"]
-    EXPORT["Portable ZIP with records + verified objects"]
-    DELETE{"Typed irreversible confirmation"}
-    LOCAL["Private document, transcript, or owned GDD"]
-    VERSION["Immutable local evidence version"]
-    GDD["GDD Architect exact-offset chapters"]
-    ASSUME{"Explicit human assumption decision"}
-    REVISION["Immutable approved GDD revision"]
-
-    ACCOUNT --> TEAM --> PROJECT
-    PROJECT --> EXPORT
-    PROJECT --> DELETE
-    LOCAL --> VERSION --> GDD --> ASSUME --> REVISION
-    REVISION --> PROJECT
-```
-
-M6 is local-first rather than a hosted billing claim: it provides identity, isolation, resource
-quotas, private storage, full project export, project deletion, and guarded account deletion with
-no paid identity service. M7 provides immediate revocation and four roles; security and integrity
-rules are enforced by middleware and database services, not by an LLM. M8 binds every chapter to
-one immutable GDD source version and exact character offsets, stores assumptions in a separate
-ledger, blocks publication while assumptions are undecided, and versions a canonical manifest.
-
-## Implemented M1-B B3 ingestion and persistence flow
-
-```mermaid
-flowchart TB
-    subgraph Discovery["Human-triggered discovery run"]
-        D1["Explicit approved listing URLs"]
-        D2["Validate mode, filters, and limits"]
-        D3["robots and scheduled HTTP"]
-        D4["Deterministic adapter discovery"]
-        D5[("Reviewable discovery candidates")]
-        D1 --> D2 --> D3 --> D4 --> D5
+sequenceDiagram
+    participant U as 用户
+    participant A as API
+    participant Q as 数据库
+    participant W as Worker
+    participant M as 本地模型
+    U->>A: 写作 / 评审 / 修订
+    A->>Q: 原子保存冻结输入、摘要、任务
+    A-->>U: 202 + 可恢复任务 ID
+    W->>Q: 领取带尝试编号的租约
+    W->>M: 有界结构化调用
+    W->>Q: 校验后保存阶段与真实用量
+    Note over W,Q: 定期续租；重试复用已完成阶段
+    W->>M: 独立评审
+    W->>Q: 检查任务未取消、尝试未过期、脚本未被修改
+    alt 所有权与版本仍匹配
+        W->>Q: 原子保存新版本、检查结果与审计
+    else 取消或并发编辑
+        W->>Q: 不写迟到结果，不覆盖人工内容
     end
-
-    subgraph Capture["Direct import or later selected-candidate run"]
-        C1["Resolve direct URL or same-project selected candidate"]
-        C2["Policy, robots, budget, and host schedule"]
-        C3["Conditional HTTP capture"]
-        C4{"Static homepage evidence sufficient?"}
-        C5["Controlled Playwright fallback"]
-        C6["Visible-text and image-reference extraction"]
-        C7["Bounded same-host image capture"]
-        C8["Content-addressed object writes"]
-        C9["Transactional source, version, and asset write"]
-        C10{"Existing evidence fingerprint?"}
-        C11["Reuse prior immutable version"]
-        C12["Create initial or meaningful version"]
-        C1 --> C2 --> C3 --> C4
-        C4 -->|"yes"| C6
-        C4 -->|"no and explicitly allowed"| C5 --> C6
-        C6 --> C7 --> C8 --> C9 --> C10
-        C10 -->|"yes"| C11
-        C10 -->|"no"| C12
-    end
-
-    D5 -->|"B4 atomic human selection command"| C1
-    C11 --> AUDIT[("Append-only audit event")]
-    C12 --> AUDIT
+    U->>A: 刷新或重新打开
+    A->>Q: 读取保存的任务状态
+    A-->>U: 当前阶段 / 问题 / 重试入口
 ```
 
-Discovery and capture are deliberately separate durable runs. A candidate may be captured only
-after it is selected and belongs to the capture run's project; this preserves the human gate
-without trying to reopen an already completed discovery run. Direct URL import is itself an
-explicit human action. No scheduled or recursive crawl exists.
-
-## Implemented M1-B B4 delivery and observability
-
-```mermaid
-flowchart LR
-    HUMAN["Local human user"]
-    SOURCES["Sources interface"]
-    RUNSUI["Runs interface"]
-    COMMAND{"Validated command"}
-    IDEMP{"Matching idempotency key?"}
-    SELECT{"Candidate still discovered?"}
-    TX["Atomic candidate, run, job, audit transaction"]
-    WORKER["B3 worker"]
-    AUDIT[("Append-only audit events")]
-    SSE["SSE with Last-Event-ID"]
-
-    HUMAN --> SOURCES --> COMMAND --> IDEMP
-    IDEMP -->|"existing matching request"| RUNSUI
-    IDEMP -->|"new request"| SELECT
-    SELECT -->|"yes or direct URL"| TX --> WORKER --> AUDIT --> SSE --> RUNSUI
-    SELECT -->|"no"| HUMAN
-    RUNSUI -->|"select run or reconnect"| SSE
-```
-
-Candidate selection and run enqueue commit together. Conflicting idempotency-key reuse and stale
-candidate selection are rejected rather than silently creating ambiguous work. SSE reads only
-project/run audit records, uses a durable cursor, and never sends raw evidence bytes or credentials.
-The interface defaults to Simplified Chinese because the product users are often Chinese studios;
-English is an explicit remembered preference even though the first marketing target is English
-TikTok.
-
-The version fingerprint covers the parser version, normalized text, and captured image digests.
-Byte-identical or semantically unchanged recaptures reuse the existing version. Changed text or an
-evidence image creates a new immutable version linked to its predecessor. Raw HTML remains stored
-for replay even though incidental markup-only changes do not automatically create versions.
-
-## Knowledge-ingestion state graph
-
-```mermaid
-stateDiagram-v2
-    [*] --> SourceSubmitted
-    SourceSubmitted --> PolicyCheck
-    PolicyCheck --> Rejected: disallowed scheme, host, or type
-    PolicyCheck --> CaptureRequested: accepted
-    CaptureRequested --> SnapshotCaptured: success
-    CaptureRequested --> IngestionFailed: timeout, rate limit, or fetch error
-    SnapshotCaptured --> ContentParsed: parse and validation succeed
-    SnapshotCaptured --> Quarantined: unsafe or non-retryable parse failure
-    IngestionFailed --> SourceSubmitted: retry from checkpoint within budget
-    IngestionFailed --> Quarantined: cancel or retry budget exhausted
-    ContentParsed --> ClaimsExtracted
-    ClaimsExtracted --> EvidenceLinked
-    EvidenceLinked --> AgentReview
-    AgentReview --> HumanReview: needs human or taxonomy correction
-    AgentReview --> PackConfirmation: clear keep or remove suggestions
-    PackConfirmation --> ConflictCheck
-    ConflictCheck --> HumanReview: conflicting claims
-    HumanReview --> ClaimsExtracted: edit and re-extract
-    HumanReview --> Rejected: reject
-    HumanReview --> SnapshotPublished: approve
-    SnapshotPublished --> [*]
-    Rejected --> [*]
-    Quarantined --> [*]
-```
-
-Key rules:
-
-- raw snapshots are immutable;
-- processed documents record parser and schema versions;
-- claims preserve source, time, region, version, and evidence spans;
-- uncertain or conflicting claims do not become approved facts automatically;
-- marketing runs reference a frozen knowledge snapshot, not mutable live records.
-- retry counts, terminal failures, and quarantine reasons remain visible in the run record.
-
-## Implemented M1-C C1 reviewable knowledge lineage
-
-```mermaid
-flowchart LR
-    PROJECT["Project"]
-    ENTITY["Controlled entity"]
-    CLAIM["Immutable model claim"]
-    EVIDENCE["Exact source-version evidence span"]
-    REVIEW{"Append-only human review"}
-    CONFLICT["Deterministic conflict group"]
-    SNAPSHOT["Immutable knowledge snapshot"]
-    MEMBER["Snapshot member with exact approving review"]
-
-    PROJECT --> ENTITY --> CLAIM
-    CLAIM --> EVIDENCE
-    CLAIM --> REVIEW
-    CLAIM --> CONFLICT
-    REVIEW -->|"approve or approve with edit"| MEMBER
-    CONFLICT -->|"open blocks publication"| MEMBER
-    SNAPSHOT --> MEMBER
-```
-
-The claim is never updated into a fact. Its model value, evidence, model name, prompt version,
-schema version, locale, region, effective time, and game version remain immutable. A human decision
-is a separate append-only record; an approved edit stores the exact accepted value without erasing
-the model output. Snapshot membership references that specific approving review.
-
-PostgreSQL triggers reject approval without evidence, reject cross-project review or snapshot
-lineage, reject snapshot membership while a claim belongs to an open conflict group, and prevent
-changes to published knowledge lineage. Application commands in C3 and C4 will explain these gates
-before transaction execution and will prevent empty snapshots.
-
-## Implemented M1-C C2.1 zero-cost model boundary
-
-```mermaid
-flowchart LR
-    REQUEST["Bounded normalized text plus subject type and display labels"]
-    PORT["Application ModelGateway port"]
-    DISABLED["Disabled gateway"]
-    REPLAY["Exact offline Replay gateway"]
-    OLLAMA["Loopback-only local Ollama gateway"]
-    OPENAI["Dependency-injected OpenAI Responses adapter"]
-    SCHEMA["Strict structured claim schema"]
-    EVIDENCE["Exact quote, range, and identity-name validator"]
-    CANDIDATE["Framework-independent candidate claims"]
-
-    REQUEST --> PORT
-    PORT --> DISABLED
-    PORT --> REPLAY --> SCHEMA
-    PORT --> OLLAMA --> SCHEMA
-    PORT -. "implemented but not composed or called" .-> OPENAI --> SCHEMA
-    SCHEMA --> EVIDENCE --> CANDIDATE
-```
-
-The application port owns provider-neutral requests, fingerprints, validated results, token usage,
-and safe failure types. Infrastructure adapters depend inward on that port. The disabled adapter
-fails closed. Replay accepts a fixture only when its key matches the exact source version, text,
-offset, subject, locale, region, prompt version, and schema version. The Ollama adapter accepts an
-injected transport that is restricted to a loopback HTTP endpoint. It requests JSON Schema output,
-records local token counts, and deterministically corrects offset arithmetic only when the returned
-exact quote has a unique or safely anchored position. Internal entity keys never enter the model
-payload. Display labels scope the task but cannot serve as evidence. An invalid individual
-candidate is dropped; valid candidates from the same or later chunks remain eligible.
-
-The OpenAI adapter constructs a Responses request with strict JSON Schema, `store: false`, bounded
-output, low reasoning effort, and no source identifier, URL, path, secret, raw HTML, image, or log
-content. C2.1 injects a simulated client in tests; it does not install the OpenAI SDK, read an API
-key, create a live client, or make a network call. Runnable cloud composition and egress preflight
-remain later work, and the confirmed strict zero-cost policy prohibits cloud execution.
-
-Both replay and provider output pass the same decoder. A candidate is rejected unless every quote
-exactly equals its cited chunk range, its declared value kind matches its JSON value, and its
-predicate belongs to the controlled vocabulary. Game and character identity values must also occur
-inside their cited quotes. Chunk-relative ranges become source-version
-absolute ranges before leaving the adapter.
-
-## Implemented M1-C C2.2 deterministic extraction Harness
-
-```mermaid
-flowchart LR
-    DOCUMENT["Immutable normalized source text"]
-    CHUNKER["unicode-boundary-v1 chunker"]
-    CHUNKS["Ordered exact 4,000/400 slices"]
-    REQUESTS["Fingerprint-bound requests without internal entity keys in model payloads"]
-    GATEWAY["Exact replay or local Ollama gateway"]
-    VALIDATE["Per-candidate schema, evidence, and identity validation"]
-    DEDUPE["Stable predicate/value/evidence deduplication"]
-    MANIFEST["Document result and invocation manifest"]
-    FAIL["Safe whole-document failure"]
-
-    DOCUMENT --> CHUNKER --> CHUNKS --> REQUESTS --> GATEWAY --> VALIDATE --> DEDUPE --> MANIFEST
-    REQUESTS -. "provider failure, invalid envelope, or fingerprint mismatch" .-> FAIL
-```
-
-The chunker never trims or normalizes its input. It prefers paragraph, newline, and sentence
-boundaries, then hard-splits only when necessary. Chunk ranges use Python Unicode code-point
-indices and each chunk ID binds the chunker version, configuration, order, offsets, and exact text.
-
-The Harness is a single sequential Knowledge Curator orchestration service, not a ReAct loop or
-multi-Agent conversation. Stable ordering makes replay and debugging reproducible. Any chunk
-failure suppresses partial output, and the public error omits source text and provider messages.
-Successful results retain chunk IDs, request fingerprints, provider/model/response identifiers,
-usage, and claim counts. Overlap duplicates are removed only when predicate, value kind, value,
-and absolute evidence are identical; the first deterministic result is retained.
-
-The committed NTE fixture freezes a minimal English official-homepage description with URL,
-capture time, public-material notice, source-text digest, and exact request fingerprint. Its test
-blocks socket connections, proving the replay path does not require a model SDK, API key, provider
-network request, or token spend. It is a test snapshot of public material, not an internal GDD or
-live-site acceptance evidence.
-
-## Implemented M1-C C2.3a generic workflow substrate
-
-```mermaid
-flowchart LR
-    COMMAND["Existing or future application command"]
-    RUN[("workflow_runs: workflow_kind and checkpoint")]
-    JOB[("workflow_jobs: task_type and lease")]
-    WORKER["Shared bounded-retry Python worker"]
-    SOURCE["source.discover or source.capture"]
-    KNOWLEDGE["knowledge.extract in C2.3b"]
-    MARKETING["marketing workflows in later milestones"]
-    AUDIT[("append-only audit_events")]
-
-    COMMAND -->|"atomic idempotent enqueue"| RUN --> JOB --> WORKER
-    WORKER --> SOURCE
-    WORKER -. "registered later" .-> KNOWLEDGE
-    WORKER -. "registered later" .-> MARKETING
-    WORKER -->|"checkpoint, retry, terminal state"| RUN
-    WORKER --> AUDIT
-```
-
-C2.3a is an infrastructure generalization, not durable extraction. The migration renames the
-existing tables in place, preserves identifiers and all foreign-key lineage, backfills each legacy
-run's `workflow_kind` from its earliest job, and retains `system.unknown` only for legacy runs that
-have no job. Upgrade/downgrade tests cover run, job, audit, and extraction-claim references. The
-existing `/runs` route and source UI retain `task_type` compatibility while exposing the new generic
-kind. One queue prevents source ingestion, knowledge extraction, and later marketing execution from
-developing incompatible retry, checkpoint, and observability semantics.
-
-## Implemented M1-C C2.3b durable extraction closure
-
-```mermaid
-flowchart LR
-    HUMAN["Explicit local command"]
-    PREFLIGHT{"Disabled or exact replay?"}
-    RUN[("workflow run and leased job")]
-    TARGET["Project-bound source version and subject"]
-    OBJECT["Verified normalized-text object"]
-    HARNESS["Sequential Knowledge Curator Harness"]
-    TRACE[("Redacted invocation lifecycle")]
-    TX{"Atomic result transaction"}
-    CLAIMS[("Immutable candidate claims and exact evidence")]
-    RESULT[("Immutable extraction result marker")]
-    AUDIT[("Append-only audit event")]
-    READ["Project-scoped result and claim APIs"]
-    STOP["Safe terminal failure"]
-
-    HUMAN --> PREFLIGHT
-    PREFLIGHT -->|"exact local replay"| RUN --> TARGET --> OBJECT --> HARNESS
-    PREFLIGHT -->|"disabled, missing, or mismatched"| STOP
-    OBJECT -. "size, digest, UTF-8, or lineage mismatch" .-> STOP
-    HARNESS --> TRACE
-    HARNESS --> TX
-    HARNESS -. "any chunk failure" .-> STOP
-    TX --> CLAIMS
-    TX --> RESULT
-    TX --> AUDIT
-    CLAIMS --> READ
-    RESULT --> READ
-```
-
-The API validates the project, immutable source version, subject, fixture provenance, source digest,
-and deterministic request coverage before enqueue. The worker repeats all authoritative checks and
-reads bytes only through `ObjectStorage`. Per-attempt invocation rows contain hashes, offsets,
-provider/model/response identifiers, usage, counts, timestamps, and safe error codes; they never
-contain prompt, source, response, secret, or object-path bodies.
-
-Claims, evidence spans, the result marker, and the success audit event commit together. A result
-marker makes later delivery of the same run a no-op, while attempts that stop before that commit
-remain observable. PostgreSQL triggers keep run, source, subject, and project lineage aligned and
-make the result marker immutable. C2.3b remains one deterministic specialist node: it does not add
-ReAct, self-learning, agent-to-agent conversation, or an MCP service.
-
-## Implemented M1-C C2.4a-C2.4b Knowledge delivery workspace
-
-```mermaid
-flowchart LR
-    HUMAN["Local user"]
-    ENTITY_API["Entity create, correct, archive APIs"]
-    STABLE[("Immutable entity identity")]
-    REVISIONS[("Append-only label revisions")]
-    VERSION_API["Latest-first source-version API"]
-    VERSIONS[("Immutable evidence versions")]
-    CAPABILITY{"Exact replay available?"}
-    EXTRACT["Existing knowledge.extract command"]
-    CLAIM_API["Filtered candidate-claim API"]
-    EVIDENCE["Stored quote and source metadata"]
-    UI["Knowledge workspace"]
-    PROGRESS["Persisted run and audit progress"]
-    RUNS_UI["Full Runs trace"]
-    SOURCES_UI["Add-source shortcut"]
-
-    HUMAN --> ENTITY_API
-    ENTITY_API --> STABLE
-    ENTITY_API --> REVISIONS
-    HUMAN --> VERSION_API --> VERSIONS
-    STABLE --> CAPABILITY
-    VERSIONS --> CAPABILITY
-    CAPABILITY -->|"available"| EXTRACT
-    CAPABILITY -->|"safe reason code"| UI
-    CAPABILITY -->|"available"| UI --> EXTRACT
-    EXTRACT --> PROGRESS --> UI
-    PROGRESS --> RUNS_UI
-    EXTRACT --> CLAIM_API --> EVIDENCE --> UI
-    REVISIONS --> UI
-    VERSION_API --> UI
-    UI -->|"no evidence"| SOURCES_UI
-```
-
-Entity IDs, project ownership, type, and canonical keys remain stable. A correction appends a new
-display-name/alias revision; it never updates or relocates existing claims. Archival appends one
-terminal revision and archived subjects cannot start extraction. The migration backfills one
-baseline revision for every existing entity, and PostgreSQL makes all revision rows immutable.
-
-The capability endpoint is read-only and reports disabled, missing, invalid, target-mismatched,
-fixture-incomplete, or available states without exposing local paths or constructing a live model
-client. Source-version reads default naturally to the latest item while retaining every historical
-version. Candidate claims can be filtered by subject or extraction run and include the exact stored
-quote plus source URL, title, locale, region, fetch time, and version number rendered by the C2.4b
-evidence panel.
-
-The Knowledge workspace defaults to the latest usable source version while keeping historical
-versions selectable. It creates or corrects game identities, shows safe capability reason codes,
-starts the existing durable extraction command, derives its four-stage display from persisted run
-and audit records, and links to the complete Runs trace. Claims remain explicitly labelled as AI
-candidates that have not been reviewed. Missing evidence leads back to Sources. No review or
-publication command is introduced here, so the interface cannot visually promote a candidate into
-an approved fact.
-
-## Implemented M1-C C2.5 NTE PostgreSQL acceptance
-
-```mermaid
-flowchart LR
-    FIXTURE["Reviewed public NTE snapshot"]
-    REBIND["Unique acceptance source version and entity key"]
-    SAFE{"Disposable localhost test database?"}
-    MIGRATE["Alembic upgrade to head"]
-    COMMAND["Idempotent knowledge.extract command"]
-    QUEUE[("PostgreSQL leased queue")]
-    REPLAY["Exact offline replay: zero tokens"]
-    ATOMIC[("Claims, exact evidence, result, audit")]
-    READS["Redacted result and provenance reads"]
-
-    SAFE -->|"yes"| MIGRATE --> REBIND
-    SAFE -->|"no"| REJECT["Reject before migration or test"]
-    FIXTURE --> REBIND --> COMMAND --> QUEUE --> REPLAY --> ATOMIC --> READS
-```
-
-The acceptance uses a unique project, source version, entity, command key, and filesystem object
-root. The reviewed fixture output is rebound to the exact unique request fingerprint in test code;
-no approximate match or live model fallback is allowed. PostgreSQL must persist one job, one
-zero-token invocation, two candidate Claims, two evidence spans, the immutable result marker, and
-the completion audit events. Every returned quote must exist in the normalized snapshot and carry
-the same source-version lineage.
-
-The local runner accepts only localhost URLs whose database name contains `test` or `acceptance`.
-Rows are not silently deleted because audit history is part of the contract. This proves the
-production PostgreSQL path for the reviewed NTE snapshot, but it is not current live-site capture
-evidence and is labelled accordingly.
-
-## Implemented M1-C C3a deterministic conflict reconciliation
-
-```mermaid
-flowchart LR
-    COMMAND["Explicit reconcile command"]
-    LOCK["Project row lock"]
-    CLAIMS["Immutable candidate Claims"]
-    SCOPE["Group by subject, predicate, scope fingerprint"]
-    DISTINCT{"Two or more normalized values?"}
-    CARDINALITY{"Single-valued predicate in policy v1?"}
-    CONFLICT["conflicting"]
-    COEXIST["possibly_coexisting"]
-    CLOSED{"Existing group is human-closed?"}
-    MEMBERS[("Idempotent group and members")]
-    AUDIT[("Reconciliation audit event")]
-    READS["Project-scoped candidates and exact evidence"]
-
-    COMMAND --> LOCK --> CLAIMS --> SCOPE --> DISTINCT
-    DISTINCT -->|"no"| AUDIT
-    DISTINCT -->|"yes"| CLOSED
-    CLOSED -->|"yes: report, do not reopen"| AUDIT
-    CLOSED -->|"no"| CARDINALITY
-    CARDINALITY -->|"yes"| CONFLICT --> MEMBERS
-    CARDINALITY -->|"no or uncertain"| COEXIST --> MEMBERS
-    MEMBERS --> AUDIT --> READS
-```
-
-The classifier is deterministic and versioned as `claim-conflict-v1`. It never reads model
-confidence, calls a model, chooses a winner, or creates an approved fact. Only game name, release
-status/date, and primary genre are considered single-valued inside an already exact scope. All
-other predicates are conservatively marked as possibly coexisting for human review.
-
-The project lock serializes concurrent reconciliation. Existing unique keys and missing-member
-checks make retries idempotent. A resolved or dismissed group is never silently reopened when new
-Claims appear; the command reports the skipped closed scope in its response and audit payload.
-
-## Implemented M1-C C3b explainable conflict workspace
-
-```mermaid
-flowchart LR
-    USER["Human requests conflict check"]
-    API["Deterministic reconcile API"]
-    GROUPS["Conflict groups and member Claims"]
-    CARDS["Localized relation and status cards"]
-    BASIS["Policy version and classification basis"]
-    CLAIM["Selected immutable Claim"]
-    EVIDENCE["Exact source-version evidence"]
-
-    USER --> API --> GROUPS --> CARDS
-    CARDS --> BASIS
-    CARDS -->|"select member"| CLAIM --> EVIDENCE
-```
-
-The browser does not reproduce conflict logic or re-slice evidence. It renders the project-scoped
-server read model, labels conflicts separately from potentially coexisting values, and lets a
-human trace each member to the already validated quote and source version. Detection is explicit;
-no winner, approval, dismissal, or snapshot is inferred from model confidence or UI selection.
-
-## Implemented M1-C C4 append-only human control
-
-```mermaid
-flowchart LR
-    CLAIM["Immutable candidate Claim"]
-    EVIDENCE["Exact source-version evidence"]
-    COMMAND["Idempotent human review command"]
-    REVIEW["Append-only review and optional edited value"]
-    LATEST["Derived latest human state"]
-    GROUP["Open conflict group"]
-    GATE{"All members final and policy satisfied?"}
-    RESOLVED["Resolved with reason and actor"]
-    DISMISSED["Explicitly dismissed with reason"]
-    AUDIT["Causal audit event"]
-
-    CLAIM --> EVIDENCE --> COMMAND --> REVIEW --> LATEST
-    LATEST --> GROUP --> GATE
-    GATE -->|"yes"| RESOLVED --> AUDIT
-    GROUP -->|"human override"| DISMISSED --> AUDIT
-```
-
-The project row lock serializes decision commands with later publication. A command key is unique
-inside the project: an exact retry is safe, while reuse for different content fails. Approval
-copies the original value or stores a separate validated edit and never mutates the Claim. The
-latest state is a read-model projection over complete review history.
-
-Conflict resolution is deliberately stricter than clicking a winner. Every member needs a latest
-approve/reject decision, deferred decisions remain incomplete, at least one value must survive,
-and a single-valued relation must converge on one normalized value. Dismissal is separately
-labelled as a reasoned human override. Neither path creates a published knowledge snapshot.
-
-## Implemented M1-C C5 immutable publication
-
-```mermaid
-flowchart LR
-    PROJECT["Project row lock"]
-    REVIEWS["Latest final reviews for every Claim"]
-    CONFLICTS{"All conflict groups human-closed?"}
-    POLICY{"Complete-project publication policy satisfied?"}
-    DIGEST["Deterministic content digest"]
-    SNAPSHOT["Immutable versioned snapshot"]
-    MEMBERS["Members with exact review and evidence lineage"]
-    AUDIT["Causal publication audit event"]
-
-    PROJECT --> REVIEWS --> CONFLICTS --> POLICY
-    POLICY -->|"yes"| DIGEST --> SNAPSHOT --> MEMBERS --> AUDIT
-    POLICY -->|"no"| BLOCKERS["Structured readiness blockers"]
-```
-
-Readiness and publication evaluate the same fail-closed policy. The service includes every current
-approved Claim, rejects missing or deferred reviews, open conflicts, archived approved entities,
-incomplete lineage, and unreconciled or multiply approved single-valued predicates. The browser can
-therefore explain all blockers before it sends the publication command.
-
-Publication takes the project lock, re-evaluates readiness, derives the content digest from sorted
-approved values plus their exact review and evidence lineage, and inserts the snapshot, members, and
-audit event in one transaction. A project-scoped command key makes exact retries return the same
-snapshot while rejecting different payloads. PostgreSQL prevents later update or deletion of the
-published lineage. Later marketing workflows must reference the snapshot ID, never mutable reviews.
-
-## Marketing workflow state graph
-
-```mermaid
-stateDiagram-v2
-    [*] --> TaskDefined
-    TaskDefined --> InputsFrozen
-    InputsFrozen --> TrendCollection
-    TrendCollection --> CollectionFailed: timeout, rate limit, or source failure
-    CollectionFailed --> TrendCollection: retry from checkpoint within budget
-    CollectionFailed --> RecoveryReview: cancel or retry budget exhausted
-    RecoveryReview --> TrendCollection: change source or resume
-    RecoveryReview --> [*]: cancel run
-    TrendCollection --> CandidateProcessing
-    CandidateProcessing --> FitAnalysis
-    FitAnalysis --> TopicApproval
-    TopicApproval --> FitAnalysis: choose another candidate
-    TopicApproval --> TrendCollection: refresh signals or change filters
-    TopicApproval --> BriefCreated: approve
-    BriefCreated --> ScriptGenerated
-    ScriptGenerated --> ScriptEvaluated
-    ScriptEvaluated --> ScriptRevised: below threshold and revision budget remains
-    ScriptRevised --> ScriptEvaluated
-    ScriptEvaluated --> FinalReview: accepted
-    ScriptEvaluated --> QualityExceptionReview: below threshold and revision budget exhausted
-    QualityExceptionReview --> ScriptGenerated: approve another bounded revision
-    QualityExceptionReview --> FinalReview: accept flagged quality exception
-    FinalReview --> ScriptGenerated: request larger revision
-    FinalReview --> Exported: approve
-    Exported --> [*]
-```
-
-The run freezes the task definition, knowledge snapshot, source policy, model, prompt, skill, and rule versions before generation. The revision loop has a fixed budget. A model score never replaces topic or final-output approval, and an exhausted budget cannot silently convert a low-quality script into an accepted one. The Agent Harness routes retryable model or tool failures back to the last safe checkpoint and exposes terminal failures for human recovery.
-
-## Implemented M2/M3 trend evidence and topic gate
-
-```mermaid
-flowchart LR
-    USER["Human verifies an authorized public trend page"]
-    SIGNAL["Immutable trend observation with source, time, region, and metric"]
-    TASK["Immutable task bound to one knowledge snapshot"]
-    RULES["trend-fit-v1 deterministic four-dimension scorer"]
-    CANDIDATE["Explainable topic candidate with risks and exact lineage"]
-    REVIEW{"Append-only human topic decision"}
-    APPROVED["One current approved topic"]
-
-    USER --> SIGNAL
-    SIGNAL --> RULES
-    TASK --> RULES
-    RULES --> CANDIDATE --> REVIEW
-    REVIEW -->|"approve"| APPROVED
-    REVIEW -->|"reject or defer"| CANDIDATE
-```
-
-No trend connector, scraper, or model call runs in this slice. Manual observations are immutable and
-explicitly labelled as not independently verified. A task references an immutable knowledge
-snapshot, so later entity/review changes cannot alter fit inputs. PostgreSQL triggers reject
-cross-project task/snapshot, task/signal, or task/candidate lineage and prevent mutation or deletion
-of tasks, signals, candidates, and reviews.
-
-The scorer freezes results instead of recomputing them on every read. Freshness is measured against
-the signal's immutable record time, market alignment uses the frozen task markets, source
-completeness reports whether a metric was recorded, and relevance preserves exact matching snapshot
-member IDs. Scores rank candidates but cannot pass the human approval gate.
-
-## Verified recovery and ownership DAG
-
-```mermaid
-flowchart LR
-    OWNER["Local owner"] --> EXPORT["Versioned portable export"]
-    EXPORT --> RECORDS["Typed project-descendant records"]
-    EXPORT --> OBJECTS["Content-addressed private objects"]
-    RECORDS --> ARCHIVE["M9 ZIP manifest"]
-    OBJECTS --> ARCHIVE
-    ARCHIVE --> LIMITS{"Entry, path, expansion and version checks"}
-    LIMITS -->|fail| REJECT["Reject without database writes"]
-    LIMITS -->|pass| DIGESTS{"Counts and every SHA-256 match"}
-    DIGESTS -->|fail| REJECT
-    DIGESTS -->|pass| COLLISIONS{"Project, slug and object collision checks"}
-    COLLISIONS -->|fail| REJECT
-    COLLISIONS -->|pass| RESTORE["Single database transaction"]
-    RESTORE --> TENANT["Assign current owner and default team"]
-    RESTORE --> DEDUPE["Remap already stored immutable objects"]
-    RESTORE --> PROJECT["Recovered project and full lineage"]
-```
-
-Archived `owner_user_id` and `team_id` values are never trusted during restore. In account mode the
-API applies the current authenticated owner, their default local team and the existing project
-quota. Stored objects can be reused only when digest, key, size and media type all agree. Any
-transaction failure removes newly written unreferenced objects.
-
-```mermaid
-flowchart LR
-    CURRENT["Current team owner"] --> ROLE["Change non-owner role"]
-    CURRENT --> TRANSFER{"Explicit ownership transfer"}
-    ROLE --> RBAC["Permission change effective immediately"]
-    TRANSFER --> TARGET["Active target member becomes owner"]
-    TRANSFER --> PRIOR["Prior owner becomes editor"]
-    TRANSFER --> PROJECTS["All team projects change owner atomically"]
-    TARGET --> AUDIT["Append-only security audit"]
-    PRIOR --> AUDIT
-    PROJECTS --> AUDIT
-```
-
-The ownership operation is a database transaction, not an Agent decision. No specialist Agent can
-grant itself access, weaken a role, change a team owner, bypass the exact-Origin boundary, or alter
-the recovery verifier.
-
-## Component relationships
-
-```mermaid
-flowchart TB
-    subgraph Delivery["Delivery"]
-        WEB["apps/web"]
-        FASTAPI["apps/api and gamecrafter.api"]
-    end
-
-    subgraph Application["Application layer"]
-        COMMANDS["Commands"]
-        QUERIES["Queries"]
-        SERVICES["Orchestration services"]
-        PORTS["Workflow and outbound ports"]
-    end
-
-    subgraph Domain["Domain layer"]
-        PROJECTS["Projects"]
-        KNOWLEDGE["Knowledge"]
-        TRENDS["Trends"]
-        CAMPAIGNS["Campaigns"]
-        SCRIPTS["Scripts"]
-        RUNS["Runs"]
-    end
-
-    subgraph Runtime["Constrained agent runtime"]
-        HARNESS["Agent Harness"]
-        GRAPHS["LangGraph graphs"]
-        NODES["Specialist nodes"]
-        SKILLS["Skills and prompts"]
-        GATES["Human gates"]
-    end
-
-    subgraph Infrastructure["Infrastructure"]
-        DATABASE["Database repositories"]
-        INGESTION["Source connectors and parsers"]
-        SEARCH["Hybrid search"]
-        MODELS["ModelGateway"]
-        TOOLS["ToolProvider"]
-        STORAGE["ObjectStorage"]
-        OBS["RunTracer"]
-    end
-
-    WEB --> FASTAPI
-    FASTAPI --> COMMANDS
-    FASTAPI --> QUERIES
-    COMMANDS --> SERVICES
-    QUERIES --> SERVICES
-    SERVICES --> Domain
-    SERVICES --> PORTS
-    HARNESS --> GRAPHS --> NODES
-    HARNESS --> GATES
-    GRAPHS --> PORTS
-    Runtime --> Domain
-    Infrastructure --> PORTS
-    Infrastructure --> Domain
-```
-
-The arrows in this diagram show source-code dependency direction, not runtime data flow. Delivery depends on application contracts; runtime and infrastructure adapters implement application ports and depend inward on application/domain contracts. Domain modules never depend on infrastructure. This direction is enforced by convention and architecture tests: domain modules must not import FastAPI, LangGraph, model SDKs, database drivers, or source-specific clients.
-
-## Agent Harness
-
-The Agent Harness is the controlled execution shell around graphs and specialist nodes. It is not another model or simulated employee. It provides:
-
-- typed state validation before and after every node;
-- checkpoints, idempotency keys, resumable human pauses, and replay metadata;
-- model, token, latency, cost, tool-call, retry, and wall-clock budgets;
-- tool allowlists, argument validation, timeouts, cancellation, and permission checks;
-- model-egress review, secret redaction, and untrusted-content isolation;
-- structured failure states and last-safe-checkpoint recovery;
-- trace propagation across models, tools, human decisions, and exports.
-
-The initial ToolProvider implementations stay in-process. MCP is an optional adapter behind that boundary only when cross-application reuse or independently managed permissions justify it; MCP is not the core orchestration mechanism.
-
-## Implemented specialist roles
-
-- Knowledge Curator: structures evidence-backed game claims.
-- Trend Analyst: clusters trends and explains task fit.
-- Script Writer: produces structured script versions from approved inputs.
-- Quality Critic: evaluates explicit dimensions and proposes bounded revisions.
-
-These are workflow roles, not simulated employees. Parallelism is used for independent source fetches, candidate analyses, and evaluation dimensions; human decisions remain sequential gates.
-
-## Reasoning and learning policy
-
-Specialist research nodes may use a bounded `Perceive → Reason → Act → Evaluate` cycle. ReAct is limited to nodes that genuinely need tools and always runs inside Harness budgets and allowlists. ReWOO is not the global workflow pattern because the state graph already provides an explicit, inspectable plan.
-
-`Learn` is intentionally outside the live run. Production agents cannot rewrite their own prompts, skills, policies, or tools. Human-approved feedback becomes a versioned offline evaluation case; a tested prompt, skill, rule, or model update is then released as a new version. This prevents silent behavior drift and preserves rollback and attribution.
-
-## Storage direction
-
-M1-A implements PostgreSQL, enables pgvector, and initially stores projects, ingestion runs, leased
-jobs, and audit events. C2.3a data-preservingly renames those execution tables to `workflow_runs`
-and `workflow_jobs`, adds the nonblank `workflow_kind`, and retains the PostgreSQL lease queue.
-M1-B B1 adds source identities, immutable evidence versions, multilingual content
-families, discovery candidates, stored-object metadata, and evidence links. Large bytes use the
-`ObjectStorage` application port; its first adapter is a private content-addressed local filesystem.
-B2 adds source-policy, `PageFetcher`, and `SiteAdapter` boundaries. B3 writes raw HTML, normalized
-text, bounded official images, source identities, version lineage, evidence links, and audit events
-through registered worker handlers. B4 reads project-scoped summaries and creates candidate/run/job
-state in one PostgreSQL transaction; SSE projects append-only audit events to the browser.
-PostgreSQL and object storage cannot commit atomically;
-content-addressed files written immediately before a failed DB transaction may be left unreferenced
-and require a later safe garbage-collection command. Embeddings and claim records remain
-unimplemented at the M1-B boundary.
-
-M1-C C1 adds project-local entities, immutable candidate claims, exact evidence ranges, append-only
-human reviews, conflict groups, and immutable knowledge snapshots. It does not yet add extraction,
-model calls, conflict classification, review APIs, or embeddings.
-
-M1-C C2.1 adds the framework-independent model port and zero-cost adapters. C2.2 adds the pure
-deterministic source chunker, sequential extraction Harness, invocation manifest, strict fixture
-loader, and source-attributed NTE offline replay. C2.3a supplies the generic durable execution
-substrate. C2.3b registers its extraction handler, validates stored text, persists redacted
-invocations plus atomic claim/evidence/result lineage, and exposes preflighted command/read APIs.
-Live model calls remain unimplemented. C3a supplies deterministic conflicts, C3b exposes
-exact-evidence navigation, C4 adds append-only human review and guarded closure commands, and C5
-publishes only a complete, human-approved, immutable knowledge version.
-
-## Observability
-
-Each workflow run progressively records:
-
-- run and trace identifiers;
-- node state and checkpoint;
-- source, model, prompt, skill, and rule versions;
-- tool calls, latency, retries, token usage, and estimated cost;
-- redacted input/output hashes, egress decisions, and failure classifications;
-- human approvals, edits, rejections, and reasons;
-- script version lineage and export state;
-- evaluation dataset, rubric, threshold, and release versions.
+- 写作已完成而评审请求失败：重试复用写作阶段，避免重复保存版本。
+- 无效 JSON、外部引用、无变化修订：不把它们缓存为有效阶段。
+- 同一工作流反复点击：复用在途操作。不同操作冲突则明确拒绝。
+- 手动重试保持尝试编号单调增加；旧 Worker 即使同名，也不能完成新的租约。
+- 编辑后必须重新评审；当前版本的**最近终审**必须批准，且指向同一次最新有效检查。
+  历史批准不能覆盖后续拒绝。
+- 有限次数修订不是无限自愈；预算耗尽后进入人工编辑。
+
+## 5. 数据与隐私
+
+来源版本、引文、人工事实审核、知识快照、脚本版本与人工终审保持各自身份。
+`creative_operations` 保存冻结输入、哈希、模型、阶段缓存和结果引用；
+脚本版本附带生成来源，评测记录附带独立语义报告。
+通用项目备份/恢复按外键遍历包含这些记录；它们与原始资料一样可能包含私有内容，
+只在本地受控库和用户明确导出的备份中保存。
+
+对外只开放既有来源连接器。模型地址仅允许本机回环或精确的 Docker 主机别名，
+不使用系统代理、不自动转发到付费云端。模型没有浏览器、文件删除或发布工具。
+生产日志不记录原始 prompt、上传全文、密码或模型推理过程。
+
+## 6. 刻意不做的事
+
+不自动投放、不抓取 TikTok 私有页面、不生成最终视频、不假装拥有素材授权；
+不在线自改 prompt 或训练模型，不让审核 Agent 提升自己的权限。
+本项目属于有证据约束的 Agent 应用与人机协作工作流，不需要为了命名先进而套用
+ReAct/ReWOO，也不把计划中的 MCP 或未接入的云适配器写成运行中的能力。
+
+运行记录可供离线评估和后续改进，但不会未经确认自动“学习”并修改系统行为。
+部署、负载能力和商业效果必须独立验收，不能从单机测试推断。

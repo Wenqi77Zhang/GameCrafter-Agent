@@ -41,5 +41,6 @@ def test_agent_catalog_discloses_all_roles_and_execution_modes() -> None:
         "creation.quality_critic",
         "design.gdd_architect",
     ]
-    assert [item["mode"] for item in payload["items"]].count("local_model") == 2
-    assert [item["mode"] for item in payload["items"]].count("deterministic") == 6
+    assert [item["mode"] for item in payload["items"]].count("local_model") == 5
+    assert [item["role_kind"] for item in payload["items"]].count("workflow_tool") == 3
+    assert [item["mode"] for item in payload["items"]].count("deterministic") == 3

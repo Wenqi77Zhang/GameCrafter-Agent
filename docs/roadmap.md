@@ -1,5 +1,14 @@
 # Long-term roadmap
 
+## Current status — M19 quality correction (2026-09-11)
+
+The older completion labels below record milestone history, not present commercial maturity.
+M19 replaces template writing, template-reset revision and completeness-only grading with real
+local generation, independent semantic review, usable editing and current-version export guards.
+Deployment is explicitly deferred. See [implementation and verification](product/real-creative-workflow.md)
+for actual test, model, browser and PostgreSQL evidence; do not count a successful API call as a
+successful campaign or assume a reviewer model is infallible.
+
 Each milestone must produce a runnable slice, tests, a failure case, evidence, and an honest README status before the next milestone begins.
 
 | Milestone | Outcome | Exit gate |
@@ -23,6 +32,8 @@ Each milestone must produce a runnable slice, tests, a failure case, evidence, a
 | M15 | Live local-Agent hardening | runtime/model preflight, subject-safe prompts, partial-candidate isolation, adversarial reviewer acceptance |
 | M16 | Guided production workspace | automatic current-task routing, progressive disclosure, background-run feedback, beginner acceptance |
 | M17 | Readable marketing conclusion | versioned strategy brief, evidence-bound direction/topic, timed execution plan, direct creation handoff |
+| M18 | Guided human-review completion | project-wide pending locator, explicit submitted state, automatic next-item routing, preset decision reasons |
+| M19 | Real evidence-constrained creative workflow | real model calls, semantic counterexamples, actual revisions, no false export eligibility, browser and database regression |
 
 The course game-marketing requirements remain the minimum acceptance line for M2–M5, but the product is no longer constrained to a four-day team submission.
 
@@ -113,5 +124,11 @@ M17 closes the marketing-output gap: Campaign Strategist 1.1 now turns ranked tr
 knowledge snapshot into a bilingual-interface strategy brief with one clear direction, recommended
 English topic, core message, timed beats, exact proof facts, provenance, risks, alternatives, approval
 state, and a direct Script Writer handoff. The projection is deterministic and keeps API cost at zero.
+M18 closes the knowledge-review navigation gap. Knowledge now loads the project-wide Claim ledger,
+separates unresolved and final decisions, identifies pending totals for both the project and selected
+entity, navigates publication blockers directly to the relevant Claim (including another entity),
+and automatically advances after submission. Completed Claims collapse with an explicit submitted
+state, while decision, correction, and conflict-closure reasons use auditable presets with free text
+only behind an explicit Other choice. Human authority and append-only review history are unchanged.
 Payment processing and anonymous public hosting remain outside scope because they contradict the
 confirmed zero-cost local boundary and would require a separate commercial/privacy decision.
