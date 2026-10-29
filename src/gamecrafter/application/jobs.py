@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import UUID
@@ -52,6 +53,10 @@ class JobExecutionError(RuntimeError):
     retryable = False
 
 
+class JobOwnershipLostError(RuntimeError):
+    """A cancelled or superseded worker must not settle another attempt."""
+
+
 class RetryableJobError(JobExecutionError):
     """Transient failure that may consume another bounded attempt."""
 
@@ -88,10 +93,13 @@ class Worker:
         if job is None:
             return False
 
-        try:
-            handler = self._handlers[job.task_type]
-            handler(job)
-        except KeyError:
+        with suppress(JobOwnershipLostError):
+            self._execute(job)
+        return True
+
+    def _execute(self, job: ClaimedJob) -> None:
+        handler = self._handlers.get(job.task_type)
+        if handler is None:
             self._queue.fail(
                 job,
                 worker_id=self._worker_id,
@@ -99,6 +107,11 @@ class Worker:
                 error_detail=f"no handler registered for {job.task_type}",
                 retryable=False,
             )
+            return
+        try:
+            handler(job)
+        except JobOwnershipLostError:
+            raise
         except JobExecutionError as error:
             self._queue.fail(
                 job,
@@ -117,4 +130,3 @@ class Worker:
             )
         else:
             self._queue.complete(job, worker_id=self._worker_id)
-        return True

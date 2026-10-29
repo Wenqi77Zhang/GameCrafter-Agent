@@ -11,8 +11,10 @@ from gamecrafter.infrastructure.database.script_service import (
 )
 
 
-def _approved_task():
-    sessions, project_id, snapshot_id = _seed()
+def _approved_task(sessions=None, *, story_fact=False, genre_only=False):
+    sessions, project_id, snapshot_id = _seed(
+        sessions, story_fact=story_fact, genre_only=genre_only
+    )
     marketing = DatabaseMarketingService(sessions)
     task, _ = marketing.create_task(
         project_id=project_id,
@@ -77,7 +79,26 @@ def test_script_generation_evaluation_human_gate_and_export() -> None:
         actor_id="local-system",
         command_key="script-generate-v1",
     )
-    generated_id = UUID(str(generated["id"]))
+    # A manual scaffold is not an automatically deliverable AI script.
+    content = generated["content"]
+    voices = [
+        "Ever wondered what this game is called?",
+        "The official title is Neverness to Everness.",
+        "Before making promises about gameplay, start with the name and check the official source.",
+        "What would you want to know next about Neverness to Everness?",
+        "Save this update and tell us what you want to see next.",
+    ]
+    for section, voice in zip(content["sections"], voices, strict=True):
+        section["voiceover"] = voice
+        section["on_screen_text"] = "Neverness to Everness"
+    edited, _ = service.edit(
+        project_id=project_id,
+        run_id=run_id,
+        content=content,
+        actor_id="local-user",
+        command_key="manual-readable-edit",
+    )
+    generated_id = UUID(str(edited["id"]))
     evaluation, _ = service.evaluate(
         project_id=project_id,
         run_id=run_id,
@@ -151,14 +172,8 @@ def test_failed_human_edit_uses_bounded_revision() -> None:
         command_key="script-evaluate-failing-edit",
     )
     assert failed["passed"] is False and failed["issues"]
-    revised, _ = service.revise(
-        project_id=project_id,
-        run_id=run_id,
-        actor_id="local-system",
-        command_key="script-auto-revision-one",
-    )
-    assert revised["origin"] == "auto_revision"
-    with pytest.raises(ScriptServiceConflictError, match="evaluate"):
+    # Legacy synchronous revision must not reset the draft to an unrelated template.
+    with pytest.raises(ScriptServiceConflictError, match="后台模型任务"):
         service.revise(
             project_id=project_id,
             run_id=run_id,

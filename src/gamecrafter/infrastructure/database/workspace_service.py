@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from gamecrafter.application.creative import RULE_VERSION
 from gamecrafter.infrastructure.database.models import (
     AuditEventRecord,
     DiscoveryCandidateRecord,
@@ -16,6 +17,7 @@ from gamecrafter.infrastructure.database.models import (
     KnowledgeSnapshotRecord,
     MarketingTaskRecord,
     ProjectRecord,
+    ScriptEvaluationRecord,
     ScriptExportRecord,
     ScriptFinalReviewRecord,
     ScriptRunRecord,
@@ -141,13 +143,54 @@ class DatabaseWorkspaceService:
                 .join(ScriptRunRecord, ScriptRunRecord.id == ScriptVersionRecord.run_id)
                 .where(ScriptRunRecord.project_id == project_id)
             )
-            final_approval_count = count(
-                select(func.count(ScriptFinalReviewRecord.id))
-                .select_from(ScriptFinalReviewRecord)
-                .join(ScriptRunRecord, ScriptRunRecord.id == ScriptFinalReviewRecord.run_id)
-                .where(
-                    ScriptRunRecord.project_id == project_id,
-                    ScriptFinalReviewRecord.decision == "approve",
+            newest_version = (
+                select(ScriptVersionRecord.id)
+                .where(ScriptVersionRecord.run_id == ScriptRunRecord.id)
+                .order_by(ScriptVersionRecord.version_number.desc())
+                .limit(1)
+                .correlate(ScriptRunRecord)
+                .scalar_subquery()
+            )
+            newest_evaluation = (
+                select(ScriptEvaluationRecord.id)
+                .where(ScriptEvaluationRecord.script_version_id == ScriptVersionRecord.id)
+                .order_by(
+                    ScriptEvaluationRecord.created_at.desc(), ScriptEvaluationRecord.id.desc()
+                )
+                .limit(1)
+                .correlate(ScriptVersionRecord)
+                .scalar_subquery()
+            )
+            newest_review = (
+                select(ScriptFinalReviewRecord.id)
+                .where(ScriptFinalReviewRecord.script_version_id == ScriptVersionRecord.id)
+                .order_by(
+                    ScriptFinalReviewRecord.created_at.desc(), ScriptFinalReviewRecord.id.desc()
+                )
+                .limit(1)
+                .correlate(ScriptVersionRecord)
+                .scalar_subquery()
+            )
+            eligible_versions = list(
+                session.scalars(
+                    select(ScriptVersionRecord.id)
+                    .join(ScriptRunRecord, ScriptRunRecord.id == ScriptVersionRecord.run_id)
+                    .join(ScriptEvaluationRecord, ScriptEvaluationRecord.id == newest_evaluation)
+                    .join(ScriptFinalReviewRecord, ScriptFinalReviewRecord.id == newest_review)
+                    .where(
+                        ScriptRunRecord.project_id == project_id,
+                        ScriptVersionRecord.id == newest_version,
+                        ScriptEvaluationRecord.passed.is_(True),
+                        ScriptEvaluationRecord.rule_version == RULE_VERSION,
+                        ScriptFinalReviewRecord.decision == "approve",
+                        ScriptFinalReviewRecord.evaluation_id == ScriptEvaluationRecord.id,
+                    )
+                )
+            )
+            final_approval_count = len(eligible_versions)
+            current_export_count = count(
+                select(func.count(ScriptExportRecord.id)).where(
+                    ScriptExportRecord.script_version_id.in_(eligible_versions)
                 )
             )
             export_count = count(
@@ -182,7 +225,7 @@ class DatabaseWorkspaceService:
                     "marketing", approved_topic_count > 0, task_count > 0 or signal_count > 0
                 ),
                 self._stage("creation", final_approval_count > 0, script_run_count > 0),
-                self._stage("delivery", export_count > 0, final_approval_count > 0),
+                self._stage("delivery", current_export_count > 0, final_approval_count > 0),
             ]
             next_action = next(
                 (stage["key"] for stage in stages if stage["status"] != "complete"), "complete"
@@ -440,7 +483,8 @@ class DatabaseWorkspaceService:
                 raise WorkspaceConflictError("run has no failed job to retry")
             for job in failed_jobs:
                 job.status = "queued"
-                job.attempts = 0
+                # Never reuse an attempt number: old workers and model-call receipts are fenced.
+                job.max_attempts = job.attempts + 2
                 job.available_at = now
                 job.lease_owner = None
                 job.lease_expires_at = None

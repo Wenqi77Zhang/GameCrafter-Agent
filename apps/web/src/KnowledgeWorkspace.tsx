@@ -75,6 +75,8 @@ type Evidence = {
 
 type ReviewDecision = "approve" | "approve_with_edit" | "reject" | "defer";
 
+type ChoiceOption = { key: string; label: string };
+
 type ClaimReview = {
   id: string;
   decision: ReviewDecision;
@@ -233,6 +235,14 @@ const text = {
     saveCorrection: "保存纠正",
     reason: "修改原因",
     reasonPlaceholder: "例如：修正输入错误",
+    otherReason: "其他原因",
+    otherReasonPlaceholder: "请简要说明其他原因",
+    correctionReasons: [
+      { key: "input_error", label: "修正输入错误" },
+      { key: "official_name", label: "与最新官方名称保持一致" },
+      { key: "alias_cleanup", label: "补充或清理别名" },
+      { key: "other", label: "其他原因" },
+    ],
     cancel: "取消",
     noEntity: "尚无游戏实体。先创建一个实体；当前验证案例默认使用《异环》。",
     useProjectEntity: "使用当前项目：",
@@ -250,7 +260,7 @@ const text = {
     start: "开始提取",
     submitting: "正在加入本地队列…",
     queued: "知识提取已进入本地队列。",
-    unreviewed: "仅显示当前提取批次；审核 Agent 拒绝的低价值项默认折叠。",
+    unreviewed: "这里汇总当前项目的全部候选。待处理项始终显示，已提交项折叠收起。",
     agentReviewTitle: "AI 知识预审",
     agentReviewHint: "独立审核 Agent 会核对证据、纠正错误分类并将知识包限制在 15 条以内；它不能替你做最终批准。",
     startAgentReview: "让审核 Agent 检查",
@@ -301,6 +311,32 @@ const text = {
     defer: "稍后决定",
     reviewReason: "决定理由",
     reviewReasonPlaceholder: "说明你依据哪条证据作出决定",
+    reviewReasons: {
+      approve: [
+        { key: "evidence_match", label: "与引用的官方原文一致" },
+        { key: "useful_accurate", label: "信息准确且对营销有用" },
+        { key: "agent_sound", label: "审核 Agent 建议合理" },
+        { key: "other", label: "其他原因" },
+      ],
+      approve_with_edit: [
+        { key: "wording_fix", label: "事实成立，但表述需要修正" },
+        { key: "normalize_name", label: "统一官方名称或格式" },
+        { key: "narrow_scope", label: "缩小范围以避免过度推断" },
+        { key: "other", label: "其他原因" },
+      ],
+      reject: [
+        { key: "unsupported", label: "原文不支持这条结论" },
+        { key: "duplicate_low_value", label: "重复或营销价值较低" },
+        { key: "incorrect", label: "存在明显事实或分类错误" },
+        { key: "other", label: "其他原因" },
+      ],
+      defer: [
+        { key: "insufficient_evidence", label: "证据不足，稍后补充" },
+        { key: "conflict_check", label: "存在冲突，需要进一步核对" },
+        { key: "expert_needed", label: "需要专业人员判断" },
+        { key: "other", label: "其他原因" },
+      ],
+    },
     editedValue: "批准后的值",
     editedValueHint: "列表每行一项；布尔值填写 true 或 false。",
     submitReview: "记录人工决定",
@@ -314,6 +350,18 @@ const text = {
     dismissConflict: "忽略该组",
     closureReason: "关闭理由",
     closureReasonPlaceholder: "说明为何可以解决或忽略该冲突组",
+    closureReasons: {
+      resolved: [
+        { key: "reviews_complete", label: "所有候选已终审，保留值一致" },
+        { key: "official_evidence", label: "已由最新官方证据确认正确值" },
+        { key: "other", label: "其他原因" },
+      ],
+      dismissed: [
+        { key: "scopes_coexist", label: "不同值适用于不同范围，可以共存" },
+        { key: "not_relevant", label: "该冲突不影响当前营销知识" },
+        { key: "other", label: "其他原因" },
+      ],
+    },
     submitClosure: "确认关闭",
     closingConflict: "正在校验并关闭…",
     closureSaved: "冲突组已由人工关闭。",
@@ -352,6 +400,27 @@ const text = {
       inconsistent_approved_values: "人工修改导致单值谓词保留了多个批准值。",
       incomplete_lineage: "批准值的证据谱系不完整。",
     },
+    reviewQueue: "人工审核待办",
+    reviewQueueDone: "本项目候选已全部处理",
+    reviewQueuePending: "本项目还有候选需要你决定",
+    reviewQueueHint: "系统会定位到具体候选；核对原文后选择决定和预设理由即可。",
+    projectRemaining: "项目待处理",
+    entityRemaining: "当前实体待处理",
+    completedCount: "已完成",
+    reviewNext: "处理下一条待审核候选",
+    reviewOtherEntity: "前往其他实体的下一条候选",
+    pendingList: "待你处理",
+    completedList: "已处理（无需再操作）",
+    pendingBadge: "待你决定",
+    deferredBadge: "已暂缓 · 仍需处理",
+    submittedBadge: "已提交",
+    selectedForReview: "正在处理这一条",
+    completedConfirmation: "这条决定已经提交成功，不需要再次处理。",
+    reviseDecision: "需要修改？重新提交一条决定",
+    blockerAction: "点此定位并处理",
+    allReviewsComplete: "决定已提交。所有候选都已处理，现在可以继续检查冲突并发布快照。",
+    nextReviewOpened: "决定已提交，并已自动打开下一条待处理候选。",
+    deferredReviewSaved: "已保存为稍后决定并打开下一条；这条仍会保留在待处理列表。",
     confirmArchive: "归档后不能恢复该实体，已有 Claim 仍保留。确认继续吗？",
     archiveReason: "用户确认该实体创建错误",
     capabilityReasons: {
@@ -381,6 +450,14 @@ const text = {
     saveCorrection: "Save correction",
     reason: "Reason for change",
     reasonPlaceholder: "For example: correct an input mistake",
+    otherReason: "Other reason",
+    otherReasonPlaceholder: "Briefly describe the other reason",
+    correctionReasons: [
+      { key: "input_error", label: "Correct an input error" },
+      { key: "official_name", label: "Match the latest official name" },
+      { key: "alias_cleanup", label: "Add or clean up aliases" },
+      { key: "other", label: "Other reason" },
+    ],
     cancel: "Cancel",
     noEntity: "No game entity yet. Create one first; the current validation case defaults to NTE.",
     useProjectEntity: "Use current project: ",
@@ -398,7 +475,7 @@ const text = {
     start: "Start extraction",
     submitting: "Adding to the local queue…",
     queued: "Knowledge extraction was added to the local queue.",
-    unreviewed: "Only the current extraction batch is shown; low-value agent rejections are collapsed.",
+    unreviewed: "All project candidates are summarized here. Pending work stays visible; submitted items are collapsed.",
     agentReviewTitle: "AI knowledge pre-review",
     agentReviewHint: "An independent local reviewer verifies evidence, flags bad taxonomy, and limits the pack to 15 facts. It cannot grant final approval.",
     startAgentReview: "Run reviewer Agent",
@@ -449,6 +526,32 @@ const text = {
     defer: "Decide later",
     reviewReason: "Decision reason",
     reviewReasonPlaceholder: "Explain which evidence supports this decision",
+    reviewReasons: {
+      approve: [
+        { key: "evidence_match", label: "Matches the quoted official evidence" },
+        { key: "useful_accurate", label: "Accurate and useful for marketing" },
+        { key: "agent_sound", label: "Reviewer Agent recommendation is sound" },
+        { key: "other", label: "Other reason" },
+      ],
+      approve_with_edit: [
+        { key: "wording_fix", label: "Fact is valid but wording needs correction" },
+        { key: "normalize_name", label: "Normalize the official name or format" },
+        { key: "narrow_scope", label: "Narrow the scope to avoid overclaiming" },
+        { key: "other", label: "Other reason" },
+      ],
+      reject: [
+        { key: "unsupported", label: "The source does not support this claim" },
+        { key: "duplicate_low_value", label: "Duplicate or low marketing value" },
+        { key: "incorrect", label: "Clear factual or taxonomy error" },
+        { key: "other", label: "Other reason" },
+      ],
+      defer: [
+        { key: "insufficient_evidence", label: "Insufficient evidence; revisit later" },
+        { key: "conflict_check", label: "Conflict requires more verification" },
+        { key: "expert_needed", label: "Expert judgment is required" },
+        { key: "other", label: "Other reason" },
+      ],
+    },
     editedValue: "Approved value",
     editedValueHint: "Use one list item per line; enter true or false for booleans.",
     submitReview: "Record human decision",
@@ -462,6 +565,18 @@ const text = {
     dismissConflict: "Dismiss group",
     closureReason: "Closure reason",
     closureReasonPlaceholder: "Explain why this group can be resolved or dismissed",
+    closureReasons: {
+      resolved: [
+        { key: "reviews_complete", label: "All candidates are final and the retained value is consistent" },
+        { key: "official_evidence", label: "Latest official evidence confirms the correct value" },
+        { key: "other", label: "Other reason" },
+      ],
+      dismissed: [
+        { key: "scopes_coexist", label: "Values apply to different scopes and may coexist" },
+        { key: "not_relevant", label: "This conflict does not affect current marketing knowledge" },
+        { key: "other", label: "Other reason" },
+      ],
+    },
     submitClosure: "Confirm closure",
     closingConflict: "Validating and closing…",
     closureSaved: "The conflict group was closed by a human.",
@@ -500,6 +615,27 @@ const text = {
       inconsistent_approved_values: "Human edits retain multiple approved values for a single-valued predicate.",
       incomplete_lineage: "Approved evidence lineage is incomplete.",
     },
+    reviewQueue: "Human review tasks",
+    reviewQueueDone: "Every project candidate is complete",
+    reviewQueuePending: "Project candidates still need your decision",
+    reviewQueueHint: "The system locates each candidate. Verify the quote, then choose a decision and preset reason.",
+    projectRemaining: "Project remaining",
+    entityRemaining: "Current entity remaining",
+    completedCount: "Completed",
+    reviewNext: "Review the next pending candidate",
+    reviewOtherEntity: "Go to the next candidate in another entity",
+    pendingList: "Needs your action",
+    completedList: "Completed (no action needed)",
+    pendingBadge: "Decision required",
+    deferredBadge: "Deferred · still pending",
+    submittedBadge: "Submitted",
+    selectedForReview: "You are reviewing this item",
+    completedConfirmation: "This decision was submitted successfully. No further action is required.",
+    reviseDecision: "Need a change? Submit a new decision",
+    blockerAction: "Locate and review",
+    allReviewsComplete: "Decision submitted. Every candidate is complete; continue with conflict checking and snapshot publication.",
+    nextReviewOpened: "Decision submitted, and the next pending candidate is now open.",
+    deferredReviewSaved: "Saved for later and opened the next item; this candidate remains in the pending list.",
     confirmArchive: "Archival is terminal. Existing Claims remain attached. Continue?",
     archiveReason: "User confirmed that this entity was created by mistake",
     capabilityReasons: {
@@ -615,6 +751,49 @@ function parseEditedValue(kind: string, input: string): unknown {
   return value;
 }
 
+function needsHumanDecision(claim: Claim): boolean {
+  return !claim.latest_review || claim.latest_review.decision === "defer";
+}
+
+function hasFinalHumanDecision(claim: Claim): boolean {
+  return Boolean(claim.latest_review && claim.latest_review.decision !== "defer");
+}
+
+function ChoiceCards({
+  label,
+  name,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  name: string;
+  options: readonly ChoiceOption[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <fieldset className="choice-card-group">
+      <legend>{label}</legend>
+      <div className="choice-card-grid">
+        {options.map((option) => (
+          <label className={value === option.key ? "choice-card active" : "choice-card"} key={option.key}>
+            <input
+              checked={value === option.key}
+              name={name}
+              onChange={() => onChange(option.key)}
+              type="radio"
+              value={option.key}
+            />
+            <span>{option.label}</span>
+            {value === option.key && <em>✓</em>}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 export function KnowledgeWorkspace({
   projectId,
   projectName,
@@ -630,7 +809,7 @@ export function KnowledgeWorkspace({
   const t = text[language];
   const [entities, setEntities] = useState<Entity[]>([]);
   const [versions, setVersions] = useState<SourceVersion[]>([]);
-  const [claims, setClaims] = useState<Claim[]>([]);
+  const [allClaims, setClaims] = useState<Claim[]>([]);
   const [conflicts, setConflicts] = useState<ConflictGroup[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState("");
   const [selectedVersionId, setSelectedVersionId] = useState("");
@@ -648,16 +827,19 @@ export function KnowledgeWorkspace({
   );
   const [correctionName, setCorrectionName] = useState("");
   const [correctionAliases, setCorrectionAliases] = useState("");
+  const [correctionReasonChoice, setCorrectionReasonChoice] = useState("input_error");
   const [correctionReason, setCorrectionReason] = useState("");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [extractionRunId, setExtractionRunId] = useState<string | null>(null);
   const [agentReview, setAgentReview] = useState<AgentReviewSummary | null>(null);
   const [showAgentRejected, setShowAgentRejected] = useState(false);
   const [reviewDecision, setReviewDecision] = useState<ReviewDecision>("approve");
+  const [reviewReasonChoice, setReviewReasonChoice] = useState("evidence_match");
   const [reviewReason, setReviewReason] = useState("");
   const [reviewEditedValue, setReviewEditedValue] = useState("");
   const [closureGroupId, setClosureGroupId] = useState<string | null>(null);
   const [closureOutcome, setClosureOutcome] = useState<"resolved" | "dismissed">("resolved");
+  const [closureReasonChoice, setClosureReasonChoice] = useState("reviews_complete");
   const [closureReason, setClosureReason] = useState("");
   const [snapshotReadiness, setSnapshotReadiness] = useState<SnapshotReadiness | null>(null);
   const [snapshots, setSnapshots] = useState<KnowledgeSnapshot[]>([]);
@@ -665,7 +847,11 @@ export function KnowledgeWorkspace({
 
   const selectedEntity = entities.find((item) => item.id === selectedEntityId) ?? null;
   const selectedVersion = versions.find((item) => item.id === selectedVersionId) ?? null;
-  const selectedClaim = claims.find((item) => item.id === selectedClaimId) ?? null;
+  const claims = useMemo(
+    () => allClaims.filter((item) => item.subject_entity_id === selectedEntityId),
+    [allClaims, selectedEntityId],
+  );
+  const selectedClaim = allClaims.find((item) => item.id === selectedClaimId) ?? null;
   const activeRun = runs.find((item) => item.id === activeRunId) ?? null;
   const activeEvents = selectedRunId === activeRunId ? events : [];
 
@@ -709,20 +895,19 @@ export function KnowledgeWorkspace({
       return;
     }
     try {
-      const query = extractionRunId
-        ? `subject_entity_id=${selectedEntityId}&extraction_run_id=${extractionRunId}`
-        : `subject_entity_id=${selectedEntityId}`;
       const payload = await api<{ items: Claim[] }>(
-        `/api/projects/${projectId}/knowledge-claims?${query}`,
+        `/api/projects/${projectId}/knowledge-claims`,
       );
       setClaims(payload.items);
       setSelectedClaimId((current) =>
-        payload.items.some((item) => item.id === current) ? current : (payload.items[0]?.id ?? ""),
+        payload.items.some((item) => item.id === current)
+          ? current
+          : (payload.items.find(needsHumanDecision)?.id ?? payload.items[0]?.id ?? ""),
       );
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
     }
-  }, [extractionRunId, projectId, selectedEntityId, t.failed]);
+  }, [projectId, selectedEntityId, t.failed]);
 
   const loadAgentReview = useCallback(async () => {
     if (!projectId || !extractionRunId) {
@@ -844,23 +1029,64 @@ export function KnowledgeWorkspace({
     if (!selectedEntity || showCorrect) return;
     setCorrectionName(selectedEntity.display_name);
     setCorrectionAliases(selectedEntity.aliases.join("\n"));
+    setCorrectionReasonChoice("input_error");
     setCorrectionReason("");
   }, [selectedEntity, showCorrect]);
 
   useEffect(() => {
     setReviewDecision("approve");
+    setReviewReasonChoice("evidence_match");
     setReviewReason("");
     setReviewEditedValue(selectedClaim ? displayValue(selectedClaim.value) : "");
   }, [selectedClaimId]);
 
-  const groupedClaims = useMemo(() => {
+  useEffect(() => {
+    const options = t.reviewReasons[reviewDecision] as readonly ChoiceOption[];
+    setReviewReasonChoice(options[0]?.key ?? "other");
+    setReviewReason("");
+  }, [language, reviewDecision, t.reviewReasons]);
+
+  useEffect(() => {
+    const options = t.closureReasons[closureOutcome] as readonly ChoiceOption[];
+    setClosureReasonChoice(options[0]?.key ?? "other");
+    setClosureReason("");
+  }, [closureOutcome, language, t.closureReasons]);
+
+  useEffect(() => {
+    setSelectedClaimId((current) => {
+      if (allClaims.some((item) => item.id === current && item.subject_entity_id === selectedEntityId)) {
+        return current;
+      }
+      const entityClaims = allClaims.filter((item) => item.subject_entity_id === selectedEntityId);
+      return entityClaims.find(needsHumanDecision)?.id ?? entityClaims[0]?.id ?? "";
+    });
+  }, [allClaims, selectedEntityId]);
+
+  const pendingClaims = useMemo(() => claims.filter(needsHumanDecision), [claims]);
+  const completedClaims = useMemo(() => claims.filter(hasFinalHumanDecision), [claims]);
+  const projectPendingClaims = useMemo(() => allClaims.filter(needsHumanDecision), [allClaims]);
+  const projectCompletedClaims = useMemo(() => allClaims.filter(hasFinalHumanDecision), [allClaims]);
+  const currentBatchClaims = useMemo(
+    () => claims.filter((claim) => claim.extraction_run_id === extractionRunId),
+    [claims, extractionRunId],
+  );
+
+  const groupedPendingClaims = useMemo(() => {
     const groups = new Map<string, Claim[]>();
-    for (const claim of claims) {
+    for (const claim of pendingClaims) {
+      groups.set(claim.predicate, [...(groups.get(claim.predicate) ?? []), claim]);
+    }
+    return [...groups.entries()];
+  }, [pendingClaims]);
+
+  const groupedCompletedClaims = useMemo(() => {
+    const groups = new Map<string, Claim[]>();
+    for (const claim of completedClaims) {
       if (!showAgentRejected && claim.agent_review?.decision === "agent_rejected") continue;
       groups.set(claim.predicate, [...(groups.get(claim.predicate) ?? []), claim]);
     }
     return [...groups.entries()];
-  }, [claims, showAgentRejected]);
+  }, [completedClaims, showAgentRejected]);
 
   const conflictByClaim = useMemo(() => {
     const index = new Map<string, ConflictMember>();
@@ -878,6 +1104,36 @@ export function KnowledgeWorkspace({
       reject: t.reject,
       defer: t.defer,
     }[decision];
+  };
+
+  const correctionReasonOptions = t.correctionReasons as readonly ChoiceOption[];
+  const reviewReasonOptions = t.reviewReasons[reviewDecision] as readonly ChoiceOption[];
+  const closureReasonOptions = t.closureReasons[closureOutcome] as readonly ChoiceOption[];
+  const correctionReasonValue = correctionReasonChoice === "other"
+    ? correctionReason.trim()
+    : (correctionReasonOptions.find((item) => item.key === correctionReasonChoice)?.label ?? "");
+  const reviewReasonValue = reviewReasonChoice === "other"
+    ? reviewReason.trim()
+    : (reviewReasonOptions.find((item) => item.key === reviewReasonChoice)?.label ?? "");
+  const closureReasonValue = closureReasonChoice === "other"
+    ? closureReason.trim()
+    : (closureReasonOptions.find((item) => item.key === closureReasonChoice)?.label ?? "");
+
+  const focusClaim = (claim: Claim) => {
+    setSelectedEntityId(claim.subject_entity_id);
+    setSelectedClaimId(claim.id);
+    globalThis.setTimeout(() => {
+      document.getElementById("claim-review-title")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    }, 0);
+  };
+
+  const focusNextPendingClaim = () => {
+    if (projectPendingClaims.length === 0) return;
+    const currentIndex = projectPendingClaims.findIndex((item) => item.id === selectedClaimId);
+    const next = currentIndex >= 0
+      ? (projectPendingClaims[currentIndex] ?? projectPendingClaims[0])
+      : projectPendingClaims[0];
+    focusClaim(next);
   };
 
   const createEntityRecord = async (displayName: string, aliasText: string) => {
@@ -906,7 +1162,7 @@ export function KnowledgeWorkspace({
 
   const correctEntity = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedEntity) return;
+    if (!selectedEntity || !correctionReasonValue) return;
     setBusy("correct");
     setMessage(null);
     try {
@@ -918,7 +1174,7 @@ export function KnowledgeWorkspace({
           body: JSON.stringify({
             display_name: correctionName,
             aliases: aliases(correctionAliases),
-            change_reason: correctionReason,
+            change_reason: correctionReasonValue,
           }),
         },
       );
@@ -979,7 +1235,7 @@ export function KnowledgeWorkspace({
   };
 
   const startAgentReview = async () => {
-    if (!extractionRunId || claims.length === 0) return;
+    if (!extractionRunId || currentBatchClaims.length === 0) return;
     setBusy("agent-review");
     setMessage(null);
     try {
@@ -1053,14 +1309,16 @@ export function KnowledgeWorkspace({
 
   const submitReview = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedClaim) return;
+    if (!selectedClaim || !reviewReasonValue) return;
+    const reviewedClaim = selectedClaim;
+    const wasPending = needsHumanDecision(reviewedClaim);
     setBusy("review");
     setMessage(null);
     try {
       const approvedValue = reviewDecision === "approve_with_edit"
         ? parseEditedValue(selectedClaim.value_kind, reviewEditedValue)
         : null;
-      await api(`/api/projects/${projectId}/knowledge-claims/${selectedClaim.id}/reviews`, {
+      await api(`/api/projects/${projectId}/knowledge-claims/${reviewedClaim.id}/reviews`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1069,12 +1327,23 @@ export function KnowledgeWorkspace({
         body: JSON.stringify({
           decision: reviewDecision,
           approved_value: approvedValue,
-          reason: reviewReason,
+          reason: reviewReasonValue,
         }),
       });
       await Promise.all([loadClaims(), loadConflicts(), loadPublication()]);
+      const remainsPending = reviewDecision === "defer";
+      const nextPending = projectPendingClaims.find((claim) => claim.id !== reviewedClaim.id);
+      if (nextPending) focusClaim(nextPending);
+      else if (remainsPending) focusClaim(reviewedClaim);
       setReviewReason("");
-      setMessage({ kind: "ok", text: t.reviewSaved });
+      setMessage({
+        kind: "ok",
+        text: remainsPending
+          ? t.deferredReviewSaved
+          : (projectPendingClaims.length - (wasPending ? 1 : 0) <= 0
+              ? t.allReviewsComplete
+              : t.nextReviewOpened),
+      });
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : t.failed });
     } finally {
@@ -1084,7 +1353,7 @@ export function KnowledgeWorkspace({
 
   const closeConflict = async (event: FormEvent) => {
     event.preventDefault();
-    if (!closureGroupId) return;
+    if (!closureGroupId || !closureReasonValue) return;
     setBusy("closure");
     setMessage(null);
     try {
@@ -1096,7 +1365,7 @@ export function KnowledgeWorkspace({
             "Content-Type": "application/json",
             "Idempotency-Key": idempotencyKey("conflict-closure"),
           },
-          body: JSON.stringify({ outcome: closureOutcome, reason: closureReason }),
+          body: JSON.stringify({ outcome: closureOutcome, reason: closureReasonValue }),
         },
       );
       await Promise.all([loadConflicts(), loadPublication()]);
@@ -1150,6 +1419,100 @@ export function KnowledgeWorkspace({
     if (index < 3 && leased) return "active";
     return "pending";
   };
+
+  const decisionOptions: readonly ChoiceOption[] = [
+    { key: "approve", label: t.approve },
+    { key: "approve_with_edit", label: t.approveWithEdit },
+    { key: "reject", label: t.reject },
+    { key: "defer", label: t.defer },
+  ];
+
+  const renderClaimCard = (claim: Claim, isComplete: boolean) => (
+    <button
+      className={`claim-card ${selectedClaimId === claim.id ? "active" : ""} ${isComplete ? "claim-card--complete" : "claim-card--pending"}`}
+      type="button"
+      key={claim.id}
+      aria-pressed={selectedClaimId === claim.id}
+      onClick={() => focusClaim(claim)}
+    >
+      <div className="claim-card__heading">
+        <strong>{displayValue(claim.value)}</strong>
+        <em className={isComplete ? "task-state task-state--done" : "task-state task-state--pending"}>
+          {isComplete
+            ? `✓ ${t.submittedBadge}`
+            : (claim.latest_review?.decision === "defer" ? t.deferredBadge : t.pendingBadge)}
+        </em>
+      </div>
+      <span>{Math.round(claim.confidence * 100)}% · {claim.locale} · {claim.region}</span>
+      {selectedClaimId === claim.id && !isComplete && <small>{t.selectedForReview}</small>}
+      {claim.agent_review && (
+        <em className={`review-state review-state--${claim.agent_review.decision}`}>
+          {claim.agent_review.decision === "agent_approved"
+            ? t.approvedByAgent
+            : claim.agent_review.decision === "agent_rejected"
+              ? t.rejectedByAgent
+              : t.needsHuman}
+          {` · ${claim.agent_review.priority}`}
+        </em>
+      )}
+      {conflictByClaim.has(claim.id) && (
+        <em className={`claim-relation claim-relation--${conflictByClaim.get(claim.id)?.relation}`}>
+          {conflictByClaim.get(claim.id)?.relation === "conflicting" ? t.conflicting : t.possiblyCoexisting}
+        </em>
+      )}
+      {isComplete && (
+        <em className={`review-state review-state--${claim.latest_review?.decision}`}>
+          {reviewLabel(claim.latest_review?.decision ?? null)}
+        </em>
+      )}
+    </button>
+  );
+
+  const reviewForm = selectedClaim ? (
+    <form className="claim-review-form" onSubmit={submitReview}>
+      <ChoiceCards
+        label={t.latestDecision}
+        name={`review-decision-${selectedClaim.id}`}
+        onChange={(value) => setReviewDecision(value as ReviewDecision)}
+        options={decisionOptions}
+        value={reviewDecision}
+      />
+      {reviewDecision === "approve_with_edit" && (
+        <label>
+          <span>{t.editedValue}</span>
+          <textarea
+            required
+            maxLength={4000}
+            value={reviewEditedValue}
+            onChange={(event) => setReviewEditedValue(event.target.value)}
+          />
+          <small>{t.editedValueHint}</small>
+        </label>
+      )}
+      <ChoiceCards
+        label={t.reviewReason}
+        name={`review-reason-${selectedClaim.id}`}
+        onChange={setReviewReasonChoice}
+        options={reviewReasonOptions}
+        value={reviewReasonChoice}
+      />
+      {reviewReasonChoice === "other" && (
+        <label>
+          <span>{t.otherReason}</span>
+          <textarea
+            required
+            maxLength={1000}
+            placeholder={t.reviewReasonPlaceholder}
+            value={reviewReason}
+            onChange={(event) => setReviewReason(event.target.value)}
+          />
+        </label>
+      )}
+      <button className="primary-button" disabled={busy !== null || !reviewReasonValue} type="submit">
+        {busy === "review" ? t.savingReview : t.submitReview}
+      </button>
+    </form>
+  ) : null;
 
   if (loading) return <div className="empty-state knowledge-loading">{t.loading}</div>;
 
@@ -1222,8 +1585,20 @@ export function KnowledgeWorkspace({
             <form className="compact-form" onSubmit={correctEntity}>
               <label><span>{t.gameName}</span><input required maxLength={300} value={correctionName} onChange={(event) => setCorrectionName(event.target.value)} /></label>
               <label><span>{t.aliases}</span><textarea maxLength={2000} value={correctionAliases} onChange={(event) => setCorrectionAliases(event.target.value)} /></label>
-              <label><span>{t.reason}</span><input required maxLength={500} placeholder={t.reasonPlaceholder} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} /></label>
-              <div className="inline-actions"><button className="primary-button" disabled={busy !== null} type="submit">{busy === "correct" ? t.submitting : t.saveCorrection}</button><button type="button" onClick={() => setShowCorrect(false)}>{t.cancel}</button></div>
+              <ChoiceCards
+                label={t.reason}
+                name="correction-reason"
+                onChange={setCorrectionReasonChoice}
+                options={correctionReasonOptions}
+                value={correctionReasonChoice}
+              />
+              {correctionReasonChoice === "other" && (
+                <label>
+                  <span>{t.otherReason}</span>
+                  <input required maxLength={500} placeholder={t.otherReasonPlaceholder} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} />
+                </label>
+              )}
+              <div className="inline-actions"><button className="primary-button" disabled={busy !== null || !correctionReasonValue} type="submit">{busy === "correct" ? t.submitting : t.saveCorrection}</button><button type="button" onClick={() => setShowCorrect(false)}>{t.cancel}</button></div>
             </form>
           )}
         </section>
@@ -1289,7 +1664,7 @@ export function KnowledgeWorkspace({
             <button
               className="primary-button"
               type="button"
-              disabled={busy !== null || claims.length === 0 || !extractionRunId}
+              disabled={busy !== null || currentBatchClaims.length === 0 || !extractionRunId}
               onClick={() => void startAgentReview()}
             >
               {busy === "agent-review" ? t.reviewing : t.startAgentReview}
@@ -1397,17 +1772,26 @@ export function KnowledgeWorkspace({
                               <option value="dismissed">{t.dismissConflict}</option>
                             </select>
                           </label>
-                          <label>
-                            <span>{t.closureReason}</span>
-                            <textarea
-                              required
-                              maxLength={1000}
-                              placeholder={t.closureReasonPlaceholder}
-                              value={closureReason}
-                              onChange={(event) => setClosureReason(event.target.value)}
-                            />
-                          </label>
-                          <button className="primary-button" disabled={busy !== null} type="submit">
+                          <ChoiceCards
+                            label={t.closureReason}
+                            name={`closure-reason-${group.id}`}
+                            onChange={setClosureReasonChoice}
+                            options={closureReasonOptions}
+                            value={closureReasonChoice}
+                          />
+                          {closureReasonChoice === "other" && (
+                            <label>
+                              <span>{t.otherReason}</span>
+                              <textarea
+                                required
+                                maxLength={1000}
+                                placeholder={t.closureReasonPlaceholder}
+                                value={closureReason}
+                                onChange={(event) => setClosureReason(event.target.value)}
+                              />
+                            </label>
+                          )}
+                          <button className="primary-button" disabled={busy !== null || !closureReasonValue} type="submit">
                             {busy === "closure" ? t.closingConflict : t.submitClosure}
                           </button>
                         </form>
@@ -1426,41 +1810,60 @@ export function KnowledgeWorkspace({
       <div className="claim-evidence-layout">
         <section className="panel claim-browser">
           <div className="list-heading"><h2>{t.candidates}</h2><span>{claims.length}</span></div>
+          <section
+            className={projectPendingClaims.length > 0 ? "review-queue review-queue--pending" : "review-queue review-queue--done"}
+            aria-labelledby="review-queue-title"
+            aria-live="polite"
+          >
+            <div className="review-queue__title">
+              <span>{projectPendingClaims.length > 0 ? projectPendingClaims.length : "✓"}</span>
+              <div>
+                <small>{t.reviewQueue}</small>
+                <h3 id="review-queue-title">{projectPendingClaims.length > 0 ? t.reviewQueuePending : t.reviewQueueDone}</h3>
+                <p>{t.reviewQueueHint}</p>
+              </div>
+            </div>
+            <dl className="review-queue__metrics">
+              <div><dt>{t.projectRemaining}</dt><dd>{projectPendingClaims.length}</dd></div>
+              <div><dt>{t.entityRemaining}</dt><dd>{pendingClaims.length}</dd></div>
+              <div><dt>{t.completedCount}</dt><dd>{projectCompletedClaims.length}</dd></div>
+            </dl>
+            {projectPendingClaims.length > 0 && (
+              <button className="primary-button" type="button" onClick={focusNextPendingClaim}>
+                {pendingClaims.length > 0 ? t.reviewNext : t.reviewOtherEntity}
+              </button>
+            )}
+          </section>
           <div className="candidate-warning">{t.unreviewed}</div>
           {agentReview && (
             <button className="ghost-button" type="button" onClick={() => setShowAgentRejected((current) => !current)}>
               {showAgentRejected ? t.hideRejected : t.showRejected} ({agentReview.counts.agent_rejected})
             </button>
           )}
-          {claims.length === 0 ? <div className="empty-state">{t.noClaims}</div> : groupedClaims.map(([predicate, items]) => (
-            <div className="claim-group" key={predicate}>
-              <h3>{predicateNames[language][predicate] ?? predicate}</h3>
-              {items.map((claim) => (
-                <button className={selectedClaimId === claim.id ? "claim-card active" : "claim-card"} type="button" key={claim.id} aria-pressed={selectedClaimId === claim.id} onClick={() => setSelectedClaimId(claim.id)}>
-                  <strong>{displayValue(claim.value)}</strong>
-                  <span>{Math.round(claim.confidence * 100)}% · {claim.locale} · {claim.region}</span>
-                  {claim.agent_review && (
-                    <em className={`review-state review-state--${claim.agent_review.decision}`}>
-                      {claim.agent_review.decision === "agent_approved"
-                        ? t.approvedByAgent
-                        : claim.agent_review.decision === "agent_rejected"
-                          ? t.rejectedByAgent
-                          : t.needsHuman}
-                      {` · ${claim.agent_review.priority}`}
-                    </em>
-                  )}
-                  {conflictByClaim.has(claim.id) && (
-                    <em className={`claim-relation claim-relation--${conflictByClaim.get(claim.id)?.relation}`}>
-                      {conflictByClaim.get(claim.id)?.relation === "conflicting" ? t.conflicting : t.possiblyCoexisting}
-                    </em>
-                  )}
-                  <em className={`review-state review-state--${claim.latest_review?.decision ?? "unreviewed"}`}>
-                    {reviewLabel(claim.latest_review?.decision ?? null)}
-                  </em>
-                </button>
+          {claims.length === 0 ? <div className="empty-state">{t.noClaims}</div> : (
+            <>
+              <div className="claim-section-heading"><h3>{t.pendingList}</h3><span>{pendingClaims.length}</span></div>
+              {groupedPendingClaims.length === 0 ? (
+                <div className="review-complete-inline">✓ {t.reviewQueueDone}</div>
+              ) : groupedPendingClaims.map(([predicate, items]) => (
+                <div className="claim-group" key={predicate}>
+                  <h3>{predicateNames[language][predicate] ?? predicate}</h3>
+                  {items.map((claim) => renderClaimCard(claim, false))}
+                </div>
               ))}
-            </div>
-          ))}
+              {completedClaims.length > 0 && (
+                <details className="completed-claims">
+                  <summary>✓ {t.completedList} · {completedClaims.length}</summary>
+                  {groupedCompletedClaims.map(([predicate, items]) => (
+                    <div className="claim-group" key={predicate}>
+                      <h3>{predicateNames[language][predicate] ?? predicate}</h3>
+                      {items.map((claim) => renderClaimCard(claim, true))}
+                    </div>
+                  ))}
+                </details>
+              )}
+            </>
+          )}
         </section>
 
         <aside className="panel evidence-panel" aria-labelledby="evidence-title">
@@ -1488,45 +1891,15 @@ export function KnowledgeWorkspace({
                   <h3 id="claim-review-title">{t.reviewTitle}</h3>
                   <p>{t.reviewHint}</p>
                 </div>
-                <form className="claim-review-form" onSubmit={submitReview}>
-                  <label>
-                    <span>{t.latestDecision}</span>
-                    <select
-                      value={reviewDecision}
-                      onChange={(event) => setReviewDecision(event.target.value as ReviewDecision)}
-                    >
-                      <option value="approve">{t.approve}</option>
-                      <option value="approve_with_edit">{t.approveWithEdit}</option>
-                      <option value="reject">{t.reject}</option>
-                      <option value="defer">{t.defer}</option>
-                    </select>
-                  </label>
-                  {reviewDecision === "approve_with_edit" && (
-                    <label>
-                      <span>{t.editedValue}</span>
-                      <textarea
-                        required
-                        maxLength={4000}
-                        value={reviewEditedValue}
-                        onChange={(event) => setReviewEditedValue(event.target.value)}
-                      />
-                      <small>{t.editedValueHint}</small>
-                    </label>
-                  )}
-                  <label>
-                    <span>{t.reviewReason}</span>
-                    <textarea
-                      required
-                      maxLength={1000}
-                      placeholder={t.reviewReasonPlaceholder}
-                      value={reviewReason}
-                      onChange={(event) => setReviewReason(event.target.value)}
-                    />
-                  </label>
-                  <button className="primary-button" disabled={busy !== null} type="submit">
-                    {busy === "review" ? t.savingReview : t.submitReview}
-                  </button>
-                </form>
+                {hasFinalHumanDecision(selectedClaim) ? (
+                  <>
+                    <div className="review-submitted" role="status">
+                      <span>✓</span>
+                      <div><strong>{t.submittedBadge}</strong><p>{t.completedConfirmation}</p></div>
+                    </div>
+                    <details className="revise-review"><summary>{t.reviseDecision}</summary>{reviewForm}</details>
+                  </>
+                ) : reviewForm}
                 <div className="review-history">
                   <strong>{t.reviewHistory}</strong>
                   {(selectedClaim.reviews ?? []).length === 0 ? <p>{t.noReview}</p> : (
@@ -1578,8 +1951,13 @@ export function KnowledgeWorkspace({
               <ul className="snapshot-blockers">
                 {snapshotReadiness.blockers.map((blocker, index) => (
                   <li key={`${blocker.code}-${index}`}>
-                    <strong>{t.snapshotBlockers[blocker.code as keyof typeof t.snapshotBlockers] ?? blocker.message}</strong>
-                    {blocker.count !== undefined && <span>{blocker.count}</span>}
+                    <div>
+                      <strong>{t.snapshotBlockers[blocker.code as keyof typeof t.snapshotBlockers] ?? blocker.message}</strong>
+                      {blocker.count !== undefined && <span>{blocker.count}</span>}
+                    </div>
+                    {(blocker.code === "unreviewed_claims" || blocker.code === "deferred_claims") && projectPendingClaims.length > 0 && (
+                      <button type="button" onClick={focusNextPendingClaim}>{t.blockerAction} →</button>
+                    )}
                   </li>
                 ))}
               </ul>

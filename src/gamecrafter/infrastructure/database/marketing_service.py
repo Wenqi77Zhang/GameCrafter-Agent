@@ -380,7 +380,7 @@ class DatabaseMarketingService:
                         "task_id": str(task.id),
                         "candidate_count": created_count,
                         "agent_version": CAMPAIGN_STRATEGIST.version,
-                        "agent_mode": CAMPAIGN_STRATEGIST.mode.value,
+                        "agent_mode": "deterministic",
                         "human_topic_gate_required": True,
                     },
                 )
@@ -498,7 +498,8 @@ class DatabaseMarketingService:
                 "marketing_direction": chosen.angle,
                 "recommended_topic": chosen.hook,
                 "core_message": (
-                    f"Use the verified {signal.title} signal as the entry point, then earn "
+                    f"Use the recorded {signal.title} topic reference as the entry point, "
+                    "then earn "
                     f"interest in {game_name} with approved knowledge instead of "
                     "unsupported claims."
                 ),
@@ -585,7 +586,7 @@ class DatabaseMarketingService:
                 "agent": {
                     "key": CAMPAIGN_STRATEGIST.key,
                     "version": CAMPAIGN_STRATEGIST.version,
-                    "mode": CAMPAIGN_STRATEGIST.mode.value,
+                    "mode": "deterministic",
                     "model_used": False,
                 },
                 "candidate": chosen_payload,
@@ -763,10 +764,10 @@ class DatabaseMarketingService:
             },
             "matched_snapshot_member_ids": matched,
             "angle": (
-                f"Use the verified “{signal.title}” signal as a {task.platform} angle "
-                f"for {game_name}."
+                f"Explore the recorded “{signal.title}” topic for {game_name} on {task.platform}; "
+                "check its relevance against the reviewed game facts."
             ),
-            "hook": f"What if “{signal.title}” happened inside {game_name}?",
+            "hook": f"{game_name}: a fact-led introduction connected to “{signal.title}”.",
             "rationale": (
                 f"Deterministic {FIT_RULE_VERSION} score {score}/100: freshness {freshness}/25, "
                 f"market alignment {region}/25, source completeness {evidence}/25, and "

@@ -8,12 +8,24 @@ import hashlib
 import json
 import re
 from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import Any
 from uuid import UUID
 from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
-from sqlalchemy import Date, DateTime, LargeBinary, Uuid, delete, func, insert, select, text
+from sqlalchemy import (
+    Date,
+    DateTime,
+    LargeBinary,
+    Numeric,
+    Uuid,
+    delete,
+    func,
+    insert,
+    select,
+    text,
+)
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -447,6 +459,15 @@ class DatabaseProjectPortabilityService:
                 if not isinstance(value, dict) or set(value) != {"base64"}:
                     raise ProjectPortabilityError("archive contains invalid binary data")
                 value = base64.b64decode(value["base64"], validate=True)
+            elif value is not None and isinstance(column.type, Numeric):
+                try:
+                    value = Decimal(str(value))
+                    if not value.is_finite():
+                        raise ValueError("non-finite number")
+                except (InvalidOperation, ValueError):
+                    raise ProjectPortabilityError(
+                        "archive contains an invalid numeric value"
+                    ) from None
             result[column.name] = value
         return result
 
@@ -478,4 +499,6 @@ class DatabaseProjectPortabilityService:
             return value.isoformat() if not isinstance(value, UUID) else str(value)
         if isinstance(value, bytes):
             return {"base64": base64.b64encode(value).decode()}
+        if isinstance(value, Decimal):
+            return str(value)  # Preserve exact confidence/metric precision across archive restores.
         return value

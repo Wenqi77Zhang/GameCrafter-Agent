@@ -58,24 +58,24 @@ TREND_ANALYST = AgentSpec(
 CAMPAIGN_STRATEGIST = AgentSpec(
     "marketing.campaign_strategist",
     "Campaign Strategist",
-    "1.1.0",
-    AgentMode.DETERMINISTIC,
+    "2.0.0",
+    AgentMode.LOCAL_MODEL,
     "plan from frozen evidence",
     True,
 )
 SCRIPT_WRITER = AgentSpec(
     "creation.script_writer",
     "Script Writer",
-    "1.0.0",
-    AgentMode.DETERMINISTIC,
+    "2.0.0",
+    AgentMode.LOCAL_MODEL,
     "structured generation",
     False,
 )
 QUALITY_CRITIC = AgentSpec(
     "creation.quality_critic",
     "Quality and Compliance Critic",
-    "1.0.0",
-    AgentMode.DETERMINISTIC,
+    "2.0.0",
+    AgentMode.LOCAL_MODEL,
     "bounded evaluator optimizer",
     True,
 )
@@ -107,6 +107,7 @@ def public_agent_catalog() -> list[dict[str, object]]:
             "name": item.name,
             "version": item.version,
             "mode": item.mode.value,
+            "role_kind": "model_agent" if item.mode is AgentMode.LOCAL_MODEL else "workflow_tool",
             "reasoning_pattern": item.reasoning_pattern,
             "human_gate_after": item.human_gate_after,
         }

@@ -9,8 +9,18 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
     try {
-      const payload = (await response.json()) as { detail?: string };
-      detail = payload.detail ?? detail;
+      const payload = (await response.json()) as { detail?: unknown };
+      if (typeof payload.detail === "string") detail = payload.detail;
+      else if (Array.isArray(payload.detail)) {
+        // FastAPI validation errors are an array. Never echo their raw input (may contain secrets).
+        const messages = payload.detail.map(
+          (item: { loc?: unknown[]; msg?: unknown }) =>
+            typeof item.msg === "string"
+              ? `${(item.loc ?? []).filter((p) => p !== "body").join(".")}: ${item.msg}`
+              : "Invalid input",
+        );
+        detail = messages.join("; ");
+      }
     } catch {
       // A non-JSON proxy error is still represented by its status.
     }

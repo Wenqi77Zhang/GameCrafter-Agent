@@ -94,3 +94,33 @@ def test_remote_build_inputs_are_immutable() -> None:
     action_uses = re.findall(r"uses:\s*[^@\s]+@([^\s#]+)", workflow)
     assert action_uses
     assert all(re.fullmatch(r"[0-9a-f]{40}", revision) for revision in action_uses)
+
+
+def test_compose_preserves_creative_model_override_and_loopback_boundary() -> None:
+    compose = (ROOT / "compose.production.yaml").read_text(encoding="utf-8")
+    assert (
+        "GAMECRAFTER_CREATIVE_OLLAMA_MODEL: "
+        "${GAMECRAFTER_CREATIVE_OLLAMA_MODEL:-${GAMECRAFTER_OLLAMA_MODEL:-qwen3.5:4b}}"
+    ) in compose
+    assert '"127.0.0.1:8080:8080"' in compose
+    assert "GAMECRAFTER_AUTH_ENABLED: ${GAMECRAFTER_AUTH_ENABLED:-false}" in compose
+    # This remains a local profile, not an implicitly public/authenticated release.
+    assert "0.0.0.0:8080" not in compose
+
+
+def test_default_pytest_does_not_clear_a_fixed_workspace_directory() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert "--basetemp" not in project["tool"]["pytest"]["ini_options"]["addopts"]
+    # pytest allocates its own per-run temporary directory; verify.ps1 uses an explicit unique one.
+    # Historical .pytest-local artifacts must not be deleted just by running tests.
+
+
+def test_frontend_release_checks_include_development_dependency_security() -> None:
+    workflow = (ROOT / ".github/workflows/verify.yml").read_text(encoding="utf-8")
+    assert "- run: pnpm audit --audit-level high" in workflow
+    # A --prod-only audit misses the Vite and Vitest tools used in development and CI.
+    package = json.loads((ROOT / "apps/web/package.json").read_text(encoding="utf-8"))
+    assert package["devDependencies"]["vite"] == "7.3.7"
+    assert package["devDependencies"]["vitest"] == "4.1.12"
+    workspace = (ROOT / "pnpm-workspace.yaml").read_text(encoding="utf-8")
+    assert "source-map-js: 1.2.2" in workspace

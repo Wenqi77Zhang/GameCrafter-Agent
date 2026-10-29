@@ -1398,6 +1398,9 @@ class ScriptVersionRecord(Base):
     origin: Mapped[str] = mapped_column(String(24), nullable=False)
     content: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False)
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    generation_metadata: Mapped[dict[str, Any]] = mapped_column(
+        json_type, nullable=False, default=dict
+    )
     created_by: Mapped[str] = mapped_column(String(120), nullable=False)
     command_key: Mapped[str] = mapped_column(String(160), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -1430,6 +1433,7 @@ class ScriptEvaluationRecord(Base):
     dimensions: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False, default=dict)
     issues: Mapped[list[str]] = mapped_column(json_type, nullable=False, default=list)
     rule_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    semantic_report: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False, default=dict)
     command_key: Mapped[str] = mapped_column(String(160), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
@@ -1495,6 +1499,37 @@ class ScriptExportRecord(Base):
     format: Mapped[str] = mapped_column(String(24), nullable=False)
     payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     command_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class CreativeOperationRecord(Base):
+    """Frozen local-model request and resumable stage outputs, separate from business approval."""
+
+    __tablename__ = "creative_operations"
+    __table_args__ = (
+        UniqueConstraint("workflow_run_id", name="uq_creative_operations_workflow"),
+        CheckConstraint(
+            "operation IN ('strategy', 'write', 'revise', 'critique')",
+            name="ck_creative_operations_kind",
+        ),
+        CheckConstraint("length(input_sha256) = 64", name="ck_creative_operations_digest"),
+        Index("ix_creative_operations_project_target", "project_id", "target_id", "created_at"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
+    )
+    workflow_run_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("workflow_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    operation: Mapped[str] = mapped_column(String(24), nullable=False)
+    target_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    input_data: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False)
+    input_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    stages: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False, default=dict)
+    result: Mapped[dict[str, Any]] = mapped_column(json_type, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

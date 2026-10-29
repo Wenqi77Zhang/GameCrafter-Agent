@@ -167,6 +167,27 @@ def test_postgres_freezes_script_versions_and_approved_export_lineage() -> None:
         command_key=f"script-generate-{nonce}",
     )
     version_id = UUID(str(version["id"]))
+    # The legacy endpoint provides only a manual scaffold, not a ready AI script.
+    assert version["generation_metadata"]["mode"] == "manual_scaffold"
+    voices = [
+        "Ever wondered what this game is called?",
+        "The official title is Neverness to Everness.",
+        "Before making promises about gameplay, start with the name and check the official source.",
+        "What would you want to know next about Neverness to Everness?",
+        "Save this update and tell us what you want to see next.",
+    ]
+    content = version["content"]
+    for section, voice in zip(content["sections"], voices, strict=True):
+        section["voiceover"] = voice
+        section["on_screen_text"] = "Neverness to Everness"
+    version, _ = scripts.edit(
+        project_id=project_id,
+        run_id=run_id,
+        content=content,
+        actor_id="acceptance-test",
+        command_key=f"script-edit-{nonce}",
+    )
+    version_id = UUID(str(version["id"]))
     evaluation, _ = scripts.evaluate(
         project_id=project_id,
         run_id=run_id,

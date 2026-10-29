@@ -1,6 +1,11 @@
 # Readable marketing strategy brief
 
-Status: implemented in M17.
+Status: M17 rule-based projection, retained as an auxiliary reference in M19.
+
+The deterministic strings below are not a real generated marketing conclusion. M19 adds a primary
+local-model recommendation with a Chinese topic sentence, two English hooks, evidence rationale,
+execution steps and a measurement plan. A second model call checks it; blocked suggestions remain
+visible but are not fed to the Script Writer. See [current workflow](real-creative-workflow.md).
 
 ## Product outcome
 
@@ -44,4 +49,3 @@ for audit. They no longer substitute for the conclusion itself.
 7. Select “按此方向生成脚本” and confirm that the Creation workspace opens.
 8. Switch to English and repeat the visual review. At desktop and mobile widths, no horizontal page
    overflow or browser-console error is acceptable.
-

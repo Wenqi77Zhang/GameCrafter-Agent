@@ -2,6 +2,26 @@
 
 Status: confirmed on 2026-07-27; local-product boundary extended and completed on 2026-08-26.
 
+## M19 correction and implementation contract (2026-09-11)
+
+The owner's September request authorizes replacing fake or unreasonable implementation while
+preserving the product boundary. The older milestone descriptions below are historical decisions,
+not proof of current model quality or deployment readiness. Current verification is recorded in
+[real-creative-workflow.md](real-creative-workflow.md).
+
+- Five model roles execute real local inference: Curator, Reviewer, Campaign Strategist,
+  Script Writer and Quality Critic. Source capture, trend normalization/fit and GDD structuring are
+  deterministic tools, not LLM agents. See the updated architecture DAGs.
+- A rule-projected brief and a scaffold are useful references, not completed marketing strategy
+  or model-generated writing. Creative operations are durable local-model jobs without paid fallback.
+- Independent review means a separate invocation with its own evidence and instructions, not a
+  guarantee that correlated errors disappear. Final human accountability remains essential.
+- Rules assess pacing, screen length and evidence coverage, not market performance or semantic truth.
+  A passing current evaluation and explicit approval of that exact version are both required to export.
+- One schema/language repair per model stage, a persisted user-selected revision budget and fenced
+  cancellation bound the loop. Old reviews are never silently upgraded to the new policy.
+- Deployment is deferred. No commercial maturity or live-user validation is claimed by this change.
+
 GameCrafter is a long-term personal product, portfolio project, and potential commercial product. It is no longer a four-day team assignment.
 
 ## Product
