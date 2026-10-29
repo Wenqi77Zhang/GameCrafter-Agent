@@ -6,6 +6,7 @@ import json
 import re
 from collections.abc import Callable, Mapping
 from copy import deepcopy
+from dataclasses import asdict, dataclass
 from time import perf_counter
 from typing import Any
 
@@ -92,10 +93,34 @@ class CreativeCallError(CreativeError):
         self.provenance = provenance
 
 
+@dataclass(frozen=True)
+class ReviewInference:
+    """Bounded local review experiments; generation settings and authority are unchanged."""
+
+    thinking: bool = False
+    batch_size: int = REVIEW_BATCH_SIZE
+    max_tokens: int = 3000
+
+    def __post_init__(self):
+        if type(self.thinking) is not bool:
+            raise ValueError("thinking must be boolean")
+        if type(self.batch_size) is not int or not 1 <= self.batch_size <= REVIEW_BATCH_SIZE:
+            raise ValueError("review batch_size must be between 1 and 8")
+        if type(self.max_tokens) is not int or not 1000 <= self.max_tokens <= 8000:
+            raise ValueError("review max_tokens must be between 1000 and 8000")
+
+
 class LocalCreativeGateway:
-    def __init__(self, *, model: str, transport: Callable[[dict], Mapping]) -> None:
+    def __init__(
+        self,
+        *,
+        model: str,
+        transport: Callable[[dict], Mapping],
+        review_inference: ReviewInference | None = None,
+    ) -> None:
         self.model = model
         self.transport = transport
+        self.review_inference = review_inference or ReviewInference()
 
     def call(self, role: str, context: dict[str, Any], schema: type[BaseModel]):
         if role not in {"critique", "strategy_review"}:
@@ -117,8 +142,8 @@ class LocalCreativeGateway:
             for key, fact in facts.items()
         }
         issues, checks, records = [], [], []
-        for offset in range(0, len(texts), REVIEW_BATCH_SIZE):
-            batch = texts[offset : offset + REVIEW_BATCH_SIZE]
+        for offset in range(0, len(texts), self.review_inference.batch_size):
+            batch = texts[offset : offset + self.review_inference.batch_size]
             try:
                 review, usage = self._call_one(
                     "evidence_review",
@@ -187,6 +212,7 @@ class LocalCreativeGateway:
             "usage_complete": all(r["usage_complete"] for r in records),
             "duration_ms": sum(r["duration_ms"] for r in records),
             "paid_api_calls": 0,
+            "review_inference": asdict(self.review_inference),
             "segments": records,
         }
 
@@ -249,8 +275,7 @@ class LocalCreativeGateway:
         request = {
             "model": self.model,
             "stream": False,
-            # Both local sizes exhausted the thinking budget without structured output in QA.
-            "think": False,
+            "think": self.review_inference.thinking if role == "evidence_review" else False,
             "format": output_schema,
             "keep_alive": "5m",
             "options": {
@@ -260,7 +285,9 @@ class LocalCreativeGateway:
                 "top_p": 0.8,
                 "top_k": 20,
                 "min_p": 0.0,
-                "num_predict": 3000,
+                "num_predict": self.review_inference.max_tokens
+                if role == "evidence_review"
+                else 3000,
                 "num_ctx": 16384,
             },
             "messages": [
@@ -301,6 +328,12 @@ class LocalCreativeGateway:
                 "usage_complete": all(c.get("usage_available", False) for c in calls),
                 "duration_ms": round((perf_counter() - started) * 1000),
                 "paid_api_calls": 0,
+                "inference": {
+                    "thinking": request["think"],
+                    "options": dict(request["options"]),
+                    "system_sha256": fingerprint(request["messages"][0]["content"]),
+                    "schema_sha256": fingerprint(request["format"]),
+                },
                 "calls": calls,
             }
 

@@ -2,6 +2,12 @@
 
 ## Current status — M19 quality correction (2026-09-11)
 
+2026-10-30 release-readiness review: M19 is still in quality validation. See
+[demonstration and public-release gates](product/release-readiness.md). October's interrupted model
+runs were not acceptance evidence; the fresh five-case diagnostic still missed two unsupported claims.
+Model-identity drift/ambiguity also invalidated a controlled settings comparison; inference defaults remain unchanged.
+No public deployment or unattended-content approval is claimed.
+
 The older completion labels below record milestone history, not present commercial maturity.
 M19 replaces template writing, template-reset revision and completeness-only grading with real
 local generation, independent semantic review, usable editing and current-version export guards.

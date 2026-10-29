@@ -31,7 +31,7 @@ dev = [
 packages = ["src/gamecrafter"]
 
 [tool.pytest.ini_options]
-addopts = "-q --strict-markers -p no:cacheprovider --basetemp=.pytest-local"
+addopts = "-q --strict-markers -p no:cacheprovider"
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [

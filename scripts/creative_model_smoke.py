@@ -26,6 +26,7 @@ from gamecrafter.infrastructure.database.models import Base  # noqa: E402
 from gamecrafter.infrastructure.database.script_service import DatabaseScriptService  # noqa: E402
 from gamecrafter.infrastructure.local_ai.creative import LocalCreativeGateway  # noqa: E402
 from gamecrafter.infrastructure.local_ai.ollama import OllamaLoopbackTransport  # noqa: E402
+from gamecrafter.infrastructure.storage.json_report import write_json_report  # noqa: E402
 
 
 def smoke_exit_code(operations, latest_review_passed):
@@ -99,9 +100,8 @@ def main():
     }
 
     def save_report():
-        body = json.dumps(report, ensure_ascii=False, indent=2)
-        (output / "creative-live-latest.json").write_text(body, encoding="utf-8")
-        database.with_suffix(".json").write_text(body, encoding="utf-8")
+        write_json_report(database.with_suffix(".json"), report)
+        write_json_report(output / "creative-live-latest.json", report)
 
     print(json.dumps({k: v for k, v in report.items() if k != "operations"}), flush=True)
     for operation in ("strategy", "write"):

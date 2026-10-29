@@ -4,7 +4,11 @@ import pytest
 
 from gamecrafter.application.creative import CreativeError, Critique, readiness_report
 from gamecrafter.application.evidence_review import review_texts
-from gamecrafter.infrastructure.local_ai.creative import CreativeCallError, LocalCreativeGateway
+from gamecrafter.infrastructure.local_ai.creative import (
+    CreativeCallError,
+    LocalCreativeGateway,
+    ReviewInference,
+)
 
 FACTS = [
     {
@@ -318,3 +322,63 @@ def test_review_keeps_subject_and_scope_but_omits_internal_entity_ids():
         "game_version": "1.0",
     }
     assert "private-id" not in json.dumps(data) and "private-revision" not in json.dumps(data)
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"thinking": "yes"},
+        {"batch_size": True},
+        {"batch_size": 0},
+        {"batch_size": 9},
+        {"max_tokens": True},
+        {"max_tokens": 999},
+        {"max_tokens": 8001},
+    ],
+)
+def test_review_inference_limits_cannot_be_unbounded(config):
+    with pytest.raises(ValueError):
+        ReviewInference(**config)
+
+
+def test_review_experiment_records_effective_settings_without_hidden_reasoning():
+    requests = []
+
+    def transport(request):
+        requests.append(request)
+        response = model_response(request)
+        response["message"]["thinking"] = "private-hidden-reasoning"
+        return response
+
+    config = ReviewInference(thinking=True, batch_size=1, max_tokens=6000)
+    result, usage = LocalCreativeGateway(
+        model="fixture", transport=transport, review_inference=config
+    ).call("critique", {"draft": {"title": "First", "caption": "Second"}}, Critique)
+    assert len(requests) == len(result.fact_checks) == 2
+    assert all(request["think"] is True for request in requests)
+    assert all(request["options"]["num_predict"] == 6000 for request in requests)
+    assert usage["review_inference"] == {"thinking": True, "batch_size": 1, "max_tokens": 6000}
+    assert usage["output_tokens"] == 34
+    settings = usage["segments"][0]["inference"]
+    assert settings["thinking"] is True and len(settings["system_sha256"]) == 64
+    assert settings["options"]["num_ctx"] == 16384
+    assert "private-hidden-reasoning" not in json.dumps(usage)
+
+
+def test_review_experiment_does_not_change_writer_settings():
+    from gamecrafter.application.creative import ScriptDraft
+
+    requests = []
+
+    def transport(request):
+        requests.append(request)
+        return {"done": False}
+
+    with pytest.raises(CreativeCallError):
+        LocalCreativeGateway(
+            model="fixture",
+            transport=transport,
+            review_inference=ReviewInference(thinking=True, batch_size=1, max_tokens=6000),
+        ).call("write", {"facts": FACTS}, ScriptDraft)
+    assert requests[0]["think"] is False
+    assert requests[0]["options"]["num_predict"] == 3000

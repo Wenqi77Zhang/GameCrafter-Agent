@@ -6,15 +6,53 @@ Every attempt is saved, including errors. No cloud, database or paid API is used
 
 import argparse
 import json
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+import httpx2
+
 from gamecrafter.application.creative import PROMPT_VERSION, RULE_VERSION, Critique, fingerprint
-from gamecrafter.infrastructure.local_ai.creative import CreativeCallError, LocalCreativeGateway
+from gamecrafter.infrastructure.local_ai.creative import (
+    CreativeCallError,
+    LocalCreativeGateway,
+    ReviewInference,
+)
 from gamecrafter.infrastructure.local_ai.ollama import OllamaLoopbackTransport
+from gamecrafter.infrastructure.storage.json_report import write_json_report
 
 CORPUS_VERSION = "creative-support-cases-v2"
+HOLDOUT_PATH = (
+    Path(__file__).resolve().parents[1] / "tests/fixtures/creative_support_holdout_v1.json"
+)
+
+
+def holdout_corpus():
+    return json.loads(HOLDOUT_PATH.read_text(encoding="utf-8"))
+
+
+def local_model_identity(model):
+    """Require one local manifest identity, not just a mutable tag. Never pull a model."""
+    with httpx2.Client(trust_env=False, timeout=3) as client:
+        tags = client.get("http://127.0.0.1:11434/api/tags")
+        tags.raise_for_status()
+        version = client.get("http://127.0.0.1:11434/api/version")
+        version.raise_for_status()
+    matches = [
+        item
+        for item in tags.json().get("models", [])
+        if model in (item.get("name"), item.get("model"))
+    ]
+    if not matches:
+        raise ValueError("The exact requested local model is not installed; no download attempted.")
+    digests = {item.get("digest") for item in matches}
+    if len(digests) != 1 or not all(isinstance(value, str) and value for value in digests):
+        raise ValueError("Local model identity is ambiguous or missing; no inference attempted.")
+    engine_version = version.json().get("version")
+    if not isinstance(engine_version, str) or not engine_version:
+        raise ValueError("Local engine version is missing; no inference attempted.")
+    return {"digest": digests.pop(), "ollama_version": engine_version}
 
 
 def build_cases():
@@ -199,6 +237,18 @@ def metrics(attempts):
         "misses": sum(
             item["expected_blocked"] and not item["target_blocked"] for item in evaluated
         ),
+        "verdict_mismatches": sum(not item.get("verdicts_match", True) for item in evaluated),
+        "duration_ms": sum(
+            (item.get("provenance") or {}).get("duration_ms", 0) for item in attempts
+        ),
+        "input_tokens": sum(
+            (item.get("provenance") or {}).get("input_tokens", 0) for item in attempts
+        ),
+        "output_tokens": sum(
+            (item.get("provenance") or {}).get("output_tokens", 0) for item in attempts
+        ),
+        "usage_complete": bool(attempts)
+        and all((item.get("provenance") or {}).get("usage_complete") is True for item in attempts),
     }
 
 
@@ -223,13 +273,19 @@ def evaluate_case(gateway, case):
         and (not case["must_block_field"] or check.field == case["must_block_field"])
         for check in result.fact_checks
     )
-    passed = target_blocked if case["expected_blocked"] else not blocked
+    verdicts_match = all(
+        any(check.field == field for check in result.fact_checks)
+        and all(check.verdict in allowed for check in result.fact_checks if check.field == field)
+        for field, allowed in case.get("expected_verdicts", {}).items()
+    )
+    passed = (target_blocked if case["expected_blocked"] else not blocked) and verdicts_match
     return {
         **outcome,
         "status": "evaluated",
         "passed": passed,
         "blocked": blocked,
         "target_blocked": target_blocked,
+        "verdicts_match": verdicts_match,
         "review": result.model_dump(),
         "provenance": provenance,
     }
@@ -239,24 +295,55 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="qwen3.5:9b")
     parser.add_argument("--repeats", type=int, choices=range(1, 6), default=2)
-    parser.add_argument("--case", choices=[case["case"] for case in build_cases()])
+    parser.add_argument("--suite", choices=("regression", "holdout"), default="regression")
+    parser.add_argument("--case", action="append", help="Repeat to select cases within one suite.")
+    parser.add_argument("--thinking", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--batch-size", type=int, choices=range(1, 9))
+    parser.add_argument("--max-tokens", type=int, choices=(1000, 2000, 3000, 4000, 6000, 8000))
     args = parser.parse_args()
-    cases = [case for case in build_cases() if not args.case or case["case"] == args.case]
+    corpus = (
+        holdout_corpus()
+        if args.suite == "holdout"
+        else {
+            "version": CORPUS_VERSION,
+            "cases": build_cases(),
+            "evidence_mode": "controlled labelled fixtures; not a held-out or live-source test",
+            "label_authority": "Developer-authored regression expectations; not human acceptance.",
+        }
+    )
+    unknown = set(args.case or []) - {case["case"] for case in corpus["cases"]}
+    if unknown:
+        parser.error("Unknown case(s) for selected suite: " + ", ".join(sorted(unknown)))
+    cases = [case for case in corpus["cases"] if not args.case or case["case"] in args.case]
+    overrides = {
+        key: value
+        for key, value in {
+            "thinking": args.thinking,
+            "batch_size": args.batch_size,
+            "max_tokens": args.max_tokens,
+        }.items()
+        if value is not None
+    }
+    inference = ReviewInference(**overrides)
     gateway = LocalCreativeGateway(
         model=args.model,
         transport=OllamaLoopbackTransport(base_url="http://127.0.0.1:11434", timeout_seconds=300),
+        review_inference=inference,
     )
     report = {
         "model": args.model,
         "prompt_version": PROMPT_VERSION,
         "rule_version": RULE_VERSION,
-        "corpus_version": CORPUS_VERSION,
+        "corpus_version": corpus["version"],
         "corpus_sha256": fingerprint(cases),
+        "full_corpus_sha256": fingerprint(corpus["cases"]),
+        "review_inference": asdict(inference),
+        "selected_cases": [case["case"] for case in cases],
+        "planned_attempts": len(cases) * args.repeats,
         "repeats": args.repeats,
         "started_at": datetime.now(UTC).isoformat(),
-        "evidence_mode": "controlled labelled fixtures; not a held-out or live-source test",
-        "corpus_notes": "v2 adds an explicit NTE alias to the original controls; "
-        "old v1 and v2 scores are not directly comparable.",
+        "evidence_mode": corpus["evidence_mode"],
+        "label_authority": corpus["label_authority"],
         "cases": [],
         "complete": False,
     }
@@ -265,10 +352,18 @@ def main():
 
     def save():
         report["metrics"] = metrics(report["cases"])
-        output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        write_json_report(output, report)
 
     save()
     print(f"Report: {output}", flush=True)
+    try:
+        report["model_identity"] = local_model_identity(args.model)
+    except Exception as error:
+        report["preflight_error"] = type(error).__name__
+        save()
+        print("Local model identity preflight failed; no inference or model download.", flush=True)
+        return 1
+    save()
     for repetition in range(1, args.repeats + 1):
         for case in cases:
             result = {**evaluate_case(gateway, case), "repetition": repetition}
@@ -280,9 +375,15 @@ def main():
             )
     report["complete"] = True
     report["finished_at"] = datetime.now(UTC).isoformat()
+    try:
+        report["model_identity_after"] = local_model_identity(args.model)
+        report["identity_unchanged"] = report["model_identity"] == report["model_identity_after"]
+    except Exception as error:
+        report["postflight_error"] = type(error).__name__
+        report["identity_unchanged"] = False
     save()
     print(json.dumps(report["metrics"]), flush=True)
-    return 0 if all(c["passed"] for c in report["cases"]) else 1
+    return 0 if report["identity_unchanged"] and all(c["passed"] for c in report["cases"]) else 1
 
 
 if __name__ == "__main__":
