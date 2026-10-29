@@ -1,5 +1,9 @@
 # GameCrafter v2 product baseline
 
+> Historical baseline. The owner confirmed the marketing-first, game-agnostic redesign on 2026-10-30.
+> Use [baseline-v3.md](baseline-v3.md) for current product decisions. The old default game and
+> knowledge-first journey below are not new requirements; retained runtime contracts describe M19 history.
+
 Status: confirmed on 2026-07-27; local-product boundary extended and completed on 2026-08-26.
 
 ## M19 correction and implementation contract (2026-09-11)

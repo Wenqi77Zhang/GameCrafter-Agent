@@ -2,8 +2,24 @@
 
 > 将可追溯的游戏资料，变成可审核、可拍摄的海外短视频营销方案。
 
-GameCrafter 是面向游戏开发者和营销人员的个人开源 AI 应用。默认简体中文界面，
-支持切换英文；首个验证场景为《异环》（NTE）面向英语地区的 TikTok 营销。
+GameCrafter 面向独立游戏开发者和中小游戏团队，帮助用户选择营销方向，再生成可执行脚本。
+默认简体中文界面，支持切换英文；首先做好英语市场的 TikTok 短视频场景，不绑定指定游戏。
+
+## 已确认的新方向：营销优先
+
+2026-10-30 确认的目标流程：
+
+**输入游戏名称 → 自动寻找官网/官方媒体 → 必要时确认身份 → 查看最多三个营销方向 →
+选定方向并确认关键事实 → 编辑、评审并终审脚本 → 导出。**
+
+用户不必上传资料，也可补链接或提供私有材料。资料不足时不硬凑方案；来源与知识作为辅助信息，
+不把维护完整游戏百科当作创作前提。详见 [当前产品基线与改造顺序](docs/product/baseline-v3.md)。
+
+**实现状态：本次仅确认设计并同步文档。** 运行代码仍是 M19，包含旧案例的专用入口、
+采集适配和测试材料；尚未实现按任意游戏名称自动发现官方来源或新的方向优先主流程。
+下面的能力和测试说明描述现有代码，不是新版验收通过。
+
+## 现有实现：M19（改造前基础）
 
 项目当前处于 **M19 真实创作链路质量验证阶段**，不是已完成商业验证的成熟 SaaS。
 部署工作暂缓。代码检查、真实模型输出质量、真实用户验收和线上运行是四个独立状态；
@@ -61,7 +77,7 @@ GDD、运行记录和账户继续放在辅助工具层，不增加主创作步�
 **没有付费模型自动回退**。SQLite 只用于隔离测试，不是正式数据库替代方案。
 
 详见 [系统架构与 DAG](docs/architecture/system-architecture.md)、
-[产品基线](docs/product/baseline-v2.md)、[工作流说明](docs/product/real-creative-workflow.md)。
+[当前产品基线](docs/product/baseline-v3.md)、[M19 工作流说明](docs/product/real-creative-workflow.md)。
 
 ## 本地运行
 
@@ -110,6 +126,8 @@ CI 使用带 pgvector 的 PostgreSQL，验证迁移、业务约束和前后端�
 
 ## 文档与边界
 
+- [当前产品基线：营销优先改版与验收](docs/product/baseline-v3.md)
+- [历史 v2 基线](docs/product/baseline-v2.md)
 - [M19 实现、自查、验收步骤](docs/product/real-creative-workflow.md)
 - [对外演示与公开上线检查单](docs/product/release-readiness.md)
 - [前端引导工作区](docs/product/guided-workspace.md)
