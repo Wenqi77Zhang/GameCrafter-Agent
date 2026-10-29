@@ -1,6 +1,24 @@
 # Long-term roadmap
 
-## Current status — M19 quality correction (2026-09-11)
+## Current direction — marketing-first redesign (confirmed 2026-10-30)
+
+The owner removed the fixed NTE validation target and confirmed a game-name-first entry for independent
+developers and small/midsize studios. Uploads are optional: discover official sites/media, disambiguate
+identity when necessary, propose up to three evidence-bearing directions, then write only after the user
+chooses a direction and confirms its key facts. See the authoritative [v3 baseline](product/baseline-v3.md).
+
+| Batch | Outcome | State |
+|---|---|---|
+| A | Confirmed scope, source paths, marketing-first journey and migration/acceptance boundaries | documentation in this change |
+| B | Generic game identity and real, bounded official-source discovery; no required upload | not implemented |
+| C | Comparable direction cards and task-scoped fact confirmation, with visible next steps | not implemented |
+| D | Verified writing/export handoff and removal of active old-case dependencies | not implemented |
+
+Do not expand GDD/team/billing/Agent count to complete this redesign. Preserve source lineage, security,
+durable jobs and exact-version human approval. Do not erase historical data or treat old test results as
+acceptance of the new flow. Public deployment remains a separate gate.
+
+## Existing implementation — M19 quality correction (2026-09-11)
 
 2026-10-30 release-readiness review: M19 is still in quality validation. See
 [demonstration and public-release gates](product/release-readiness.md). October's interrupted model
