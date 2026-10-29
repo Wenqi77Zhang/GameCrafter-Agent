@@ -113,3 +113,14 @@ def test_default_pytest_does_not_clear_a_fixed_workspace_directory() -> None:
     assert "--basetemp" not in project["tool"]["pytest"]["ini_options"]["addopts"]
     # pytest allocates its own per-run temporary directory; verify.ps1 uses an explicit unique one.
     # Historical .pytest-local artifacts must not be deleted just by running tests.
+
+
+def test_frontend_release_checks_include_development_dependency_security() -> None:
+    workflow = (ROOT / ".github/workflows/verify.yml").read_text(encoding="utf-8")
+    assert "- run: pnpm audit --audit-level high" in workflow
+    # A --prod-only audit misses the Vite and Vitest tools used in development and CI.
+    package = json.loads((ROOT / "apps/web/package.json").read_text(encoding="utf-8"))
+    assert package["devDependencies"]["vite"] == "7.3.7"
+    assert package["devDependencies"]["vitest"] == "4.1.12"
+    workspace = (ROOT / "pnpm-workspace.yaml").read_text(encoding="utf-8")
+    assert "source-map-js: 1.2.2" in workspace

@@ -239,10 +239,18 @@ Playwright 技能驱动真实 Edge + 独立 SQLite API 的浏览器验收：点�
 
 **工程和运行状态：**
 
-- 最终 `scripts/verify.ps1`：后端 **262 通过、15 项 PostgreSQL 专属测试跳过**；前端 **39 通过**，
+- 最终 `scripts/verify.ps1`：后端 **263 通过、15 项 PostgreSQL 专属测试跳过**；前端 **39 通过**，
   类型检查、生产构建、Ruff 格式和静态检查通过。真实浏览器验收未执行，不能冒充全栈通过。
-- `pnpm audit --prod --audit-level high` 未发现前端运行时依赖的已知漏洞，范围不含 Python、
-  开发依赖、容器镜像或默认分支安全状态。
+- 首次 `pnpm audit --prod --audit-level high` 只覆盖前端运行时依赖，未发现已知漏洞。
+  随后全量检查发现开发/测试工具仍有 2 项高危、5 项中危、1 项低危告警；不能把首次结果写成全栈安全。
+- 对应修补为 Vite 7.3.7、Vitest 4.1.12 和 source-map-js 1.2.2，未升级主版本或修改业务代码。
+  依据 [Vite/launch-editor 公告](https://github.com/advisories/GHSA-587h-7wmj-h5pm)、
+  [Vitest 公告](https://github.com/advisories/GHSA-qxg6-89mg-rqv8) 和
+  [source-map-js 公告](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)；锁文件仅同步相关依赖。
+  `pnpm install --frozen-lockfile` 成功，完整 `pnpm audit` 未发现已知漏洞；CI 增加包含开发依赖的
+  `pnpm audit --audit-level high`。结果仍不覆盖 Python、镜像或整个应用的安全审查。
+- GitHub 默认分支当时仍有 10 项告警（3 高、6 中、1 低）。部分旧修补尚在本 PR；
+  不因本分支通过就关闭或忽略默认分支告警，实际合并后必须重新检查。
 - Docker Desktop 引擎未就绪；8080/8000/5173 未监听。没有重置 Docker、删除数据卷或启动公网。
 - 修复 Compose 创作专用模型漏传；实际 `docker compose ... config --format json` 验证 API 与
   worker 的默认创作模型随知识模型，显式创作 9b 覆盖时知识仍为 4b。没有据此声称容器运行正常。
