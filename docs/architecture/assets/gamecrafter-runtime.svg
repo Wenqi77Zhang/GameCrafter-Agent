@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1840" height="1280" viewBox="0 0 1840 1280" role="img" aria-labelledby="title desc">
+<title id="title">系统运行架构：界面、执行与数据边界</title>
+<desc id="desc">GameCrafter M19 current implementation, verified against the source code on 2026-11-11. Planned v3 features are explicitly separated.</desc>
+<rect x="0" y="0" width="1840" height="1280" rx="0" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="72" y="63" fill="#116c60" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">GAMECRAFTER / PRODUCT &amp; AGENT ENGINEERING</text>
+<text x="72" y="119" fill="#173244" font-size="43" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">系统运行架构：界面、执行与数据边界</text>
+<text x="72" y="159" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">现有 M19 实现 · 已包含 creative-evidence-v11 边界修复 · 非公开上线认证</text>
+<polyline points="72,193 1768,193" fill="none" stroke="#cdd9e2" stroke-width="1"/>
+<text x="72" y="1240" fill="#516878" font-size="16" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">依据：docs/architecture/system-architecture.md 与实际 Python / React 代码</text>
+<text x="1768" y="1240" fill="#516878" font-size="16" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="end">2026-11-11  |  1 / 2</text>
+<text x="72" y="230" fill="#173244" font-size="23" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">01 交互层  /  Interface and API</text>
+<rect x="72" y="255" width="250" height="125" rx="12" fill="#fff5de" stroke="#e0bd70" stroke-width="1.5"/>
+<text x="90" y="290" fill="#886018" font-size="25" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">用户与负责人</text>
+<text x="90" y="321" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">确认事实与选题</text>
+<text x="90" y="350" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">核对当前稿并终审</text>
+<rect x="392" y="255" width="575" height="125" rx="12" fill="#edf4fb" stroke="#afc6d9" stroke-width="1.5"/>
+<text x="410" y="290" fill="#205a85" font-size="27" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">React / TypeScript / Vite</text>
+<text x="410" y="321" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">中文默认、英文切换、五步制作路线</text>
+<text x="410" y="350" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">提交状态、问题定位、逐镜编辑、版本回看</text>
+<rect x="1040" y="255" width="728" height="125" rx="12" fill="#edf4fb" stroke="#afc6d9" stroke-width="1.5"/>
+<text x="1058" y="290" fill="#205a85" font-size="27" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">FastAPI / Pydantic</text>
+<text x="1058" y="321" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">输入与项目边界校验、幂等提交、只读状态接口</text>
+<text x="1058" y="350" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">认证与 RBAC 能力可用；录制使用本地单用户模式</text>
+<polyline points="322,318 392,318" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="392.00,318.00 382.00,322.50 382.00,313.50" fill="#728b9b"/>
+<polygon points="322.00,318.00 332.00,313.50 332.00,322.50" fill="#728b9b"/>
+<polyline points="967,318 1040,318" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1040.00,318.00 1030.00,322.50 1030.00,313.50" fill="#728b9b"/>
+<polygon points="967.00,318.00 977.00,313.50 977.00,322.50" fill="#728b9b"/>
+<polyline points="1404,380 1404,424 52,424 52,582 72,582" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="72.00,582.00 62.00,586.50 62.00,577.50" fill="#728b9b"/>
+<polygon points="1404.00,380.00 1408.50,390.00 1399.50,390.00" fill="#728b9b"/>
+<rect x="829.338134765625" y="409" width="341.32373046875" height="26" rx="3" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="1000" y="429" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="middle">命令入队 / 读取进度；前端轮询与部分 SSE</text>
+<text x="72" y="476" fill="#173244" font-size="23" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">02 执行与持久化  /  Modular Python backend</text>
+<rect x="72" y="500" width="480" height="165" rx="12" fill="#f4f6f8" stroke="#c7d3dc" stroke-width="1.5"/>
+<text x="90" y="535" fill="#405e74" font-size="27" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">PostgreSQL 17</text>
+<text x="90" y="566" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">业务实体、证据引用、知识快照</text>
+<text x="90" y="595" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">持久任务队列、创作阶段与脚本版本</text>
+<text x="90" y="624" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">审核决定、调用用量与审计记录</text>
+<rect x="680" y="500" width="480" height="165" rx="12" fill="#edf4fb" stroke="#afc6d9" stroke-width="1.5"/>
+<text x="698" y="535" fill="#205a85" font-size="27" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">共享 Python Worker</text>
+<text x="698" y="566" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">领取带尝试编号的任务租约</text>
+<text x="698" y="595" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">心跳续期、分阶段处理与结果验证</text>
+<text x="698" y="624" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">阶段缓存与原子保存；拒绝迟到写入</text>
+<rect x="1288" y="500" width="480" height="165" rx="12" fill="#e9f6f2" stroke="#91cbbf" stroke-width="1.5"/>
+<text x="1306" y="535" fill="#116c60" font-size="27" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">Ollama 本地推理</text>
+<text x="1306" y="566" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">提取 / 预审 / 策划 / 写作 / 质检</text>
+<text x="1306" y="595" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">Schema 约束、独立上下文、有界调用</text>
+<text x="1306" y="624" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">同一模型可承担多个角色，无云端回退</text>
+<polyline points="552,565 680,565" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="680.00,565.00 670.00,569.50 670.00,560.50" fill="#728b9b"/>
+<polygon points="552.00,565.00 562.00,560.50 562.00,569.50" fill="#728b9b"/>
+<rect x="566.84765625" y="530" width="98.3046875" height="25" rx="3" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="616" y="549" fill="#516878" font-size="16" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="middle">租约 / 状态</text>
+<polyline points="1160,565 1288,565" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1288.00,565.00 1278.00,569.50 1278.00,560.50" fill="#728b9b"/>
+<polygon points="1160.00,565.00 1170.00,560.50 1170.00,569.50" fill="#728b9b"/>
+<rect x="1175.0" y="530" width="98.0" height="25" rx="3" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="1224" y="549" fill="#516878" font-size="16" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="middle">结构化调用</text>
+<rect x="72" y="733" width="480" height="125" rx="12" fill="#f4f6f8" stroke="#c7d3dc" stroke-width="1.5"/>
+<text x="90" y="768" fill="#405e74" font-size="25" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">内容寻址对象存储</text>
+<text x="90" y="799" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">原始页面、规范化文本与导入文件</text>
+<text x="90" y="828" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">数据库保存对象键及哈希，不混作事实</text>
+<rect x="680" y="733" width="480" height="150" rx="12" fill="#edf4fb" stroke="#afc6d9" stroke-width="1.5"/>
+<text x="698" y="768" fill="#205a85" font-size="25" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">确定性业务工具</text>
+<text x="698" y="799" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">来源采集 / 趋势清洗匹配 / GDD 整理</text>
+<text x="698" y="828" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">来源异步；趋势与 GDD 由 API 调用</text>
+<text x="698" y="857" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">HTTP 优先；必要时受限浏览器回退</text>
+<rect x="1288" y="733" width="480" height="125" rx="12" fill="#fcf0ed" stroke="#e0b8ae" stroke-width="1.5"/>
+<text x="1306" y="768" fill="#935b4d" font-size="25" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">外部资料：不可信输入</text>
+<text x="1306" y="799" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">明确的官方页 / 可选本地文件 / 趋势</text>
+<text x="1306" y="828" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">来源地址、时间、地区与版本必须保留</text>
+<polyline points="312,665 312,733" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polyline points="920,665 920,733" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="920.00,733.00 915.50,723.00 924.50,723.00" fill="#728b9b"/>
+<polygon points="920.00,665.00 924.50,675.00 915.50,675.00" fill="#728b9b"/>
+<polyline points="1768,318 1806,318 1806,697 1090,697 1090,733" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1090.00,733.00 1085.50,723.00 1094.50,723.00" fill="#728b9b"/>
+<rect x="1377.373046875" y="682" width="225.25390625000003" height="26" rx="3" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="1490" y="702" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="middle">趋势 / GDD：API 同步调用</text>
+<polyline points="680,795 552,795" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="552.00,795.00 562.00,790.50 562.00,799.50" fill="#728b9b"/>
+<rect x="575.0" y="761" width="82.0" height="25" rx="3" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="616" y="780" fill="#516878" font-size="16" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="middle">保全来源</text>
+<polyline points="1160,795 1288,795" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1288.00,795.00 1278.00,799.50 1278.00,790.50" fill="#728b9b"/>
+<polygon points="1160.00,795.00 1170.00,790.50 1170.00,799.50" fill="#728b9b"/>
+<rect x="1183.0" y="761" width="82.0" height="25" rx="3" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="1224" y="780" fill="#516878" font-size="16" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="middle">受控访问</text>
+<rect x="72" y="899" width="1696" height="131" rx="12" fill="#f4f7fa" stroke="#c7d3dc" stroke-width="1.5"/>
+<text x="92" y="933" fill="#173244" font-size="23" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">Harness = 模型之外的工作流控制层</text>
+<text x="92" y="969" fill="#173244" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">提交安全</text>
+<text x="92" y="1001" fill="#516878" font-size="19" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">输入校验 · 项目边界 · 幂等</text>
+<text x="650" y="969" fill="#173244" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">执行安全</text>
+<text x="650" y="1001" fill="#516878" font-size="19" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">租约心跳 · 取消 · 限次重试 · 过期拒写</text>
+<text x="1230" y="969" fill="#173244" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">交付安全</text>
+<text x="1230" y="1001" fill="#516878" font-size="19" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">快照与版本绑定 · 终审守卫 · 审计</text>
+<text x="72" y="1073" fill="#173244" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">技术定位：Python 模块化单体 + 数据库持久队列；5 个模型职责，不是 5 个独立部署服务。</text>
+<rect x="72" y="1110" width="1696" height="88" rx="12" fill="#fffaed" stroke="#d9ba78" stroke-width="1.5" stroke-dasharray="7 5"/>
+<text x="92" y="1143" fill="#886018" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">规划，不计为当前能力</text>
+<text x="92" y="1177" fill="#516878" font-size="21" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">任意游戏名 → 自动发现官方来源 → 先比较 1-3 个营销方向。当前 M19 仍含旧案例入口。</text>
+</svg>
