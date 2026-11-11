@@ -237,10 +237,20 @@ class DatabaseKnowledgeRepository:
         subject_entity_id: UUID,
         prompt_version: str,
         schema_version: str,
+        model_provider: str,
+        model_name: str,
     ) -> UUID | None:
-        """Reuse an exact completed extraction instead of duplicating its claims."""
+        """Reuse only results produced by the requested provider and model name.
+
+        Invocation provenance also covers empty claim sets. Mixed successful
+        attempts are conservatively excluded rather than attributed to one model.
+        """
 
         with self._session_factory() as session:
+            successful_invocations = select(ModelInvocationRecord.id).where(
+                ModelInvocationRecord.run_id == KnowledgeExtractionResultRecord.run_id,
+                ModelInvocationRecord.status == "succeeded",
+            )
             return session.scalar(
                 select(KnowledgeExtractionResultRecord.run_id)
                 .join(
@@ -254,6 +264,14 @@ class DatabaseKnowledgeRepository:
                     KnowledgeExtractionResultRecord.prompt_version == prompt_version,
                     KnowledgeExtractionResultRecord.schema_version == schema_version,
                     WorkflowRunRecord.status == "succeeded",
+                    successful_invocations.where(
+                        ModelInvocationRecord.provider == model_provider,
+                        ModelInvocationRecord.model == model_name,
+                    ).exists(),
+                    ~successful_invocations.where(
+                        (ModelInvocationRecord.provider != model_provider)
+                        | (ModelInvocationRecord.model != model_name)
+                    ).exists(),
                 )
                 .order_by(KnowledgeExtractionResultRecord.created_at.desc())
                 .limit(1)

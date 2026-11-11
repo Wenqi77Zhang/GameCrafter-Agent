@@ -11,6 +11,7 @@ from gamecrafter.application.knowledge_jobs import (
     EXTRACT_KNOWLEDGE_TASK,
     KnowledgeExtractionHandlers,
 )
+from gamecrafter.application.ports.model_gateway import CLAIM_PROMPT_VERSION, CLAIM_SCHEMA_VERSION
 from gamecrafter.domain.knowledge.claims import EntityType
 from gamecrafter.infrastructure.database.job_queue import DatabaseJobQueue
 from gamecrafter.infrastructure.database.knowledge_repository import (
@@ -151,6 +152,42 @@ def test_worker_persists_atomic_evidence_result_trace_and_retry_is_idempotent(
         assert invocation.provider == "replay"
         event_types = set(session.scalars(select(AuditEventRecord.event_type)))
         assert {"knowledge.extraction_persisted", "job.completed"} <= event_types
+
+    reuse_target = {
+        "project_id": project_id,
+        "source_version_id": SOURCE_VERSION_ID,
+        "subject_entity_id": entity_id,
+        "prompt_version": CLAIM_PROMPT_VERSION,
+        "schema_version": CLAIM_SCHEMA_VERSION,
+    }
+    assert (
+        repository.completed_run_for_target(
+            **reuse_target, model_provider="replay", model_name="offline-fixture"
+        )
+        == run_id
+    )
+    assert (
+        repository.completed_run_for_target(
+            **reuse_target, model_provider="ollama-local", model_name="qwen3.5:9b"
+        )
+        is None
+    )
+    with factory.begin() as session:
+        invocation = session.scalar(select(ModelInvocationRecord))
+        invocation.provider = "ollama-local"
+        invocation.model = "qwen3.5:4b"
+    assert (
+        repository.completed_run_for_target(
+            **reuse_target, model_provider="ollama-local", model_name="qwen3.5:4b"
+        )
+        == run_id
+    )
+    assert (
+        repository.completed_run_for_target(
+            **reuse_target, model_provider="ollama-local", model_name="qwen3.5:9b"
+        )
+        is None
+    )
 
     job_id = factory().scalar(
         select(WorkflowJobRecord.id).where(WorkflowJobRecord.run_id == run_id)

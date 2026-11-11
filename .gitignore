@@ -41,4 +41,5 @@ playwright-report/
 test-results/
 .artifacts/
 output/playwright/
+output/pdf/
 .playwright-cli/

@@ -343,7 +343,7 @@ def create_knowledge_extraction(
     response: Response,
     request: Request,
 ) -> dict[str, object]:
-    """Queue extraction only when an exact, local, zero-cost replay can run."""
+    """Queue an available local extraction; reuse only matching model results."""
 
     try:
         target = _repository().validate_target(
@@ -351,13 +351,18 @@ def create_knowledge_extraction(
             source_version_id=command.source_version_id,
             subject_entity_id=command.subject_entity_id,
         )
-        _preflight_replay(get_settings(), target)
+        settings = get_settings()
+        _preflight_replay(settings, target)
         completed_run_id = _repository().completed_run_for_target(
             project_id=project_id,
             source_version_id=command.source_version_id,
             subject_entity_id=command.subject_entity_id,
             prompt_version=CLAIM_PROMPT_VERSION,
             schema_version=CLAIM_SCHEMA_VERSION,
+            model_provider="ollama-local" if settings.model_provider == "ollama" else "replay",
+            model_name=settings.ollama_model
+            if settings.model_provider == "ollama"
+            else "offline-fixture",
         )
         if completed_run_id is not None:
             response.status_code = status.HTTP_200_OK

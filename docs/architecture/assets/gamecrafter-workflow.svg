@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1840" height="1280" viewBox="0 0 1840 1280" role="img" aria-labelledby="title desc">
+<title id="title">业务逻辑与 Agent 协作：从证据到交付</title>
+<desc id="desc">GameCrafter M19 current implementation, verified against the source code on 2026-11-11. Planned v3 features are explicitly separated.</desc>
+<rect x="0" y="0" width="1840" height="1280" rx="0" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="72" y="63" fill="#116c60" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">GAMECRAFTER / PRODUCT &amp; AGENT ENGINEERING</text>
+<text x="72" y="119" fill="#173244" font-size="43" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">业务逻辑与 Agent 协作：从证据到交付</text>
+<text x="72" y="159" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">现有 M19 实现 · 已包含 creative-evidence-v11 边界修复 · 非公开上线认证</text>
+<polyline points="72,193 1768,193" fill="none" stroke="#cdd9e2" stroke-width="1"/>
+<text x="72" y="1240" fill="#516878" font-size="16" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">依据：docs/architecture/system-architecture.md 与实际 Python / React 代码</text>
+<text x="1768" y="1240" fill="#516878" font-size="16" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="end">2026-11-11  |  2 / 2</text>
+<rect x="72" y="213" width="16" height="16" rx="3" fill="#edf4fb" stroke="#afc6d9" stroke-width="1.5"/>
+<text x="98" y="228" fill="#516878" font-size="18" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">确定性工具</text>
+<rect x="277" y="213" width="16" height="16" rx="3" fill="#e9f6f2" stroke="#91cbbf" stroke-width="1.5"/>
+<text x="303" y="228" fill="#516878" font-size="18" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">模型职责</text>
+<rect x="482" y="213" width="16" height="16" rx="3" fill="#fff5de" stroke="#e0bd70" stroke-width="1.5"/>
+<text x="508" y="228" fill="#516878" font-size="18" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">人工关口</text>
+<rect x="687" y="213" width="16" height="16" rx="3" fill="#f4f6f8" stroke="#c7d3dc" stroke-width="1.5"/>
+<text x="713" y="228" fill="#516878" font-size="18" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">版本化数据</text>
+<text x="1768" y="228" fill="#516878" font-size="18" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="end">箭头表示数据与控制依赖，不是自由聊天</text>
+<text x="72" y="281" fill="#173244" font-size="23" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">01 资料变成可用事实</text>
+<rect x="72" y="305" width="254" height="125" rx="12" fill="#fcf0ed" stroke="#e0b8ae" stroke-width="1.5"/>
+<text x="90" y="340" fill="#935b4d" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">明确输入</text>
+<text x="90" y="371" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">官方页面 / 本地资料</text>
+<text x="90" y="397" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">不等于内部 GDD</text>
+<rect x="356" y="305" width="254" height="125" rx="12" fill="#edf4fb" stroke="#afc6d9" stroke-width="1.5"/>
+<text x="374" y="340" fill="#205a85" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">来源与溯源工具</text>
+<text x="374" y="371" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">受控采集、保全证据</text>
+<text x="374" y="397" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">URL / 时间 / 内容哈希</text>
+<rect x="640" y="305" width="254" height="125" rx="12" fill="#e9f6f2" stroke="#91cbbf" stroke-width="1.5"/>
+<text x="658" y="340" fill="#116c60" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">Knowledge Curator</text>
+<text x="658" y="371" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">模型提取候选事实</text>
+<text x="658" y="397" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">精确引文另做校验</text>
+<rect x="924" y="305" width="254" height="125" rx="12" fill="#e9f6f2" stroke="#91cbbf" stroke-width="1.5"/>
+<text x="942" y="340" fill="#116c60" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">Knowledge Reviewer</text>
+<text x="942" y="371" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">独立模型预审建议</text>
+<text x="942" y="397" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">无权代替人工批准</text>
+<rect x="1208" y="305" width="254" height="125" rx="12" fill="#fff5de" stroke="#e0bd70" stroke-width="1.5"/>
+<text x="1226" y="340" fill="#886018" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">H1 人工知识审核</text>
+<text x="1226" y="371" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">确认 / 修改 / 拒绝</text>
+<text x="1226" y="397" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">处理重复与冲突</text>
+<rect x="1492" y="305" width="254" height="125" rx="12" fill="#f4f6f8" stroke="#c7d3dc" stroke-width="1.5"/>
+<text x="1510" y="340" fill="#405e74" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">冻结知识快照</text>
+<text x="1510" y="371" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">已审核值与证据绑定</text>
+<text x="1510" y="397" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">实体 / 地区 / 版本</text>
+<polyline points="326,368 356,368" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="356.00,368.00 346.00,372.50 346.00,363.50" fill="#728b9b"/>
+<polyline points="610,368 640,368" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="640.00,368.00 630.00,372.50 630.00,363.50" fill="#728b9b"/>
+<polyline points="894,368 924,368" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="924.00,368.00 914.00,372.50 914.00,363.50" fill="#728b9b"/>
+<polyline points="1178,368 1208,368" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1208.00,368.00 1198.00,372.50 1198.00,363.50" fill="#728b9b"/>
+<polyline points="1462,368 1492,368" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1492.00,368.00 1482.00,372.50 1482.00,363.50" fill="#728b9b"/>
+<polyline points="1619,430 1619,465 740,465 740,535 565,535 565,550" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="565.00,550.00 560.50,540.00 569.50,540.00" fill="#728b9b"/>
+<rect x="957.0" y="449" width="306.00000000000006" height="27" rx="3" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="1110" y="470" fill="#516878" font-size="18" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="middle">绑定不可变知识版本与营销任务规格</text>
+<text x="72" y="521" fill="#173244" font-size="23" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">02 形成营销建议与选题  /  平台、市场、时长固定</text>
+<rect x="72" y="550" width="280" height="125" rx="12" fill="#edf4fb" stroke="#afc6d9" stroke-width="1.5"/>
+<text x="90" y="585" fill="#205a85" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">趋势工具</text>
+<text x="90" y="616" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">RSS / GDELT / 可选 YouTube</text>
+<text x="90" y="642" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">手动 TikTok 观察；不伪造热度</text>
+<rect x="425" y="550" width="280" height="125" rx="12" fill="#edf4fb" stroke="#afc6d9" stroke-width="1.5"/>
+<text x="443" y="585" fill="#205a85" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">可解释话题匹配</text>
+<text x="443" y="616" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">清洗、去重、时间与关键词</text>
+<text x="443" y="642" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">匹配分不是效果预测</text>
+<rect x="778" y="550" width="280" height="125" rx="12" fill="#e9f6f2" stroke="#91cbbf" stroke-width="1.5"/>
+<text x="796" y="585" fill="#116c60" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">Campaign Strategist</text>
+<text x="796" y="616" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">中文方向 / 理由 / 英语开场</text>
+<text x="796" y="642" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">拍摄步骤 / 风险 / 验证计划</text>
+<rect x="1131" y="550" width="280" height="125" rx="12" fill="#e9f6f2" stroke="#91cbbf" stroke-width="1.5"/>
+<text x="1149" y="585" fill="#116c60" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">Quality Critic</text>
+<text x="1149" y="616" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">独立策划检查</text>
+<text x="1149" y="642" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">阻断稿保留，但不供写作</text>
+<rect x="1484" y="550" width="280" height="125" rx="12" fill="#fff5de" stroke="#e0bd70" stroke-width="1.5"/>
+<text x="1502" y="585" fill="#886018" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">H2 人工选题</text>
+<text x="1502" y="616" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">可在策划前后确认</text>
+<text x="1502" y="642" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">保存选择与理由</text>
+<polyline points="352,613 425,613" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="425.00,613.00 415.00,617.50 415.00,608.50" fill="#728b9b"/>
+<polyline points="705,613 778,613" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="778.00,613.00 768.00,617.50 768.00,608.50" fill="#728b9b"/>
+<polyline points="1058,613 1131,613" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1131.00,613.00 1121.00,617.50 1121.00,608.50" fill="#728b9b"/>
+<polyline points="1411,613 1484,613" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1484.00,613.00 1474.00,617.50 1474.00,608.50" fill="#728b9b"/>
+<polyline points="565,675 565,713 1624,713 1624,675" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1624.00,675.00 1628.50,685.00 1619.50,685.00" fill="#728b9b"/>
+<rect x="861.0" y="697" width="378.00000000000006" height="27" rx="3" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="1050" y="718" fill="#516878" font-size="18" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="middle">也可直接确认匹配话题；不强制采纳模型策划</text>
+<polyline points="1764,640 1794,640 1794,778 52,778 52,917 72,917" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="72.00,917.00 62.00,921.50 62.00,912.50" fill="#728b9b"/>
+<rect x="844.99853515625" y="762" width="510.00292968750006" height="27" rx="3" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="1100" y="783" fill="#516878" font-size="18" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="middle">必需：已批准选题 + 事实；可选：同一选题下通过检查的策划</text>
+<text x="72" y="827" fill="#173244" font-size="23" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">03 创作、复核与交付</text>
+<rect x="72" y="854" width="280" height="125" rx="12" fill="#e9f6f2" stroke="#91cbbf" stroke-width="1.5"/>
+<text x="90" y="889" fill="#116c60" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">Script Writer</text>
+<text x="90" y="920" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">五镜英语稿 / 按问题修订</text>
+<text x="90" y="946" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">口播 / 字幕 / 画面 / 引用</text>
+<rect x="425" y="854" width="280" height="125" rx="12" fill="#e9f6f2" stroke="#91cbbf" stroke-width="1.5"/>
+<text x="443" y="889" fill="#116c60" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">Quality Critic</text>
+<text x="443" y="920" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">逐段支持性判断与理由</text>
+<text x="443" y="946" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">模型仍可能误报或漏报</text>
+<rect x="778" y="854" width="280" height="125" rx="12" fill="#edf4fb" stroke="#afc6d9" stroke-width="1.5"/>
+<text x="796" y="889" fill="#205a85" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">确定性质量检查</text>
+<text x="796" y="920" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">覆盖与引文 / Schema / 引用</text>
+<text x="796" y="946" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">语速与时长 / 当前版本</text>
+<rect x="1131" y="854" width="280" height="125" rx="12" fill="#fff5de" stroke="#e0bd70" stroke-width="1.5"/>
+<text x="1149" y="889" fill="#886018" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">H3 人工终审</text>
+<text x="1149" y="920" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">事实、表达与素材权利</text>
+<text x="1149" y="946" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">批准只对当前检查版本有效</text>
+<rect x="1484" y="854" width="280" height="125" rx="12" fill="#f4f6f8" stroke="#c7d3dc" stroke-width="1.5"/>
+<text x="1502" y="889" fill="#405e74" font-size="22" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">准确版本导出</text>
+<text x="1502" y="920" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">Markdown / JSON</text>
+<text x="1502" y="946" fill="#516878" font-size="17" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">脚本与事实引用可回查</text>
+<polyline points="352,917 425,917" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="425.00,917.00 415.00,921.50 415.00,912.50" fill="#728b9b"/>
+<polyline points="705,917 778,917" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="778.00,917.00 768.00,921.50 768.00,912.50" fill="#728b9b"/>
+<polyline points="1058,917 1131,917" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1131.00,917.00 1121.00,921.50 1121.00,912.50" fill="#728b9b"/>
+<polyline points="1411,917 1484,917" fill="none" stroke="#728b9b" stroke-width="2.2"/>
+<polygon points="1484.00,917.00 1474.00,921.50 1474.00,912.50" fill="#728b9b"/>
+<polyline points="918,979 918,1034 212,1034 212,979" fill="none" stroke="#a67626" stroke-width="2.2"/>
+<polygon points="212.00,979.00 216.50,989.00 207.50,989.00" fill="#a67626"/>
+<polyline points="1271,979 1271,1034 918,1034" fill="none" stroke="#a67626" stroke-width="2.2"/>
+<rect x="473.17626953125" y="1018" width="453.64746093750006" height="27" rx="3" fill="#ffffff" stroke="#ffffff" stroke-width="1.5"/>
+<text x="700" y="1039" fill="#886018" font-size="18" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="middle">有阻断或被拒：限次修订 / 人工编辑 → 新版本 → 重评</text>
+<rect x="72" y="1087" width="1696" height="66" rx="12" fill="#edf7f4" stroke="#acd0c6" stroke-width="1.5"/>
+<text x="92" y="1114" fill="#116c60" font-size="21" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="700" text-anchor="start">v11 输入边界</text>
+<text x="272" y="1114" fill="#516878" font-size="20" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">策划、写作与创作评审只使用已批准事实值；完整原文留在追溯层，不扩大批准范围。</text>
+<text x="92" y="1140" fill="#516878" font-size="18" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">这不是事实正确率保证。覆盖检查、模型判断和负责人终审是不同关口。</text>
+<text x="72" y="1194" fill="#173244" font-size="19" font-family="Microsoft YaHei,Noto Sans CJK SC,Arial,sans-serif" font-weight="400" text-anchor="start">Quality Critic 虽出现两次，仍是同一职责的独立调用。5 个模型角色可共用本机模型；无自主发布或在线自学习。</text>
+</svg>

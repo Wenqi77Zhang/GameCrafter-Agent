@@ -2,6 +2,7 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 
 from gamecrafter.api.app import create_app
@@ -37,6 +38,7 @@ def test_local_ollama_capability_probes_runtime_and_model(monkeypatch) -> None:
 
 class FakeKnowledgeRepository:
     def __init__(self) -> None:
+        self.reuse_queries = []
         loaded = load_replay_fixture(FIXTURE_PATH)
         body = loaded.document.normalized_text.encode("utf-8")
         self.target = ExtractionTarget(
@@ -62,7 +64,7 @@ class FakeKnowledgeRepository:
         return {"run_id": str(kwargs["run_id"]), "claim_count": 2, "invocations": []}
 
     def completed_run_for_target(self, **kwargs):
-        del kwargs
+        self.reuse_queries.append(kwargs)
         return None
 
     def list_claims(self, project_id, **kwargs):
@@ -249,6 +251,35 @@ def test_disabled_mode_blocks_before_enqueue() -> None:
         assert workspace.enqueued == []
     finally:
         knowledge._repository, knowledge._workspace, knowledge.get_settings = originals
+
+
+@pytest.mark.parametrize("model_name", ["qwen3.5:4b", "qwen3.5:9b"])
+def test_local_extraction_reuse_is_scoped_to_configured_model(monkeypatch, model_name) -> None:
+    repository = FakeKnowledgeRepository()
+    workspace = FakeWorkspace()
+    monkeypatch.setattr(knowledge, "_repository", lambda: repository)
+    monkeypatch.setattr(knowledge, "_workspace", lambda: workspace)
+    monkeypatch.setattr(
+        knowledge,
+        "get_settings",
+        lambda: Settings(
+            _env_file=None,
+            model_provider="ollama",
+            ollama_model=model_name,
+        ),
+    )
+    monkeypatch.setattr(knowledge.OllamaLoopbackTransport, "has_model", lambda self, model: True)
+    response = TestClient(create_app()).post(
+        f"/api/projects/{PROJECT_ID}/knowledge-extractions",
+        headers={"Idempotency-Key": "model-scoped-extraction"},
+        json={
+            "source_version_id": str(repository.target.source_version_id),
+            "subject_entity_id": str(ENTITY_ID),
+        },
+    )
+    assert response.status_code == 202
+    assert repository.reuse_queries[0]["model_provider"] == "ollama-local"
+    assert repository.reuse_queries[0]["model_name"] == model_name
 
 
 def test_exact_replay_queues_and_read_models_are_project_scoped() -> None:
