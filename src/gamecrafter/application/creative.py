@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
-PROMPT_VERSION = "creative-evidence-v10"
+PROMPT_VERSION = "creative-evidence-v11"
 RULE_VERSION = "script-readiness-v6"
 PURPOSES = ("hook", "setup", "proof", "payoff", "cta")
 CHINESE_TEXT = r"^[\s\S]*[\u4e00-\u9fff][\s\S]*$"

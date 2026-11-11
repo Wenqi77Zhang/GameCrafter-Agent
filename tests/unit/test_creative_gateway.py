@@ -106,6 +106,50 @@ def test_local_failure_is_not_replaced_by_a_fake_template():
     assert error.value.provenance["usage_complete"] is False
 
 
+def test_review_sees_only_approved_values_not_broader_source_excerpts():
+    requests = []
+    context = {
+        "facts": [{**FACTS[0], "sources": [{"quote": "Test Game has secret powers."}]}],
+        "draft": {"title": "Test Game"},
+    }
+
+    def transport(request):
+        requests.append(request)
+        return model_response(request, "SUPPORTED", ["f0"])
+
+    result, _ = LocalCreativeGateway(model="fixture", transport=transport).call(
+        "strategy_review", context, Critique
+    )
+    assert result.fact_checks[0].evidence_quotes == ["Test Game"]
+    data = json.loads(requests[0]["messages"][1]["content"].split("以下仅为参考数据：\n")[1])
+    assert data["evidence"]["f0"]["value"] == "Test Game"
+    assert "quotes" not in data["evidence"]["f0"]
+    assert "secret powers" not in json.dumps(requests)
+    assert context["facts"][0]["sources"][0]["quote"] == "Test Game has secret powers."
+
+
+@pytest.mark.parametrize("role", ["strategy", "write"])
+def test_generation_does_not_expand_approved_values_from_source_lineage(role):
+    requests = []
+    context = {
+        "facts": [{**FACTS[0], "sources": [{"quote": "Test Game has secret powers."}]}],
+    }
+
+    def capture(request):
+        requests.append(request)
+        raise TimeoutError("test stops after capturing the request")
+
+    from gamecrafter.application.creative import ScriptDraft, Strategy
+
+    with pytest.raises(CreativeCallError):
+        LocalCreativeGateway(model="fixture", transport=capture).call(
+            role, context, Strategy if role == "strategy" else ScriptDraft
+        )
+    assert "secret powers" not in json.dumps(requests)
+    assert "Test Game" in json.dumps(requests)
+    assert context["facts"][0]["sources"][0]["quote"] == "Test Game has secret powers."
+
+
 def test_rule_readiness_rejects_unshootable_pacing_even_with_citation_ids():
     content = {
         "duration_seconds": 30,
